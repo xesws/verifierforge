@@ -1,2 +1,5 @@
 pydantic>=2,<3
-# TODO: add verl and vllm when real training begins.
+# v0.3.0 RunPod runtime provisioning: CUDA 12.8 worker dependency set.
+--extra-index-url https://download.pytorch.org/whl/cu128
+vllm==0.25.1
+verl @ git+https://github.com/verl-project/verl.git@cb367c201187259e109a90f58af9ad9659126429
