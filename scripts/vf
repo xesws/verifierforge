@@ -2,6 +2,7 @@
 set -euo pipefail
 
 REMOTE_ROOT=/workspace/verifierforge
+REPO_URL="${VF_REPO_URL:-git@github.com:xesws/verifierforge.git}"
 
 usage() {
   echo "usage: vf {bootstrap|train <job> <cfg>|watch <job>|logs <job>|status|kill <job>|model <job>}" >&2
@@ -16,9 +17,14 @@ cfg_arg() {
   [[ "${1:-}" =~ ^[A-Za-z0-9._/@+=:-]+$ ]] || usage
 }
 
+repo_arg() {
+  [[ "$1" =~ ^[A-Za-z0-9._/@+=:-]+$ ]] || usage
+}
+
 case "${1:-}" in
   bootstrap)
-    ssh runpod "cd $REMOTE_ROOT && bash trainer/bootstrap.sh"
+    repo_arg "$REPO_URL"
+    ssh runpod "set -e; if ! command -v git >/dev/null; then apt-get update && DEBIAN_FRONTEND=noninteractive apt-get install -y git; fi; mkdir -p /workspace; if [ -d $REMOTE_ROOT/.git ]; then git -C $REMOTE_ROOT pull --ff-only; else git clone $REPO_URL $REMOTE_ROOT; fi; cd $REMOTE_ROOT && bash trainer/bootstrap.sh"
     ;;
   train)
     job_arg "${2:-}"
@@ -41,7 +47,7 @@ case "${1:-}" in
     ssh runpod "tail -n 100 -f $REMOTE_ROOT/runs/$2/train.log"
     ;;
   status)
-    ssh runpod "tmux list-sessions 2>/dev/null || true"
+    ssh runpod "tmux list-sessions 2>/dev/null || true; nvidia-smi"
     ;;
   kill)
     job_arg "${2:-}"
