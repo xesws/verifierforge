@@ -5,8 +5,9 @@ WORKSPACE="${VF_WORKSPACE:-/workspace}"
 ROOT="${VF_ROOT:-$WORKSPACE/verifierforge}"
 REPO_URL="${VF_REPO_URL:-git@github.com:xesws/verifierforge.git}"
 export HF_HOME="${HF_HOME:-$WORKSPACE/hf-cache}"
+export PIP_CACHE_DIR="${PIP_CACHE_DIR:-$WORKSPACE/pip-cache}"
 
-mkdir -p "$WORKSPACE" "$HF_HOME"
+mkdir -p "$WORKSPACE" "$HF_HOME" "$PIP_CACHE_DIR"
 
 restore_workspace_deploy_key() {
   local source_dir="$WORKSPACE/.ssh"
