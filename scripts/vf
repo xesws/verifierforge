@@ -1,0 +1,58 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+REMOTE_ROOT=/workspace/verifierforge
+
+usage() {
+  echo "usage: vf {bootstrap|train <job> <cfg>|watch <job>|logs <job>|status|kill <job>|model <job>}" >&2
+  exit 2
+}
+
+job_arg() {
+  [[ "${1:-}" =~ ^[A-Za-z0-9._-]+$ ]] || usage
+}
+
+cfg_arg() {
+  [[ "${1:-}" =~ ^[A-Za-z0-9._/@+=:-]+$ ]] || usage
+}
+
+case "${1:-}" in
+  bootstrap)
+    ssh runpod "cd $REMOTE_ROOT && bash trainer/bootstrap.sh"
+    ;;
+  train)
+    job_arg "${2:-}"
+    job="$2"
+    cfg="${3:-}"
+    cfg_arg "$cfg"
+    ssh runpod "cd $REMOTE_ROOT && git pull --ff-only && mkdir -p runs/$job && tmux new-session -d -s $job 'bash trainer/launch.sh $job $cfg 2>&1 | tee runs/$job/train.log'"
+    ;;
+  watch)
+    job_arg "${2:-}"
+    job="$2"
+    mkdir -p "runs/$job"
+    while true; do
+      rsync -az --exclude='*.safetensors' --exclude='ckpt/' "runpod:$REMOTE_ROOT/runs/$job/" "runs/$job/"
+      sleep 2
+    done
+    ;;
+  logs)
+    job_arg "${2:-}"
+    ssh runpod "tail -n 100 -f $REMOTE_ROOT/runs/$2/train.log"
+    ;;
+  status)
+    ssh runpod "tmux list-sessions 2>/dev/null || true"
+    ;;
+  kill)
+    job_arg "${2:-}"
+    ssh runpod "tmux kill-session -t $2"
+    ;;
+  model)
+    job_arg "${2:-}"
+    mkdir -p "models/$2"
+    rsync -az "runpod:$REMOTE_ROOT/runs/$2/artifacts/final/" "models/$2/"
+    ;;
+  *)
+    usage
+    ;;
+esac

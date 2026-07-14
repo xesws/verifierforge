@@ -1,0 +1,2 @@
+pydantic>=2,<3
+# TODO: add verl and vllm when real training begins.

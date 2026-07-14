@@ -1,0 +1,6 @@
+runs/
+models/
+*.safetensors
+__pycache__/
+.env
+node_modules/
