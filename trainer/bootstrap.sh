@@ -8,6 +8,20 @@ export HF_HOME="${HF_HOME:-$WORKSPACE/hf-cache}"
 
 mkdir -p "$WORKSPACE" "$HF_HOME"
 
+restore_workspace_deploy_key() {
+  local source_dir="$WORKSPACE/.ssh"
+  [[ -f "$source_dir/id_ed25519" ]] || return 0
+
+  install -d -m 700 "$HOME/.ssh"
+  install -m 600 "$source_dir/id_ed25519" "$HOME/.ssh/id_ed25519"
+  [[ ! -f "$source_dir/id_ed25519.pub" ]] || \
+    install -m 644 "$source_dir/id_ed25519.pub" "$HOME/.ssh/id_ed25519.pub"
+  [[ ! -f "$source_dir/known_hosts" ]] || \
+    install -m 600 "$source_dir/known_hosts" "$HOME/.ssh/known_hosts"
+}
+
+restore_workspace_deploy_key
+
 packages=()
 for command in git tmux rsync python3; do
   command -v "$command" >/dev/null 2>&1 || packages+=("$command")
