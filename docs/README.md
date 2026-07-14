@@ -17,4 +17,4 @@
 
 Before implementation, reserve a target version and write its plan in `versions/v0.<minor>.x/`. In the same change, write or update a versioned document in every affected technical area. Use filenames such as `v0.2.0-d1-remote-smoke.md`; do not create unversioned feature notes. The plan must exist before code, delegation, or a worktree is created. Update it before changing scope, and require it during merge review.
 
-The current scaffold is `v0.1.0`. `v0.1.1` establishes this documentation governance, and `v0.2.0` is reserved for the D1 remote-control smoke-test plan.
+The current scaffold is `v0.1.0`. `v0.1.1` establishes this documentation governance, `v0.2.0` completed the D1 remote-control smoke test, and `v0.3.0` is the planned RunPod runtime-provisioning release.
