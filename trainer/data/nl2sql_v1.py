@@ -68,11 +68,33 @@ INSERT INTO employee_projects VALUES
 """.strip()
 
 
+# The model needs table and column names to form a query, not a second copy of
+# every execution fixture. Keeping inserts out of this prompt makes the D2
+# 1024-token rollout budget meaningful while `SCHEMA_SQL` remains authoritative
+# for reward execution.
+PROMPT_SCHEMA_SQL = """
+CREATE TABLE departments (
+    id INTEGER PRIMARY KEY, name TEXT NOT NULL, location TEXT NOT NULL, budget INTEGER NOT NULL
+);
+CREATE TABLE employees (
+    id INTEGER PRIMARY KEY, name TEXT NOT NULL, department_id INTEGER NOT NULL,
+    title TEXT NOT NULL, salary INTEGER NOT NULL, hire_date TEXT NOT NULL, active INTEGER NOT NULL
+);
+CREATE TABLE projects (
+    id INTEGER PRIMARY KEY, name TEXT NOT NULL, department_id INTEGER NOT NULL,
+    lead_employee_id INTEGER NOT NULL, budget INTEGER NOT NULL, status TEXT NOT NULL
+);
+CREATE TABLE employee_projects (
+    employee_id INTEGER NOT NULL, project_id INTEGER NOT NULL, hours INTEGER NOT NULL
+);
+""".strip()
+
+
 def _format_prompt(question: str) -> str:
     return (
         "Return exactly one read-only SQLite SELECT or WITH statement. "
         "Do not include an explanation.\n\n"
-        f"Schema:\n{SCHEMA_SQL}\n\n"
+        f"Schema:\n{PROMPT_SCHEMA_SQL}\n\n"
         f"Question: {question}\nSQL:"
     )
 

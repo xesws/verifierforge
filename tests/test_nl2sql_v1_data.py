@@ -14,6 +14,8 @@ def test_v1_fixture_has_fifty_sorted_reviewable_cases() -> None:
     assert [case["id"] for case in cases] == [f"v1-{index:03d}" for index in range(1, 51)]
     assert all(case["schema_sql"] == SCHEMA_SQL for case in cases)
     assert all("Schema:" in case["prompt"] for case in cases)
+    assert all("INSERT INTO" not in case["prompt"] for case in cases)
+    assert all(len(case["prompt"]) < 1_500 for case in cases)
     assert all(isinstance(case["expected_results"], list) for case in cases)
 
 
