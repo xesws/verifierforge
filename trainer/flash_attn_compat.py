@@ -9,7 +9,13 @@ kernels.
 from __future__ import annotations
 
 from collections.abc import Callable
+from importlib import abc, machinery
+import sys
 from typing import Any
+
+
+_ATTENTION_UTILS_MODULE = "verl.utils.attention_utils"
+_INSTALL_MARKER = "_vf_padding_fallback_installed"
 
 
 def index_first_axis(input_tensor: Any, indices: Any) -> Any:
@@ -65,22 +71,70 @@ def _transformers_padding_functions() -> tuple[Callable[..., Any], ...]:
     return (_index_first_axis, _pad_input, einops_rearrange, _unpad_input)
 
 
-def install_verl_padding_fallback() -> bool:
-    """Install the layout-only fallback when FlashAttention is unavailable.
+def install_verl_padding_fallback(attention_utils: Any) -> bool:
+    """Patch an imported verl helper module with a layout-only fallback.
 
-    The function replaces only verl's dynamic helper resolver.  vLLM retains
-    its normal backend detection and never sees a pretend ``flash_attn`` module.
+    The resolver is lazy: it tries the original function first and imports
+    Transformers only if the exact optional ``flash_attn`` dependency is absent.
+    vLLM retains its normal backend detection and never sees a pretend package.
     """
-    import verl.utils.attention_utils as attention_utils
-
-    try:
-        attention_utils._get_attention_functions()
-    except ModuleNotFoundError as error:
-        if error.name != "flash_attn":
-            raise
-    else:
+    if getattr(attention_utils, _INSTALL_MARKER, False):
         return False
 
-    functions = _transformers_padding_functions()
-    attention_utils._get_attention_functions = lambda: functions
+    original_resolver = attention_utils._get_attention_functions
+    resolved: tuple[Callable[..., Any], ...] | None = None
+
+    def resolve_attention_functions() -> tuple[Callable[..., Any], ...]:
+        nonlocal resolved
+        if resolved is not None:
+            return resolved
+        try:
+            resolved = original_resolver()
+        except ModuleNotFoundError as error:
+            if error.name != "flash_attn":
+                raise
+            resolved = _transformers_padding_functions()
+        return resolved
+
+    attention_utils._get_attention_functions = resolve_attention_functions
+    setattr(attention_utils, _INSTALL_MARKER, True)
+    return True
+
+
+class _AttentionUtilsLoader:
+    """Delegate normal import, then install the narrow resolver patch."""
+
+    def __init__(self, delegate: Any) -> None:
+        self._delegate = delegate
+
+    def create_module(self, spec: Any) -> Any:
+        create_module = getattr(self._delegate, "create_module", None)
+        return create_module(spec) if create_module is not None else None
+
+    def exec_module(self, module: Any) -> None:
+        self._delegate.exec_module(module)
+        install_verl_padding_fallback(module)
+
+
+class _AttentionUtilsFinder(abc.MetaPathFinder):
+    """Defer the verl import until a training worker needs its helper module."""
+
+    def find_spec(self, fullname: str, path: Any = None, target: Any = None) -> Any:
+        del target
+        if fullname != _ATTENTION_UTILS_MODULE:
+            return None
+        spec = machinery.PathFinder.find_spec(fullname, path)
+        if spec is not None and spec.loader is not None:
+            spec.loader = _AttentionUtilsLoader(spec.loader)
+        return spec
+
+
+def install_import_hook() -> bool:
+    """Register the lazy patch without importing verl in Ray auxiliary processes."""
+    imported_module = sys.modules.get(_ATTENTION_UTILS_MODULE)
+    if imported_module is not None:
+        return install_verl_padding_fallback(imported_module)
+    if any(isinstance(finder, _AttentionUtilsFinder) for finder in sys.meta_path):
+        return False
+    sys.meta_path.insert(0, _AttentionUtilsFinder())
     return True

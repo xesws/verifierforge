@@ -6,6 +6,6 @@ import os
 
 
 if os.environ.get("VF_VERL_TORCH_PADDING_FALLBACK") == "1":
-    from trainer.flash_attn_compat import install_verl_padding_fallback
+    from trainer.flash_attn_compat import install_import_hook
 
-    install_verl_padding_fallback()
+    install_import_hook()

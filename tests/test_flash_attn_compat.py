@@ -2,6 +2,8 @@ from __future__ import annotations
 
 import pytest
 
+from trainer import flash_attn_compat
+
 
 torch = pytest.importorskip("torch")
 
@@ -38,3 +40,24 @@ def test_index_and_rearrange_cover_verl_helper_patterns() -> None:
     flattened = rearrange(batched, "b s ... -> (b s) ...")
     assert torch.equal(flattened, batched.flatten(0, 1))
     assert torch.equal(rearrange(flattened, "(b s) ... -> b s ...", b=2), batched)
+
+
+def test_lazy_resolver_uses_fallback_only_after_flash_attention_is_requested(monkeypatch: pytest.MonkeyPatch) -> None:
+    fallback = (object(), object(), object(), object())
+    monkeypatch.setattr(flash_attn_compat, "_transformers_padding_functions", lambda: fallback)
+
+    class AttentionUtils:
+        calls = 0
+
+        @staticmethod
+        def _get_attention_functions() -> tuple[object, ...]:
+            AttentionUtils.calls += 1
+            raise ModuleNotFoundError("missing flash_attn", name="flash_attn")
+
+    module = AttentionUtils()
+    assert flash_attn_compat.install_verl_padding_fallback(module)
+    assert AttentionUtils.calls == 0
+    assert module._get_attention_functions() is fallback
+    assert module._get_attention_functions() is fallback
+    assert AttentionUtils.calls == 1
+    assert not flash_attn_compat.install_verl_padding_fallback(module)
