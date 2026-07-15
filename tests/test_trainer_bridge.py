@@ -106,7 +106,7 @@ def test_grpo_config_builds_storage_only_resume_command(tmp_path: Path) -> None:
         python="python",
     )
 
-    assert command[:3] == ["python", "-m", "verl.trainer.main_ppo_sync"]
+    assert command[:3] == ["python", "-m", "verl.trainer.main_ppo"]
     assert "algorithm.adv_estimator=grpo" in command
     assert "actor_rollout_ref.model.lora_rank=16" in command
     assert "+actor_rollout_ref.model.override_config.attn_implementation=sdpa" in command

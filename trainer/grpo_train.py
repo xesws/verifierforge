@@ -43,7 +43,7 @@ def build_verl_command(
         job_id=job_id,
         resume_path=resume_path,
     )
-    return [python or sys.executable, "-m", "verl.trainer.main_ppo_sync", *overrides]
+    return [python or sys.executable, "-m", "verl.trainer.main_ppo", *overrides]
 
 
 def run(
