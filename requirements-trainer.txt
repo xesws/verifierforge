@@ -1,4 +1,5 @@
 pydantic>=2,<3
+sqlparse>=0.5
 # v0.3.0 RunPod runtime provisioning: CUDA 12.8 / verl 0.8-compatible set.
 --extra-index-url https://download.pytorch.org/whl/cu128
 vllm==0.10.2
