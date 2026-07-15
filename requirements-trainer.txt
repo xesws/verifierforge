@@ -3,6 +3,9 @@ sqlparse>=0.5
 # v0.3.0 RunPod runtime provisioning: CUDA 12.8 / verl 0.8-compatible set.
 --extra-index-url https://download.pytorch.org/whl/cu128
 vllm==0.10.2
+# v0.4.8: vLLM 0.10.2 reads a Transformers v4 tokenizer API; prevent pip from
+# selecting the incompatible Transformers 5 major release on a fresh pod.
+transformers==4.57.6
 verl[vllm] @ git+https://github.com/verl-project/verl.git@cb367c201187259e109a90f58af9ad9659126429
 # v0.4.0: verl 0.8 initializes this runtime component for the D2 GRPO path.
 TransferQueue==0.1.7
