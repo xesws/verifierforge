@@ -120,6 +120,7 @@ class GrpoSmokeConfig:
             "data.filter_overlong_prompts=True",
             "data.truncation=error",
             f"data.train_batch_size={self.train_batch_size}",
+            "data.val_batch_size=1",
             f"data.max_prompt_length={self.max_prompt_length}",
             f"data.max_response_length={self.max_response_length}",
             f"actor_rollout_ref.model.path={self.model_path}",

@@ -110,6 +110,7 @@ def test_grpo_config_builds_storage_only_resume_command(tmp_path: Path) -> None:
     assert "algorithm.adv_estimator=grpo" in command
     assert "actor_rollout_ref.model.lora_rank=16" in command
     assert "actor_rollout_ref.rollout.tensor_model_parallel_size=1" in command
+    assert "data.val_batch_size=1" in command
     assert "trainer.save_freq=50" in command
     assert "trainer.resume_mode=resume_path" in command
     assert f"trainer.resume_from_path={resume}" in command
