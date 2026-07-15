@@ -2,3 +2,4 @@ fastapi>=0.110
 uvicorn[standard]>=0.27
 pydantic>=2,<3
 sqlparse>=0.5
+openai>=1,<3
