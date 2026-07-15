@@ -124,6 +124,9 @@ class GrpoSmokeConfig:
             f"data.max_prompt_length={self.max_prompt_length}",
             f"data.max_response_length={self.max_response_length}",
             f"actor_rollout_ref.model.path={self.model_path}",
+            # verl 0.8 defaults to FlashAttention2. The D2 pod deliberately
+            # uses the proven torch runtime without that optional extension.
+            "actor_rollout_ref.model.override_config.attn_implementation=sdpa",
             "actor_rollout_ref.model.use_remove_padding=True",
             "actor_rollout_ref.model.enable_gradient_checkpointing=True",
             f"actor_rollout_ref.model.lora_rank={self.lora_rank}",
