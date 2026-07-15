@@ -39,7 +39,7 @@ case "${1:-}" in
     job="$2"
     mkdir -p "runs/$job"
     while true; do
-      rsync -az --exclude='*.safetensors' --exclude='ckpt/' "runpod:$REMOTE_ROOT/runs/$job/" "runs/$job/"
+      rsync -az --exclude='*.safetensors' --exclude='ckpt/' --exclude='.verl-staging/' "runpod:$REMOTE_ROOT/runs/$job/" "runs/$job/"
       sleep 2
     done
     ;;

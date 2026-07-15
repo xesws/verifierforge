@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import json
 import os
 from dataclasses import dataclass, field
 from typing import Any, Mapping, Sequence
@@ -82,6 +83,7 @@ class OpenRouterClient:
         *,
         model: str | None = None,
         temperature: float | None = None,
+        response_format: Mapping[str, Any] | None = None,
     ) -> str:
         """Return one non-empty assistant message from OpenRouter."""
         request: dict[str, Any] = {
@@ -90,6 +92,8 @@ class OpenRouterClient:
         }
         if temperature is not None:
             request["temperature"] = temperature
+        if response_format is not None:
+            request["response_format"] = dict(response_format)
 
         response = self._client.chat.completions.create(**request)
         if not response.choices:
@@ -99,3 +103,41 @@ class OpenRouterClient:
         if not content or not content.strip():
             raise OpenRouterResponseError("OpenRouter returned an empty completion.")
         return content
+
+    def complete_json(
+        self,
+        messages: Sequence[dict[str, str]],
+        *,
+        model: str | None = None,
+        temperature: float = 0.2,
+    ) -> dict[str, Any]:
+        """Return a JSON-object completion or raise a provider-specific error."""
+        content = self.complete(
+            messages,
+            model=model,
+            temperature=temperature,
+            response_format={"type": "json_object"},
+        )
+        payload = _strip_json_fence(content)
+        try:
+            parsed = json.loads(payload)
+        except json.JSONDecodeError as error:
+            raise OpenRouterResponseError(
+                "OpenRouter returned invalid JSON for a structured completion."
+            ) from error
+        if not isinstance(parsed, dict):
+            raise OpenRouterResponseError(
+                "OpenRouter returned JSON that was not an object."
+            )
+        return parsed
+
+
+def _strip_json_fence(content: str) -> str:
+    """Accept a JSON code fence while keeping malformed text visible to callers."""
+    stripped = content.strip()
+    if not stripped.startswith("```"):
+        return stripped
+    lines = stripped.splitlines()
+    if len(lines) >= 3 and lines[-1].strip() == "```":
+        return "\n".join(lines[1:-1]).strip()
+    return stripped

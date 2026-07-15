@@ -9,6 +9,7 @@ from pathlib import Path
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 
+from app.api.copilot import router as copilot_router
 from core.contracts import MetricRecord, Metrics
 
 
@@ -20,6 +21,7 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+app.include_router(copilot_router)
 
 
 def _runs_dir() -> Path:

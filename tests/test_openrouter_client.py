@@ -111,3 +111,44 @@ def test_client_rejects_empty_completion() -> None:
 
     with pytest.raises(OpenRouterResponseError, match="empty completion"):
         client.complete([{"role": "user", "content": "Hello"}])
+
+
+def test_client_extracts_fenced_json_and_requests_json_mode() -> None:
+    requests: list[dict[str, object]] = []
+
+    class FakeCompletions:
+        def create(self, **kwargs):
+            requests.append(kwargs)
+            return SimpleNamespace(
+                choices=[
+                    SimpleNamespace(
+                        message=SimpleNamespace(content="```json\n{\"ok\": true}\n```")
+                    )
+                ]
+            )
+
+    client = OpenRouterClient(
+        OpenRouterSettings(api_key="sk-or-test"),
+        client=SimpleNamespace(chat=SimpleNamespace(completions=FakeCompletions())),
+    )
+
+    assert client.complete_json([{"role": "user", "content": "Return JSON"}]) == {"ok": True}
+    assert requests[0]["response_format"] == {"type": "json_object"}
+
+
+def test_client_rejects_invalid_structured_json() -> None:
+    client = OpenRouterClient(
+        OpenRouterSettings(api_key="sk-or-test"),
+        client=SimpleNamespace(
+            chat=SimpleNamespace(
+                completions=SimpleNamespace(
+                    create=lambda **_: SimpleNamespace(
+                        choices=[SimpleNamespace(message=SimpleNamespace(content="not json"))]
+                    )
+                )
+            )
+        ),
+    )
+
+    with pytest.raises(OpenRouterResponseError, match="invalid JSON"):
+        client.complete_json([{"role": "user", "content": "Return JSON"}])

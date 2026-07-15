@@ -6,13 +6,23 @@ cfg="${2:?usage: launch.sh <job> <cfg>}"
 export HF_HOME="${HF_HOME:-/workspace/hf-cache}"
 mkdir -p "$HF_HOME"
 
-args=()
-if [[ "$cfg" == "fake_smoke" ]]; then
-  args=(--steps 150 --interval 2)
-fi
-
+python=python3
 if [[ -x .venv/bin/python ]]; then
-  exec .venv/bin/python -m trainer.fake_train --job "$job" "${args[@]}"
+  python=.venv/bin/python
 fi
 
-exec python3 -m trainer.fake_train --job "$job" "${args[@]}"
+case "$cfg" in
+  fake_smoke)
+    exec "$python" -m trainer.fake_train --job "$job" --steps 150 --interval 2
+    ;;
+  grpo_v1_0p5b)
+    exec "$python" -m trainer.grpo_train --job "$job" --config "$cfg"
+    ;;
+  grpo_v1_0p5b_preflight)
+    exec "$python" -m trainer.grpo_train --job "$job" --config grpo_v1_0p5b --steps 2
+    ;;
+  *)
+    echo "unknown trainer config: $cfg" >&2
+    exit 2
+    ;;
+esac
