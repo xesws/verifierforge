@@ -100,11 +100,15 @@ def run(
     environment = os.environ.copy()
     environment["VERL_FILE_LOGGER_PATH"] = str(logger_path)
     environment.setdefault("HF_HOME", "/workspace/hf-cache")
+    # verl 0.8 calls FlashAttention's padding helpers even under SDPA.  The
+    # child and its Ray workers opt into our layout-only PyTorch replacement;
+    # no fake FlashAttention package is exposed to vLLM.
+    environment["VF_VERL_TORCH_PADDING_FALLBACK"] = "1"
     existing_python_path = environment.get("PYTHONPATH")
     environment["PYTHONPATH"] = (
-        f"{REPOSITORY_ROOT}{os.pathsep}{existing_python_path}"
+        f"{REPOSITORY_ROOT / 'trainer'}{os.pathsep}{REPOSITORY_ROOT}{os.pathsep}{existing_python_path}"
         if existing_python_path
-        else str(REPOSITORY_ROOT)
+        else f"{REPOSITORY_ROOT / 'trainer'}{os.pathsep}{REPOSITORY_ROOT}"
     )
 
     process = subprocess.Popen(
