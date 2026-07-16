@@ -1,6 +1,6 @@
 # P0 Run Sheet — v0.6.1 data freeze
 
-**Status:** in progress — v0.6.2 pod-local Gate A recovery
+**Status:** stopped — Branch A Gate A exceeded the fixed upper bound
 **Owner:** Codex on `main`
 **Starting commit:** `78912f1` (`v0.6.0 Data: discard malformed expansion responses`)
 **Recovery rule:** after any session interruption, this file is the sole operational context. Read it before taking any action.
@@ -336,11 +336,28 @@ Stop condition ③ is not triggered.
 
 ### A3. Branch A subset Gate A rerun
 
-- [ ] Only after A2 passes, run the 50-row subset at `k=8` on pod-local vLLM,
+- [x] Only after A2 passes, run the 50-row subset at `k=8` on pod-local vLLM,
   save sample evidence, and sync/hash-check it.
-- [ ] If Gate A passes, proceed to O5. If it completes but `pass_at_1 < 0.20`,
+- [x] If Gate A passes, proceed to O5. If it completes but `pass_at_1 < 0.20`,
   continue to Branch B with verifier v2. Any other non-passing Gate A outcome
   is recorded exactly and handled by the existing stop rules.
 
 **Admission:** the v2 subset run, not v0.7.0's diagnostic triplet, is the Gate
 A decision. Thresholds are unchanged.
+
+**Result (stopped):** detached pod job `vf-gate-a-v080` completed with exit
+`1`, not infrastructure exit `2`. The v2 Gate A triplet is exactly
+`pass_at_1=0.64`, `pass_at_8=0.82`, `mixed_fraction=0.42`; it fails solely
+because `0.64 > 0.60`. The completed evidence records 50 candidates, 400
+samples, subset input SHA-256
+`cfa93154cd87013b7460666925200be14f67c5112229f03c66df2978d747255c`, verifier
+v2/source SHA-256 `b76707e5c0603d227393d03ffc0bdc7c66ec072a139c6aa717c282f4082de47f`,
+and synchronized hashes: samples
+`2721778b6597a787cada0f02eb437926e80e8b3fb6e1cb1a5940ff95aa7919cb`; evidence
+`7f48ff304695b7b4304fa0352b1ec4a38a4035f4a4ee9abafb682ebc2b3b6b8e`.
+
+**Stop / decision boundary:** the supplied Branch A rule authorizes automatic
+Branch B only for `pass_at_1 < 0.20`. This run is the opposite threshold
+failure (`0.64 > 0.60`), so the runbook does not authorize projection, freeze,
+tagging, or training. No further model request was sent after this evidence;
+human direction is required for the next branch.
