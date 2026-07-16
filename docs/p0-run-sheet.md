@@ -617,12 +617,15 @@ runtime alias of the first identity, not a separate dataset.
 
 ### F0. Documentation gate
 
-- [ ] Commit v0.10.2 version plus evaluation-serving, verifier, infrastructure,
+- [x] Commit v0.10.2 version plus evaluation-serving, verifier, infrastructure,
   and model-trainer area documents before freeze implementation.
 
 **Acceptance:** manifest schema, exact identities, runtime alias, tag name,
 and Gate B stop conditions are documented before code.
 **Stop:** no freeze code or data write if this commit fails.
+
+**Result:** `d51aa5a` committed the required version and area documents before
+the freeze helper was created.
 
 ### F1. Validate and publish the three-piece manifest
 
