@@ -607,3 +607,55 @@ gate predicate; it is the only allowed pre-training before number.
 
 **Stop:** any freeze/tag/push/baseline/train failure. No trainer change,
 replacement sampling, or retry beyond this authorized entrypoint recovery.
+
+## v0.10.2 — U3 three-piece freeze and Gate B
+
+U2 passed in v0.10.1, so the human-approved automatic path now enters U3. This
+section freezes only the 50-row training pool, the disjoint 60-row held-out
+set, and verifier v2 provenance. The byte-identical trainer fixture is a
+runtime alias of the first identity, not a separate dataset.
+
+### F0. Documentation gate
+
+- [ ] Commit v0.10.2 version plus evaluation-serving, verifier, infrastructure,
+  and model-trainer area documents before freeze implementation.
+
+**Acceptance:** manifest schema, exact identities, runtime alias, tag name,
+and Gate B stop conditions are documented before code.
+**Stop:** no freeze code or data write if this commit fails.
+
+### F1. Validate and publish the three-piece manifest
+
+- [ ] Validate 50/60 counts, zero source-record overlap, exact reference SQL
+  score `1.0`, training Gate A admission, held-out reference baseline, and
+  verifier v2 source/blob identity.
+- [ ] Atomically publish `data/nl2sql/v0.10.2-u3-freeze-manifest.json` and a
+  byte-identical `trainer/data/nl2sql_v1.jsonl` training-pool alias.
+- [ ] Recompute every manifest/fixture hash and validate the loader's 40/10
+  split without changing trainer logic.
+
+**Acceptance:** the manifest binds exactly the required three identities and
+the alias hash equals the training-pool hash.
+**Stop:** any validation, overlap, reference, evidence, or publication failure;
+do not commit/tag/train.
+
+### F2. Commit and tag the immutable freeze
+
+- [ ] Commit the manifest and runtime alias, create annotated
+  `v0.10.2-p0-three-piece-freeze` naming the local eval model, and push `main`
+  plus the tag.
+- [ ] Verify the tag resolves to the commit containing the manifest/alias and
+  all hashes recompute at that commit.
+
+**Stop:** any commit/tag/push/hash failure; preserve artifacts and do not train.
+
+### F3. Detached 0.5B Gate B
+
+- [ ] On RunPod, check out the freeze tag, stop `vf-eval-vllm`, verify its GPU
+  memory release, then run `vf train p0-gateb-v102 grpo_v1_0p5b`.
+- [ ] Verify tmux detachment, then poll at least 120 seconds apart until the
+  job completes; sync metrics/log/artifact and record a training-monitoring
+  conclusion only.
+
+**Stop:** evaluator-release, launch, execution, sync, or artifact failure.
+Held-out evaluation is a later D4 step; no Gate B metric is a gain claim.
