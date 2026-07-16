@@ -541,7 +541,7 @@ scope, Gate B dependency, and stop conditions are committed before any code.
 - [x] Before `vf` detaches any remote job, run
   `/workspace/verifierforge/.venv/bin/python -c "import scripts.gate_a"` from
   the repository root and fail synchronously on import error.
-- [ ] Validate the same import on RunPod before the U2 tmux session exists.
+- [x] Validate the same import on RunPod before the U2 tmux session exists.
 
 **Selection and reason:** package marker rather than a second absolute-path
 entrypoint. It gives one importable canonical command in laptop and pod
@@ -553,8 +553,12 @@ session.
 entrypoint explicit, and `vf train` runs the remote import immediately after
 `git pull --ff-only` and before `tmux new-session`. Local import, module-help,
 and shell syntax checks passed; focused tests passed `26 passed` and the full
-suite passed `174 passed, 1 skipped`. Pod preflight remains required before a
-new U2 session.
+suite passed `174 passed, 1 skipped`.
+
+**Pod preflight result:** RunPod pulled `309392e`; from
+`/workspace/verifierforge`, `/workspace/verifierforge/.venv/bin/python -c
+"import scripts.gate_a"` printed `ok`. `vf-u2-v010` was absent before any new
+session was created.
 
 ### E2. Authorized U2 rerun and held-out baseline
 
