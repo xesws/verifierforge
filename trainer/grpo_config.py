@@ -25,6 +25,7 @@ class GrpoSmokeConfig:
     kl_loss_coef: float
     rollout_gpu_memory_utilization: float
     enforce_eager: bool
+    vllm_attention_backend: str | None
     checkpoint_every: int
     validation_every: int
 
@@ -77,6 +78,8 @@ class GrpoSmokeConfig:
             raise ValueError("rollout_gpu_memory_utilization must be in (0, 1]")
         if not isinstance(self.enforce_eager, bool):
             raise ValueError("enforce_eager must be a boolean")
+        if self.vllm_attention_backend not in (None, "TORCH_SDPA"):
+            raise ValueError("vllm_attention_backend must be null or TORCH_SDPA")
 
     def with_l4_fallback(self) -> "GrpoSmokeConfig":
         """Apply the one documented OOM retry, without changing the run target."""
@@ -184,6 +187,11 @@ class GrpoSmokeConfig:
             f"trainer.default_local_dir={staging_dir}",
             "trainer.default_hdfs_dir=null",
         ]
+        if self.vllm_attention_backend is not None:
+            overrides.append(
+                "+ray_kwargs.ray_init.runtime_env.env_vars."
+                f"VLLM_ATTENTION_BACKEND={self.vllm_attention_backend}"
+            )
         if resume_path is None:
             overrides.append("trainer.resume_mode=disable")
         else:

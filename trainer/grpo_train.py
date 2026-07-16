@@ -104,6 +104,8 @@ def run(
     # child and its Ray workers opt into our layout-only PyTorch replacement;
     # no fake FlashAttention package is exposed to vLLM.
     environment["VF_VERL_TORCH_PADDING_FALLBACK"] = "1"
+    if config.vllm_attention_backend is not None:
+        environment["VLLM_ATTENTION_BACKEND"] = config.vllm_attention_backend
     existing_python_path = environment.get("PYTHONPATH")
     environment["PYTHONPATH"] = (
         f"{REPOSITORY_ROOT / 'trainer'}{os.pathsep}{REPOSITORY_ROOT}{os.pathsep}{existing_python_path}"
