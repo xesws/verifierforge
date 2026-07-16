@@ -973,6 +973,30 @@ verbatim into this section before any diagnosis conclusion.
 
 ### Runtime result and raw py-spy evidence
 
-_Pending the authorized run. This placeholder will be replaced with timestamps,
-the process manifest, complete raw dumps, any single authorized repair/retest,
-and W1 teardown proof._
+**Initial reproduction:** `p0-v112-pyspy-r0` started at `20:20:48 UTC`, reached
+`ray::WorkerDict` at `20:30:38 UTC` using 7,192 MiB, and at `20:34:38 UTC` was
+still at 7,192 MiB with zero metrics, no engine-ready/rollout/update evidence,
+and only the vLLM `enable_sleep_mode` line. This exceeds the required
+three-minute unchanged WorkerDict window.
+
+**Py-spy installation and capture result:** `py-spy 0.4.2` was already
+installed in `/workspace/verifierforge/.venv`; its version/install output is
+`runs/p0-v112-pyspy-r0/evidence/py-spy-{install,version}.txt`. The snapshot
+method selects Python executables from the recorded launch session and the
+verl/Ray session. At `20:35:44 UTC`, however, the vLLM actor had already
+terminated the entire job; the verbatim manifest records `selected_count=0`.
+No partial substitute stack is claimed as complete evidence.
+
+**Raw failure that ended the capture:** the `train.log` vLLM actor emitted
+`VLLM_ATTENTION_BACKEND=TORCH_SDPA is not supported by the V1 Engine. Falling
+back to V0`, then failed with `ValueError: Using V1 AsyncLLMEngine, but
+envs.VLLM_USE_V1=False`. The full raw traceback is retained in the ignored
+`runs/p0-v112-pyspy-r0/train.log` and will be embedded below after final
+artifact synchronization.
+
+**Authorized one-step repair:** remove only the incompatible
+`VLLM_ATTENTION_BACKEND=TORCH_SDPA` injection by setting the smoke config's
+`vllm_attention_backend` to `null`; do not guess a `VLLM_USE_V1` value. This
+is vLLM's explicit recommendation and is the sole allowed repair. The one
+retest ends at the original `20:40:48 UTC` deadline, then W1 teardown and a
+zero-MiB check are mandatory.

@@ -13,6 +13,7 @@ kl_loss_coef: 0.001
 rollout_gpu_memory_utilization: 0.50
 # W2 repair #1: bypass CUDA graph capture during Blackwell engine startup.
 enforce_eager: true
-vllm_attention_backend: TORCH_SDPA
+# v0.11.2: V1 AsyncLLM rejects TORCH_SDPA's forced V0 fallback.
+vllm_attention_backend: null
 checkpoint_every: 10
 validation_every: 10
