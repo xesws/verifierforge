@@ -49,15 +49,15 @@
 
 ### 2. S2 — deterministic 50-row projection
 
-- [ ] Add/test a projection tool. For every `v1-001` through `v1-050`, re-verify candidates and choose the lexicographically smallest candidate `id`.
-- [ ] A seed with no eligible candidate—whether unprocessed or processed with zero accepted variants—uses its original verifier-checked seed row. Preserve `seed_id`, `source_candidate_id` (`null` for fallback), and selection reason.
-- [ ] Count all fallback rows together; if the count exceeds 10, do not overwrite the trainer fixture.
+- [x] Add/test a projection tool. For every `v1-001` through `v1-050`, re-verify candidates and choose the lexicographically smallest candidate `id`.
+- [x] A seed with no eligible candidate—whether unprocessed or processed with zero accepted variants—uses its original verifier-checked seed row. Preserve `seed_id`, `source_candidate_id` (`null` for fallback), and selection reason.
+- [x] Count all fallback rows together; if the count exceeds 10, do not overwrite the trainer fixture.
 
 **Acceptance:** exactly 50 unique canonical IDs, one per seed; every selected/fallback row scores `1.0`; fallback count is at most 10; the existing loader produces its stable 40/10 split.
 **Stop:** missing/duplicate/invalid seed, re-verification failure, or fallback count above 10. Record counts and do not run Gate A.
 
 **Selection rule:** candidate rows are grouped by `seed_id`; sort eligible rows by `id` ascending and choose the first. Original seed fallback is used only when that group is empty.
-**Result:** pending.
+**Result:** completed. `276` candidates were independently rechecked; `276` remained eligible and none were discarded. The projection contains exactly `50` canonical rows, all independently re-scored at `1.0`; `46` use lexicographically smallest candidate IDs and `4` use `fallback_processed_no_eligible_candidate`. Total fallbacks: `4` (`0` unprocessed, `4` processed), below the limit of `10`. The existing loader accepts all 50 rows and preserves its 40/10 split.
 
 ### 3. S3 — real Gate A
 
