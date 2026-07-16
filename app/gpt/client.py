@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import json
 import os
+import re
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any, Mapping, Sequence
@@ -25,7 +26,18 @@ class LLMResponseError(ValueError):
 
 
 class LLMRequestError(RuntimeError):
-    """Raised when a configured compatible endpoint cannot complete a request."""
+    """A provider failure with a redacted, bounded audit payload."""
+
+    def __init__(
+        self,
+        message: str,
+        *,
+        status_code: int | None = None,
+        provider_body: str | None = None,
+    ) -> None:
+        super().__init__(message)
+        self.status_code = status_code
+        self.provider_body = provider_body
 
 
 @dataclass(frozen=True)
@@ -118,10 +130,10 @@ class LLMClient:
             return
         try:
             self._client = OpenAI(api_key=settings.api_key, base_url=settings.base_url)
-        except Exception:
+        except Exception as error:
             raise LLMConfigurationError(
                 "The configured base_url could not initialize an OpenAI-compatible client."
-            ) from None
+            ) from error
 
     @property
     def model(self) -> str:
@@ -149,19 +161,23 @@ class LLMClient:
         try:
             response = self._client.chat.completions.create(**request)
         except Exception as error:
-            raise LLMRequestError(_request_error_message(error)) from None
+            raise LLMRequestError(
+                _request_error_message(error),
+                status_code=_provider_status_code(error),
+                provider_body=_provider_error_body(error),
+            ) from error
 
         try:
             choices = response.choices
-        except Exception:
-            raise LLMResponseError("LLM returned an invalid completion response.") from None
+        except Exception as error:
+            raise LLMResponseError("LLM returned an invalid completion response.") from error
         if not choices:
             raise LLMResponseError("LLM returned no completion choices.")
 
         try:
             content = choices[0].message.content
-        except Exception:
-            raise LLMResponseError("LLM returned an invalid completion response.") from None
+        except Exception as error:
+            raise LLMResponseError("LLM returned an invalid completion response.") from error
         if not isinstance(content, str) or not content.strip():
             raise LLMResponseError("LLM returned an empty completion.")
         return content
@@ -182,10 +198,10 @@ class LLMClient:
         )
         try:
             parsed = json.loads(_strip_json_fence(content))
-        except json.JSONDecodeError:
+        except json.JSONDecodeError as error:
             raise LLMResponseError(
                 "LLM returned invalid JSON for a structured completion."
-            ) from None
+            ) from error
         if not isinstance(parsed, dict):
             raise LLMResponseError("LLM returned JSON that was not an object.")
         return parsed
@@ -193,10 +209,55 @@ class LLMClient:
 
 def _request_error_message(error: Exception) -> str:
     """Describe a provider failure without copying credentials, prompts, or response text."""
-    status_code = getattr(error, "status_code", None)
-    if isinstance(status_code, int):
+    status_code = _provider_status_code(error)
+    if status_code is not None:
         return f"LLM request failed with HTTP status {status_code}."
     return "LLM request failed before a completion was returned."
+
+
+def _provider_status_code(error: BaseException) -> int | None:
+    """Return a trustworthy HTTP status when the compatible SDK exposes one."""
+    status_code = getattr(error, "status_code", None)
+    if isinstance(status_code, int) and not isinstance(status_code, bool):
+        return status_code
+    return None
+
+
+def _provider_error_body(error: BaseException) -> str | None:
+    """Extract a redacted provider response body for evidence, never for stdout."""
+    body = getattr(error, "body", None)
+    if body is None:
+        response = getattr(error, "response", None)
+        body = getattr(response, "text", None)
+    if body is None:
+        return None
+    if isinstance(body, (dict, list)):
+        try:
+            text = json.dumps(body, ensure_ascii=False, sort_keys=True, default=str)
+        except (TypeError, ValueError):
+            text = str(body)
+    else:
+        text = str(body)
+    return _redact_and_truncate(text)
+
+
+def _redact_and_truncate(text: str, *, limit: int = 4096) -> str:
+    """Keep useful error evidence while removing common bearer/query credentials."""
+    redacted = re.sub(
+        r"(?i)(authorization\s*:\s*bearer\s+)([^\s,;\"']+)",
+        r"\1[REDACTED]",
+        text,
+    )
+    redacted = re.sub(r"(?i)(bearer\s+)([^\s,;\"']+)", r"\1[REDACTED]", redacted)
+    redacted = re.sub(r"\bsk-[A-Za-z0-9_-]+", "[REDACTED]", redacted)
+    redacted = re.sub(
+        r"(?i)([?&;](?:api[_-]?key|token|key|authorization)=)([^&#\s]+)",
+        r"\1[REDACTED]",
+        redacted,
+    )
+    if len(redacted) <= limit:
+        return redacted
+    return redacted[:limit] + "…[truncated]"
 
 
 def _strip_json_fence(content: str) -> str:

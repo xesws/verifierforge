@@ -93,6 +93,9 @@ def test_gate_a_reports_raw_metrics_and_writes_secret_free_evidence(
     }
     assert client.models == ["configured-glm"] * 4
     payload = json.loads(evidence.read_text(encoding="utf-8"))
+    assert payload["schema_version"] == 2
+    assert payload["status"] == "completed"
+    assert payload["mode"] == "gate"
     assert payload["passed"] is True
     assert payload["candidate_count"] == 2
     assert payload["sample_count"] == 4
@@ -177,8 +180,12 @@ def test_gate_a_rejects_non_finite_json_cells_before_loading_a_client(
 
     monkeypatch.setattr(gate_a, "_load_eval_client", should_not_load_client)
 
-    assert gate_a.main([str(candidates), "--report", str(tmp_path / "evidence.json")]) == 2
+    evidence = tmp_path / "evidence.json"
+    assert gate_a.main([str(candidates), "--report", str(evidence)]) == 2
     assert "finite SQL scalar JSON value" in capsys.readouterr().err
+    payload = json.loads(evidence.read_text(encoding="utf-8"))
+    assert payload["status"] == "failed"
+    assert payload["failure"]["category"] == "input"
 
 
 def test_gate_a_load_eval_client_uses_only_eval_settings(monkeypatch) -> None:
@@ -298,3 +305,110 @@ def test_gate_a_never_renders_provider_exception_text(tmp_path: Path, monkeypatc
     captured = capsys.readouterr()
     assert "definitely-not-for-output" not in captured.out
     assert "definitely-not-for-output" not in captured.err
+
+
+def test_gate_a_persists_retry_and_provider_failure_evidence(
+    tmp_path: Path, monkeypatch, capsys
+) -> None:
+    candidates = tmp_path / "candidates.jsonl"
+    evidence = tmp_path / "gate-a.json"
+    _write_candidates(candidates, [_record(1)])
+    secret = "sk-failure-secret"
+
+    class ProviderFailure(RuntimeError):
+        def __init__(self) -> None:
+            super().__init__(f"Authorization: Bearer {secret}")
+            self.status_code = 503
+            self.body = {"detail": f"Authorization: Bearer {secret}"}
+
+    class FailingClient:
+        def __init__(self) -> None:
+            self.calls = 0
+
+        def complete(self, *args, **kwargs) -> str:
+            del args, kwargs
+            self.calls += 1
+            raise ProviderFailure()
+
+    client = FailingClient()
+    _install_fake_client(monkeypatch, client)
+
+    assert (
+        gate_a.main(
+            [str(candidates), "--k", "1", "--workers", "1", "--report", str(evidence)]
+        )
+        == 2
+    )
+
+    captured = capsys.readouterr()
+    payload = json.loads(evidence.read_text(encoding="utf-8"))
+    failure = payload["failure"]
+    sample_failure = failure["failures"][0]
+    assert client.calls == 2
+    assert payload["schema_version"] == 2
+    assert payload["status"] == "failed"
+    assert payload["resolved_config"] == {
+        "base_url": "https://router.test/v1",
+        "model": "configured-glm",
+    }
+    assert failure["category"] == "completion"
+    assert failure["circuit_open"] is False
+    assert failure["terminal_failure_count"] == 1
+    assert sample_failure["request_ordinal"] == 1
+    assert sample_failure["record_index"] == 1
+    assert sample_failure["sample_index"] == 1
+    assert sample_failure["attempt_count"] == 2
+    assert [item["status_code"] for item in sample_failure["attempts"]] == [503, 503]
+    assert "ProviderFailure" in [item["type"] for item in sample_failure["exception_chain"]]
+    assert secret not in evidence.read_text(encoding="utf-8")
+    assert secret not in captured.out
+    assert secret not in captured.err
+
+
+def test_gate_a_persists_config_failure_evidence_without_llm_fallback(
+    tmp_path: Path, monkeypatch
+) -> None:
+    candidates = tmp_path / "candidates.jsonl"
+    evidence = tmp_path / "gate-a.json"
+    _write_candidates(candidates, [_record(1)])
+    monkeypatch.delenv("VF_EVAL_BASE_URL", raising=False)
+    monkeypatch.delenv("VF_EVAL_MODEL", raising=False)
+    monkeypatch.setenv("VF_LLM_API_KEY", "must-not-be-used")
+
+    assert gate_a.main([str(candidates), "--report", str(evidence)]) == 2
+
+    payload = json.loads(evidence.read_text(encoding="utf-8"))
+    assert payload["status"] == "failed"
+    assert payload["failure"]["category"] == "configuration"
+    assert payload["resolved_config"] == {"base_url": None, "model": None}
+    assert "must-not-be-used" not in evidence.read_text(encoding="utf-8")
+
+
+def test_reference_mode_records_threshold_status_but_does_not_reject(
+    tmp_path: Path, monkeypatch
+) -> None:
+    candidates = tmp_path / "candidates.jsonl"
+    evidence = tmp_path / "full-gate-a.json"
+    _write_candidates(candidates, [_record(1)])
+    _install_fake_client(monkeypatch, SequenceClient(["SELECT name FROM people"] * 2))
+
+    assert (
+        gate_a.main(
+            [
+                str(candidates),
+                "--k",
+                "2",
+                "--workers",
+                "1",
+                "--report",
+                str(evidence),
+                "--reference",
+            ]
+        )
+        == 0
+    )
+
+    payload = json.loads(evidence.read_text(encoding="utf-8"))
+    assert payload["status"] == "completed"
+    assert payload["mode"] == "reference"
+    assert payload["passed"] is False

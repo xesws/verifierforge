@@ -118,12 +118,14 @@
 
 ### F2. Failure evidence and bounded execution
 
-- [ ] Preserve provider exception chains, HTTP status, request ordinal, record/sample, two-attempt history, and a redacted 4 KiB provider-body cap.
-- [ ] Replace all-at-once submission with at most eight in-flight logical samples. Retry each failed sample once; after ten consecutive terminal failures in request-ordinal order, stop submitting new jobs and record circuit-open state.
-- [ ] Any terminal sample failure makes the run exit `2` with failure evidence and invalid metrics; it never becomes verifier score `0`. No automatic whole-run retry occurs.
+- [x] Preserve provider exception chains, HTTP status, request ordinal, record/sample, two-attempt history, and a redacted 4 KiB provider-body cap.
+- [x] Replace all-at-once submission with at most eight in-flight logical samples. Retry each failed sample once; after ten consecutive terminal failures in request-ordinal order, stop submitting new jobs and record circuit-open state.
+- [x] Any terminal sample failure makes the run exit `2` with failure evidence and invalid metrics; it never becomes verifier score `0`. No automatic whole-run retry occurs.
 
 **Acceptance:** failure evidence is atomically persisted on every configuration/input/completion failure; stdout/stderr remain secret-free.
 **Stop:** failure evidence cannot be written, retry/circuit tests fail, or a partial run produces Gate A metrics.
+
+**Result:** complete locally; tests cover retry success, terminal metadata/cause/body redaction, ordered circuit opening, bounded concurrency, config/input/completion evidence, and reference-only completion.
 
 ### F3. Pod-local vLLM exam server
 

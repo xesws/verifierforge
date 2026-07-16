@@ -1,8 +1,12 @@
 from __future__ import annotations
 
+from threading import Lock
+import time
+
 import pytest
 
 from core.eval_runner import (
+    EvaluationCompletionError,
     EvaluationMetrics,
     EvaluationRecordError,
     evaluate_records,
@@ -181,6 +185,92 @@ def test_runner_preserves_sample_slots_with_bounded_workers() -> None:
     assert run.metrics.baseline_pass_at_1 == 0.5
     assert run.metrics.pass_at_k == 0.5
     assert run.metrics.mixed_fraction == 0.0
+
+
+def test_runner_retries_one_provider_failure_before_scoring() -> None:
+    class FlakyClient:
+        def __init__(self) -> None:
+            self.calls = 0
+
+        def complete(self, messages, *, model=None, temperature=None) -> str:
+            del messages, model, temperature
+            self.calls += 1
+            if self.calls == 1:
+                raise RuntimeError("temporary endpoint failure")
+            return "SELECT name FROM people"
+
+    client = FlakyClient()
+    run = evaluate_records([RECORD], client, k=1, workers=1)
+
+    assert client.calls == 2
+    assert run.metrics.baseline_pass_at_1 == 1.0
+
+
+def test_terminal_failure_keeps_request_metadata_and_redacted_provider_facts() -> None:
+    secret = "sk-this-must-not-survive"
+
+    class ProviderFailure(RuntimeError):
+        def __init__(self) -> None:
+            super().__init__("backend unavailable")
+            self.status_code = 503
+            self.body = {"error": f"Authorization: Bearer {secret}"}
+
+    class FailingClient:
+        def complete(self, messages, *, model=None, temperature=None) -> str:
+            del messages, model, temperature
+            raise ProviderFailure()
+
+    with pytest.raises(EvaluationCompletionError) as raised:
+        evaluate_records([RECORD], FailingClient(), k=1, workers=1)
+
+    failure = raised.value.failures[0]
+    assert failure.request_ordinal == 1
+    assert failure.record_index == 1
+    assert failure.sample_index == 1
+    assert len(failure.attempts) == 2
+    assert [attempt.status_code for attempt in failure.attempts] == [503, 503]
+    assert all(attempt.provider_body is not None for attempt in failure.attempts)
+    assert secret not in str(failure.attempts)
+    assert "[REDACTED]" in failure.attempts[0].provider_body
+    assert isinstance(failure.__cause__, ProviderFailure)
+    assert raised.value.circuit_open is False
+    assert raised.value.completed_logical_samples == 1
+
+
+def test_runner_opens_circuit_after_ten_ordered_terminal_failures() -> None:
+    class AlwaysFailingClient:
+        def __init__(self) -> None:
+            self.calls = 0
+            self.active = 0
+            self.maximum_active = 0
+            self.lock = Lock()
+
+        def complete(self, messages, *, model=None, temperature=None) -> str:
+            del messages, model, temperature
+            with self.lock:
+                self.calls += 1
+                self.active += 1
+                self.maximum_active = max(self.maximum_active, self.active)
+            try:
+                time.sleep(0.01)
+                raise RuntimeError("temporary evaluator outage")
+            finally:
+                with self.lock:
+                    self.active -= 1
+
+    client = AlwaysFailingClient()
+    records = [{**RECORD, "id": f"case-{index}"} for index in range(20)]
+
+    with pytest.raises(EvaluationCompletionError) as raised:
+        evaluate_records(records, client, k=1, workers=100)
+
+    error = raised.value
+    assert error.circuit_open is True
+    assert error.maximum_consecutive_terminal_failures >= 10
+    assert error.completed_logical_samples <= 17
+    assert len(error.failures) <= 17
+    assert client.calls <= 34  # One retry for each logical sample that began.
+    assert client.maximum_active <= 8
 
 
 @pytest.mark.parametrize("k", [0, -1, True])

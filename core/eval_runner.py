@@ -8,9 +8,10 @@ requests itself; callers inject the completion source they want to use.
 from __future__ import annotations
 
 from collections.abc import Callable, Iterable, Mapping, Sequence
-from concurrent.futures import ThreadPoolExecutor
+from concurrent.futures import FIRST_COMPLETED, Future, ThreadPoolExecutor, wait
 from dataclasses import dataclass
 import math
+import re
 from typing import Any, Protocol
 
 from core.rewards.nl2sql import NL2SQLVerifier
@@ -20,8 +21,62 @@ class EvaluationRecordError(ValueError):
     """Raised when a candidate cannot be safely evaluated."""
 
 
+MAX_IN_FLIGHT = 8
+MAX_COMPLETION_ATTEMPTS = 2
+
+
+@dataclass(frozen=True)
+class CompletionAttemptFailure:
+    """One redacted provider attempt belonging to a logical sample request."""
+
+    attempt: int
+    exception_type: str
+    message: str
+    status_code: int | None
+    provider_body: str | None
+
+
 class CompletionError(RuntimeError):
-    """Raised when an injected completion source cannot produce a string."""
+    """A terminal logical-sample failure with its original safe audit facts."""
+
+    def __init__(
+        self,
+        message: str,
+        *,
+        request_ordinal: int | None = None,
+        record_index: int | None = None,
+        sample_index: int | None = None,
+        attempts: Sequence[CompletionAttemptFailure] = (),
+        cause: BaseException | None = None,
+    ) -> None:
+        super().__init__(message)
+        self.request_ordinal = request_ordinal
+        self.record_index = record_index
+        self.sample_index = sample_index
+        self.attempts = tuple(attempts)
+        self.cause = cause
+
+
+class EvaluationCompletionError(RuntimeError):
+    """Raised when any Gate A sample terminates without a usable completion."""
+
+    def __init__(
+        self,
+        failures: Sequence[CompletionError],
+        *,
+        circuit_open: bool,
+        completed_logical_samples: int,
+        total_logical_samples: int,
+        maximum_consecutive_terminal_failures: int,
+    ) -> None:
+        super().__init__("evaluation has terminal completion failures")
+        self.failures = tuple(failures)
+        self.circuit_open = circuit_open
+        self.completed_logical_samples = completed_logical_samples
+        self.total_logical_samples = total_logical_samples
+        self.maximum_consecutive_terminal_failures = (
+            maximum_consecutive_terminal_failures
+        )
 
 
 class CompletionClient(Protocol):
@@ -91,6 +146,26 @@ class EvaluationRun:
 
     metrics: EvaluationMetrics
     groups: tuple[SampleGroup, ...]
+
+
+@dataclass(frozen=True)
+class _SampleJob:
+    """A fixed request ordinal, so concurrent completion cannot alter evidence."""
+
+    request_ordinal: int
+    record_index: int
+    sample_index: int
+    record: EvaluationRecord
+
+
+@dataclass(frozen=True)
+class _SampleResult:
+    """One successfully completed and verifier-scored logical sample."""
+
+    request_ordinal: int
+    record_index: int
+    sample_index: int
+    score: float
 
 
 def parse_evaluation_record(
@@ -208,79 +283,164 @@ def _evaluate_samples(
     model: str | None,
     temperature: float,
     workers: int,
-) -> list[tuple[int, int, float]]:
-    """Evaluate every record/sample pair, retaining submission order for audit."""
-    jobs = [
-        (record_index, sample_index, record)
-        for record_index, record in enumerate(records, start=1)
-        for sample_index in range(1, k + 1)
-    ]
-    if workers == 1:
-        return [
-            _score_sample(
-                record,
-                completion_source,
-                model=model,
-                temperature=temperature,
-                record_index=record_index,
-                sample_index=sample_index,
-            )
-            for record_index, sample_index, record in jobs
-        ]
+) -> list[_SampleResult]:
+    """Run samples with bounded concurrency and deterministic failure ordering.
 
-    # Calls are I/O-bound.  Future results are collected in submission order,
-    # so concurrent request completion never changes pass@1 or audit ordering.
-    with ThreadPoolExecutor(max_workers=min(workers, len(jobs))) as executor:
-        futures = [
-            executor.submit(
-                _score_sample,
-                record,
-                completion_source,
-                model=model,
-                temperature=temperature,
-                record_index=record_index,
-                sample_index=sample_index,
-            )
-            for record_index, sample_index, record in jobs
-        ]
-        try:
-            return [future.result() for future in futures]
-        except BaseException:
-            for future in futures:
-                future.cancel()
-            raise
+    The scheduler submits no more than eight logical samples at once. Results
+    are committed by the ordinal assigned before submission, rather than by
+    future-completion order; this makes the ten-consecutive-failure circuit
+    breaker reproducible even when network timings differ.
+    """
+    jobs = [
+        _SampleJob(
+            request_ordinal=ordinal,
+            record_index=record_index,
+            sample_index=sample_index,
+            record=record,
+        )
+        for ordinal, (record_index, sample_index, record) in enumerate(
+            (
+                (record_index, sample_index, record)
+                for record_index, record in enumerate(records, start=1)
+                for sample_index in range(1, k + 1)
+            ),
+            start=1,
+        )
+    ]
+    worker_count = min(MAX_IN_FLIGHT, workers, len(jobs))
+    results: list[_SampleResult] = []
+    failures: list[CompletionError] = []
+    buffered: dict[int, _SampleResult | CompletionError] = {}
+    next_job_index = 0
+    next_commit_ordinal = 1
+    consecutive_terminal_failures = 0
+    maximum_consecutive_terminal_failures = 0
+    completed_logical_samples = 0
+    circuit_open = False
+
+    with ThreadPoolExecutor(max_workers=worker_count) as executor:
+        in_flight: dict[Future[_SampleResult], _SampleJob] = {}
+
+        def submit_until_full() -> None:
+            nonlocal next_job_index
+            while (
+                not circuit_open
+                and len(in_flight) < worker_count
+                and next_job_index < len(jobs)
+                # Never let out-of-order fast futures move the submission
+                # window beyond the earliest uncommitted ordinal. This caps
+                # post-circuit work at the seven samples already in flight.
+                and jobs[next_job_index].request_ordinal
+                < next_commit_ordinal + worker_count
+            ):
+                job = jobs[next_job_index]
+                next_job_index += 1
+                in_flight[
+                    executor.submit(
+                        _score_sample,
+                        job,
+                        completion_source,
+                        model=model,
+                        temperature=temperature,
+                    )
+                ] = job
+
+        submit_until_full()
+        while in_flight:
+            done, _ = wait(in_flight, return_when=FIRST_COMPLETED)
+            for future in done:
+                job = in_flight.pop(future)
+                try:
+                    buffered[job.request_ordinal] = future.result()
+                except CompletionError as error:
+                    buffered[job.request_ordinal] = error
+                except Exception as error:
+                    buffered[job.request_ordinal] = _unexpected_completion_error(
+                        job, error
+                    )
+
+            while next_commit_ordinal in buffered:
+                outcome = buffered.pop(next_commit_ordinal)
+                completed_logical_samples += 1
+                if isinstance(outcome, CompletionError):
+                    failures.append(outcome)
+                    consecutive_terminal_failures += 1
+                    maximum_consecutive_terminal_failures = max(
+                        maximum_consecutive_terminal_failures,
+                        consecutive_terminal_failures,
+                    )
+                    if consecutive_terminal_failures >= 10:
+                        circuit_open = True
+                else:
+                    results.append(outcome)
+                    consecutive_terminal_failures = 0
+                next_commit_ordinal += 1
+
+            # A circuit-open run drains only samples already running. No jobs
+            # have been queued beyond ``in_flight``, so none start afterward.
+            submit_until_full()
+
+    if failures:
+        raise EvaluationCompletionError(
+            failures,
+            circuit_open=circuit_open,
+            completed_logical_samples=completed_logical_samples,
+            total_logical_samples=len(jobs),
+            maximum_consecutive_terminal_failures=maximum_consecutive_terminal_failures,
+        )
+    return results
 
 
 def _score_sample(
-    record: EvaluationRecord,
+    job: _SampleJob,
     completion_source: CompletionSource,
     *,
     model: str | None,
     temperature: float,
-    record_index: int,
-    sample_index: int,
-) -> tuple[int, int, float]:
-    verifier = NL2SQLVerifier(record.schema_sql, record.expected_results)
+) -> _SampleResult:
+    """Complete and score one pre-ordered logical sample."""
+    verifier = NL2SQLVerifier(job.record.schema_sql, job.record.expected_results)
     completion = _complete(
         completion_source,
-        messages=[{"role": "user", "content": record.prompt}],
+        messages=[{"role": "user", "content": job.record.prompt}],
         model=model,
         temperature=temperature,
-        record_index=record_index,
-        sample_index=sample_index,
+        request_ordinal=job.request_ordinal,
+        record_index=job.record_index,
+        sample_index=job.sample_index,
     )
-    return record_index, sample_index, verifier.score(record.prompt, completion)
+    return _SampleResult(
+        request_ordinal=job.request_ordinal,
+        record_index=job.record_index,
+        sample_index=job.sample_index,
+        score=verifier.score(job.record.prompt, completion),
+    )
+
+
+def _unexpected_completion_error(job: _SampleJob, error: Exception) -> CompletionError:
+    """Turn an unexpected worker exception into the same auditable failure shape."""
+    failure = _attempt_failure(0, error)
+    completion_error = CompletionError(
+        f"completion failed for request {job.request_ordinal}",
+        request_ordinal=job.request_ordinal,
+        record_index=job.record_index,
+        sample_index=job.sample_index,
+        attempts=(failure,),
+        cause=error,
+    )
+    completion_error.__cause__ = error
+    return completion_error
 
 
 def _group_samples(
     records: Sequence[EvaluationRecord],
-    samples: Sequence[tuple[int, int, float]],
+    samples: Sequence[_SampleResult],
     *,
     k: int,
 ) -> list[SampleGroup]:
     scores_by_record = [[0.0] * k for _ in records]
-    for record_index, sample_index, score in samples:
-        scores_by_record[record_index - 1][sample_index - 1] = score
+    for sample in samples:
+        scores_by_record[sample.record_index - 1][sample.sample_index - 1] = sample.score
     return [
         SampleGroup(
             record_id=record.record_id,
@@ -308,26 +468,95 @@ def _complete(
     messages: list[dict[str, str]],
     model: str | None,
     temperature: float,
+    request_ordinal: int,
     record_index: int,
     sample_index: int,
 ) -> str:
+    """Call a completion source twice at most, retaining the original cause."""
     complete = getattr(completion_source, "complete", completion_source)
     if not callable(complete):
-        raise CompletionError("completion source must be callable or define complete()")
-
-    try:
-        completion = complete(messages, model=model, temperature=temperature)
-    except Exception as error:
-        raise CompletionError(
-            f"completion failed for record {record_index}, sample {sample_index}"
-        ) from error
-
-    if not isinstance(completion, str):
-        raise CompletionError(
-            f"completion source returned a non-string for record {record_index}, "
-            f"sample {sample_index}"
+        source_error = TypeError("completion source must be callable or define complete()")
+        completion_error = CompletionError(
+            f"completion failed for request {request_ordinal}",
+            request_ordinal=request_ordinal,
+            record_index=record_index,
+            sample_index=sample_index,
+            attempts=(_attempt_failure(0, source_error),),
+            cause=source_error,
         )
-    return completion
+        raise completion_error from source_error
+
+    attempts: list[CompletionAttemptFailure] = []
+    last_error: Exception | None = None
+    for attempt in range(1, MAX_COMPLETION_ATTEMPTS + 1):
+        try:
+            completion = complete(messages, model=model, temperature=temperature)
+            if not isinstance(completion, str):
+                raise TypeError("completion source returned a non-string")
+            return completion
+        except Exception as error:
+            attempts.append(_attempt_failure(attempt, error))
+            last_error = error
+
+    assert last_error is not None
+    completion_error = CompletionError(
+        f"completion failed for request {request_ordinal}",
+        request_ordinal=request_ordinal,
+        record_index=record_index,
+        sample_index=sample_index,
+        attempts=attempts,
+        cause=last_error,
+    )
+    raise completion_error from last_error
+
+
+def _attempt_failure(attempt: int, error: BaseException) -> CompletionAttemptFailure:
+    """Extract redacted status/body facts without depending on a provider SDK."""
+    return CompletionAttemptFailure(
+        attempt=attempt,
+        exception_type=type(error).__name__,
+        message=_redact_and_truncate(str(error), limit=1024),
+        status_code=_status_code(error),
+        provider_body=_provider_body(error),
+    )
+
+
+def _status_code(error: BaseException) -> int | None:
+    value = getattr(error, "status_code", None)
+    if isinstance(value, int) and not isinstance(value, bool):
+        return value
+    return None
+
+
+def _provider_body(error: BaseException) -> str | None:
+    value = getattr(error, "provider_body", None)
+    if value is None:
+        value = getattr(error, "body", None)
+    if value is None:
+        response = getattr(error, "response", None)
+        value = getattr(response, "text", None)
+    if value is None:
+        return None
+    return _redact_and_truncate(str(value))
+
+
+def _redact_and_truncate(value: str, *, limit: int = 4096) -> str:
+    """Redact likely credentials in provider diagnostics before evidence storage."""
+    redacted = re.sub(
+        r"(?i)(authorization\s*:\s*bearer\s+)([^\s,;\"']+)",
+        r"\1[REDACTED]",
+        value,
+    )
+    redacted = re.sub(r"(?i)(bearer\s+)([^\s,;\"']+)", r"\1[REDACTED]", redacted)
+    redacted = re.sub(r"\bsk-[A-Za-z0-9_-]+", "[REDACTED]", redacted)
+    redacted = re.sub(
+        r"(?i)([?&;](?:api[_-]?key|token|key|authorization)=)([^&#\s]+)",
+        r"\1[REDACTED]",
+        redacted,
+    )
+    if len(redacted) <= limit:
+        return redacted
+    return redacted[:limit] + "…[truncated]"
 
 
 def _required_nonempty_string(

@@ -4,11 +4,14 @@
 from __future__ import annotations
 
 import argparse
+from collections import Counter
 from collections.abc import Mapping, Sequence
 from datetime import UTC, datetime
 import hashlib
 import json
+import os
 from pathlib import Path
+import re
 import sys
 from tempfile import NamedTemporaryFile
 from typing import Any
@@ -21,8 +24,10 @@ REPOSITORY_ROOT = Path(__file__).resolve().parents[1]
 if str(REPOSITORY_ROOT) not in sys.path:
     sys.path.insert(0, str(REPOSITORY_ROOT))
 
+from app.gpt import LLMConfigurationError  # noqa: E402 - path setup above is intentional.
 from core.eval_runner import (  # noqa: E402 - path setup above is intentional.
     CompletionError,
+    EvaluationCompletionError,
     EvaluationMetrics,
     EvaluationRecordError,
     evaluate_records,
@@ -73,6 +78,11 @@ def build_parser() -> argparse.ArgumentParser:
         required=True,
         help="write a structured, secret-free Gate A evidence JSON file",
     )
+    parser.add_argument(
+        "--reference",
+        action="store_true",
+        help="record metrics without rejecting a completed full-set reference run",
+    )
     return parser
 
 
@@ -86,10 +96,25 @@ def main(argv: Sequence[str] | None = None) -> int:
     parser = build_parser()
     args = parser.parse_args(argv)
     candidate_path = _resolve_candidate_path(parser, args)
-
+    mode = "reference" if args.reference else "gate"
+    input_digest: str | None = None
+    records: list[dict[str, Any]] | None = None
+    settings: Any | None = None
     try:
         records, input_digest = load_candidate_jsonl(candidate_path)
     except (OSError, EvaluationRecordError) as error:
+        _write_failure_or_report(
+            args.report,
+            candidate_path=candidate_path,
+            input_digest=None,
+            record_count=None,
+            settings=None,
+            k=args.k,
+            workers=args.workers,
+            mode=mode,
+            category="input",
+            error=error,
+        )
         print(f"gate_a input error: {error}", file=sys.stderr)
         return 2
 
@@ -116,16 +141,67 @@ def main(argv: Sequence[str] | None = None) -> int:
             temperature=1.0,
             workers=args.workers,
         )
-    except (ValueError, EvaluationRecordError) as error:
-        print(f"gate_a configuration error: {error}", file=sys.stderr)
+    except EvaluationCompletionError as error:
+        _write_failure_or_report(
+            args.report,
+            candidate_path=candidate_path,
+            input_digest=input_digest,
+            record_count=len(records),
+            settings=settings,
+            k=args.k,
+            workers=args.workers,
+            mode=mode,
+            category="completion",
+            error=error,
+        )
+        print("gate_a evaluation error: terminal completion failure", file=sys.stderr)
         return 2
-    except CompletionError:
-        print("gate_a evaluation error: completion request failed", file=sys.stderr)
+    except CompletionError as error:
+        _write_failure_or_report(
+            args.report,
+            candidate_path=candidate_path,
+            input_digest=input_digest,
+            record_count=len(records),
+            settings=settings,
+            k=args.k,
+            workers=args.workers,
+            mode=mode,
+            category="completion",
+            error=error,
+        )
+        print("gate_a evaluation error: terminal completion failure", file=sys.stderr)
         return 2
-    except Exception:
-        # Provider exceptions sometimes include request details.  Gate A never
-        # prints them because the caller's environment contains the API key.
-        print("gate_a configuration error: LLM client is unavailable", file=sys.stderr)
+    except (LLMConfigurationError, ValueError, EvaluationRecordError) as error:
+        _write_failure_or_report(
+            args.report,
+            candidate_path=candidate_path,
+            input_digest=input_digest,
+            record_count=len(records),
+            settings=settings,
+            k=args.k,
+            workers=args.workers,
+            mode=mode,
+            category="configuration",
+            error=error,
+        )
+        print(f"gate_a configuration error: {_safe_message(error)}", file=sys.stderr)
+        return 2
+    except Exception as error:
+        _write_failure_or_report(
+            args.report,
+            candidate_path=candidate_path,
+            input_digest=input_digest,
+            record_count=len(records),
+            settings=settings,
+            k=args.k,
+            workers=args.workers,
+            mode=mode,
+            category="internal",
+            error=error,
+        )
+        # Provider exceptions sometimes include request details. Gate A never
+        # renders them; the evidence file contains a bounded redacted chain.
+        print("gate_a internal error: see evidence report", file=sys.stderr)
         return 2
 
     decision = gate_passes(run.metrics)
@@ -139,12 +215,15 @@ def main(argv: Sequence[str] | None = None) -> int:
                 model=model,
                 base_url=settings.base_url,
                 workers=args.workers,
+                mode=mode,
             )
         except OSError:
             print("gate_a evidence error: could not write evidence file", file=sys.stderr)
             return 2
 
     print(json.dumps(display_metrics(run.metrics), sort_keys=True))
+    if args.reference:
+        return 0
     return 0 if decision else 1
 
 
@@ -209,10 +288,13 @@ def write_evidence(
     model: str,
     base_url: object,
     workers: int,
+    mode: str = "gate",
 ) -> None:
     """Atomically write freeze-ready evidence without prompts, completions, or keys."""
     payload = {
-        "schema_version": 1,
+        "schema_version": 2,
+        "status": "completed",
+        "mode": mode,
         "timestamp": datetime.now(UTC).isoformat(),
         "candidate_path": str(candidate_path),
         "input_sha256": input_digest,
@@ -231,7 +313,8 @@ def write_evidence(
         "pass_at_k": metrics.pass_at_k,
         "mixed_fraction": metrics.mixed_fraction,
         "k": metrics.k,
-        "workers": workers,
+        "workers": min(workers, 8),
+        "max_in_flight": min(workers, 8),
         "candidate_count": metrics.record_count,
         "sample_count": metrics.record_count * metrics.k,
         "thresholds": {
@@ -244,14 +327,222 @@ def write_evidence(
         # Preserve the stable pass_at_k/k fields while making the fixed Gate A
         # metric directly addressable in freeze evidence.
         payload["pass_at_8"] = metrics.pass_at_k
+    _write_json_atomic(path, payload)
+
+
+def _write_failure_or_report(
+    path: Path,
+    *,
+    candidate_path: Path,
+    input_digest: str | None,
+    record_count: int | None,
+    settings: object | None,
+    k: int,
+    workers: int,
+    mode: str,
+    category: str,
+    error: BaseException,
+) -> None:
+    """Persist a secret-free failure report or surface a durable-write failure."""
+    try:
+        write_failure_evidence(
+            path,
+            candidate_path=candidate_path,
+            input_digest=input_digest,
+            record_count=record_count,
+            settings=settings,
+            k=k,
+            workers=workers,
+            mode=mode,
+            category=category,
+            error=error,
+        )
+    except OSError:
+        print("gate_a evidence error: could not write failure evidence file", file=sys.stderr)
+
+
+def write_failure_evidence(
+    path: Path,
+    *,
+    candidate_path: Path,
+    input_digest: str | None,
+    record_count: int | None,
+    settings: object | None,
+    k: int,
+    workers: int,
+    mode: str,
+    category: str,
+    error: BaseException,
+) -> None:
+    """Write schema-v2 evidence for an invalid Gate A invocation or run."""
+    base_url = _safe_base_url(getattr(settings, "base_url", None))
+    model = getattr(settings, "model", None)
+    resolved_model = model.strip() if isinstance(model, str) and model.strip() else None
+    payload: dict[str, Any] = {
+        "schema_version": 2,
+        "status": "failed",
+        "mode": mode,
+        "timestamp": datetime.now(UTC).isoformat(),
+        "candidate_path": str(candidate_path),
+        "input_sha256": input_digest,
+        "candidate_count": record_count,
+        "verifier": {
+            "identity": "core.rewards.nl2sql.NL2SQLVerifier",
+            "source_sha256": _verifier_source_digest(),
+            "full_pass_score": 1.0,
+        },
+        "model": resolved_model,
+        "base_url": base_url,
+        "resolved_config": {
+            "base_url": base_url,
+            "model": resolved_model,
+        },
+        "k": k,
+        "workers": min(workers, 8),
+        "max_in_flight": min(workers, 8),
+        "failure": _failure_payload(category, error),
+    }
+    _write_json_atomic(path, payload)
+
+
+def _write_json_atomic(path: Path, payload: Mapping[str, Any]) -> None:
+    """Durably replace an evidence file, preserving an older complete report on failure."""
     path.parent.mkdir(parents=True, exist_ok=True)
-    with NamedTemporaryFile(
-        mode="w", encoding="utf-8", dir=path.parent, prefix=f".{path.name}.", delete=False
-    ) as temporary:
-        json.dump(payload, temporary, indent=2, sort_keys=True)
-        temporary.write("\n")
-        temporary_path = Path(temporary.name)
-    temporary_path.replace(path)
+    temporary_path: Path | None = None
+    try:
+        with NamedTemporaryFile(
+            mode="w",
+            encoding="utf-8",
+            dir=path.parent,
+            prefix=f".{path.name}.",
+            delete=False,
+        ) as temporary:
+            temporary_path = Path(temporary.name)
+            json.dump(dict(payload), temporary, indent=2, sort_keys=True)
+            temporary.write("\n")
+            temporary.flush()
+            os.fsync(temporary.fileno())
+        os.replace(temporary_path, path)
+    finally:
+        if temporary_path is not None:
+            temporary_path.unlink(missing_ok=True)
+
+
+def _failure_payload(category: str, error: BaseException) -> dict[str, Any]:
+    """Return failure facts that are useful for recovery but safe to retain."""
+    payload: dict[str, Any] = {
+        "category": category,
+        "exception_type": type(error).__name__,
+        "message": _safe_message(error),
+        "exception_chain": _exception_chain(error),
+    }
+    if isinstance(error, EvaluationCompletionError):
+        payload.update(
+            {
+                "circuit_open": error.circuit_open,
+                "completed_logical_samples": error.completed_logical_samples,
+                "total_logical_samples": error.total_logical_samples,
+                "terminal_failure_count": len(error.failures),
+                "maximum_consecutive_terminal_failures": (
+                    error.maximum_consecutive_terminal_failures
+                ),
+                "failure_distribution": dict(
+                    sorted(
+                        Counter(
+                            failure.attempts[-1].exception_type
+                            if failure.attempts
+                            else type(failure).__name__
+                            for failure in error.failures
+                        ).items()
+                    )
+                ),
+                "failures": [
+                    _completion_failure_payload(failure) for failure in error.failures
+                ],
+            }
+        )
+    elif isinstance(error, CompletionError):
+        payload.update(
+            {
+                "circuit_open": False,
+                "terminal_failure_count": 1,
+                "failures": [_completion_failure_payload(error)],
+            }
+        )
+    return payload
+
+
+def _completion_failure_payload(error: CompletionError) -> dict[str, Any]:
+    """Serialize one retry-exhausted logical sample and its causal chain."""
+    return {
+        "request_ordinal": error.request_ordinal,
+        "record_index": error.record_index,
+        "sample_index": error.sample_index,
+        "attempt_count": len(error.attempts),
+        "attempts": [
+            {
+                "attempt": attempt.attempt,
+                "exception_type": attempt.exception_type,
+                "message": attempt.message,
+                "status_code": attempt.status_code,
+                "provider_body": attempt.provider_body,
+            }
+            for attempt in error.attempts
+        ],
+        "exception_chain": _exception_chain(error),
+    }
+
+
+def _exception_chain(error: BaseException, *, limit: int = 8) -> list[dict[str, Any]]:
+    """Traverse explicit causes without exposing unredacted provider text."""
+    chain: list[dict[str, Any]] = []
+    current: BaseException | None = error
+    seen: set[int] = set()
+    while current is not None and id(current) not in seen and len(chain) < limit:
+        seen.add(id(current))
+        entry: dict[str, Any] = {
+            "type": type(current).__name__,
+            "message": _safe_message(current),
+        }
+        status_code = getattr(current, "status_code", None)
+        if isinstance(status_code, int) and not isinstance(status_code, bool):
+            entry["status_code"] = status_code
+        provider_body = getattr(current, "provider_body", None)
+        if provider_body is None:
+            provider_body = getattr(current, "body", None)
+        if provider_body is not None:
+            entry["provider_body"] = _redact_and_truncate(str(provider_body))
+        chain.append(entry)
+        next_error = current.__cause__ or current.__context__
+        if next_error is None:
+            possible_cause = getattr(current, "cause", None)
+            next_error = possible_cause if isinstance(possible_cause, BaseException) else None
+        current = next_error
+    return chain
+
+
+def _safe_message(error: BaseException) -> str:
+    """Keep known non-secret diagnostics while redacting arbitrary provider strings."""
+    return _redact_and_truncate(str(error), limit=1024)
+
+
+def _redact_and_truncate(value: str, *, limit: int = 4096) -> str:
+    """Redact bearer/query credentials before any evidence write or terminal use."""
+    redacted = re.sub(
+        r"(?i)(authorization\s*:\s*bearer\s+)([^\s,;\"']+)",
+        r"\1[REDACTED]",
+        value,
+    )
+    redacted = re.sub(r"(?i)(bearer\s+)([^\s,;\"']+)", r"\1[REDACTED]", redacted)
+    redacted = re.sub(r"\bsk-[A-Za-z0-9_-]+", "[REDACTED]", redacted)
+    redacted = re.sub(
+        r"(?i)([?&;](?:api[_-]?key|token|key|authorization)=)([^&#\s]+)",
+        r"\1[REDACTED]",
+        redacted,
+    )
+    if len(redacted) <= limit:
+        return redacted
+    return redacted[:limit] + "…[truncated]"
 
 
 def _resolve_candidate_path(parser: argparse.ArgumentParser, args: argparse.Namespace) -> Path:

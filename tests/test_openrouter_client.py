@@ -260,6 +260,58 @@ def test_client_reports_http_status_without_provider_error_text() -> None:
     assert secret not in str(raised.value)
 
 
+def test_client_preserves_redacted_provider_body_and_exception_cause() -> None:
+    secret = "sk-never-store-this"
+
+    class FakeHTTPError(RuntimeError):
+        def __init__(self) -> None:
+            super().__init__("provider is unavailable")
+            self.status_code = 503
+            self.body = {"detail": f"Authorization: Bearer {secret}"}
+
+    class FakeCompletions:
+        def create(self, **kwargs):
+            del kwargs
+            raise FakeHTTPError()
+
+    client = LLMClient(
+        LLMSettings(api_key="test-key"),
+        client=SimpleNamespace(chat=SimpleNamespace(completions=FakeCompletions())),
+    )
+
+    with pytest.raises(LLMRequestError) as raised:
+        client.complete([{"role": "user", "content": "Hello"}])
+
+    assert raised.value.status_code == 503
+    assert raised.value.provider_body is not None
+    assert secret not in raised.value.provider_body
+    assert "[REDACTED]" in raised.value.provider_body
+    assert isinstance(raised.value.__cause__, FakeHTTPError)
+
+
+def test_client_caps_provider_body_evidence() -> None:
+    class FakeHTTPError(RuntimeError):
+        status_code = 502
+        body = "x" * 5000
+
+    class FakeCompletions:
+        def create(self, **kwargs):
+            del kwargs
+            raise FakeHTTPError("gateway failure")
+
+    client = LLMClient(
+        LLMSettings(api_key="test-key"),
+        client=SimpleNamespace(chat=SimpleNamespace(completions=FakeCompletions())),
+    )
+
+    with pytest.raises(LLMRequestError) as raised:
+        client.complete([{"role": "user", "content": "Hello"}])
+
+    assert raised.value.provider_body is not None
+    assert len(raised.value.provider_body) <= 4110
+    assert raised.value.provider_body.endswith("…[truncated]")
+
+
 def test_client_extracts_fenced_json_and_requests_json_mode() -> None:
     requests: list[dict[str, object]] = []
 
