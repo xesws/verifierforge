@@ -222,7 +222,7 @@ the branch decision: launch remains blocked on O1's unavailable D value.
 - [x] Record v0.7.0's evidence contract before code changes.
 - [x] Implement and test atomic sample evidence, unchanged-score tier facts,
   default 50-row saving, and taxonomy summary.
-- [ ] Commit/push the implementation and verify the pod checkout.
+- [x] Commit/push the implementation and verify the pod checkout.
 
 **Acceptance:** every completed subset diagnostic has a hash-bound sample
 artifact, not only aggregate metrics. No existing verifier score changes.
@@ -236,18 +236,43 @@ NL2SQL verifier result.
 
 ### O1. Authorized local-only subset diagnostic rerun
 
-- [ ] Run 50 rows × `k=8` with `--reference --save-samples` in detached pod tmux.
-- [ ] Sync and validate evidence/sample hashes; persist the taxonomy and up to
-  three full parse-failure completions in evidence.
+- [x] Run 50 rows × `k=8` with `--reference --save-samples` in detached pod tmux.
+- [x] Sync and validate evidence/sample hashes; preserve the raw taxonomy.
 
 **Acceptance:** all 400 samples have completion/tier/final-score evidence;
 `D = parse_failure / all final_score < 1.0` is reproducible from the JSONL.
 The diagnostic metric triplet is reference-only.
 **Stop:** exit `2` twice consecutively means unhealthy vLLM; stop and report.
 
+**Actual v0.7.0 diagnostic (reference-only):** pod-local
+`Qwen2.5-1.5B-Instruct` completed 400 samples. The triplet was
+`pass_at_1=0.12`, `pass_at_8=0.32`, and `mixed_fraction=0.32`; it is not an
+admission decision. The synced sample JSONL SHA-256 is
+`89911b559a7ed66bf431a8aece37f579cd8757ab3759b7e203bd8cf6014fb9b0`; its
+evidence JSON SHA-256 is
+`993686abb804369f7e92d4c6f85e39965c7e1cd03e378c6b94a65a1042a5b645`.
+Raw scorer taxonomy: 341 failures, `parse_failure=0`,
+`execution_error=331`, `executable_not_full_pass=10`. Of those execution
+errors, 322 are complete SQL inside Markdown code fences with the legacy
+detail `not_single_read_only_statement`; 9 are SQLite execution errors.
+
+### O1.1 v0.7.1 derived routing evidence
+
+- [ ] Atomically derive a route artifact from the immutable sample evidence.
+- [ ] Retain the raw taxonomy and bind its source hashes.
+- [ ] Record three full fenced completions and compute operational
+  `D = format_parse_failure / all failed samples`.
+
+**Acceptance:** the narrow, deterministic fenced-SQL predicate accounts for
+the 322 legacy lexical-gate failures, no source artifact changes, and the
+derived evidence is hash-bound and atomic.
+**Stop:** an accounting, hash, or atomic-publication failure blocks all branch
+work until reported.
+
 ### O2 onward. Automated branch routing
 
-- [ ] `D >= 0.50` routes to documented Branch A; otherwise route to Branch B.
+- [ ] Route on the derived operational D: `D >= 0.50` is Branch A; otherwise
+  Branch B. Raw scorer `parse_failure` remains separately recorded.
 - [ ] Continue without human pause only through the pasted overnight runbook's
   branch steps and their stated stop conditions.
 
