@@ -107,12 +107,14 @@
 
 ### F1. Eval configuration separation
 
-- [ ] Add `EvalSettings`: require only `VF_EVAL_BASE_URL` and `VF_EVAL_MODEL`; optionally honor `VF_EVAL_API_KEY`; otherwise use the non-secret local SDK placeholder `vf-local-eval`.
-- [ ] Gate A uses only `EvalSettings`, does not load `.env`, and never reads/falls back to `VF_LLM_*` or `VF_AUGMENT_MODEL`.
-- [ ] Remove the Gate A `--model` override. Require `--report`; print resolved sanitized base URL and model before any request and store both in all evidence.
+- [x] Add `EvalSettings`: require only `VF_EVAL_BASE_URL` and `VF_EVAL_MODEL`; optionally honor `VF_EVAL_API_KEY`; otherwise use the non-secret local SDK placeholder `vf-local-eval`.
+- [x] Gate A uses only `EvalSettings`, does not load `.env`, and never reads/falls back to `VF_LLM_*` or `VF_AUGMENT_MODEL`.
+- [x] Remove the Gate A `--model` override. Require `--report`; print resolved sanitized base URL and model before any request and store both in all evidence.
 
 **Acceptance:** missing eval base/model fails closed before client creation; generic augmentation/copilot client behavior remains unchanged.
 **Stop:** any observed `VF_LLM_*` fallback, key/log leak, or failed focused/full test.
+
+**Result:** complete locally; focused and full pytest validation recorded in the F1 commit.
 
 ### F2. Failure evidence and bounded execution
 

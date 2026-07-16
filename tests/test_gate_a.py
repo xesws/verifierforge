@@ -54,11 +54,13 @@ def _install_fake_client(monkeypatch, client: SequenceClient) -> None:
         model="configured-glm",
         base_url="https://key@router.test/v1?api_key=nope",
     )
-    monkeypatch.setattr(gate_a, "_load_client", lambda: (client, settings))
+    monkeypatch.setattr(gate_a, "_load_eval_client", lambda: (client, settings))
 
 
 def test_gate_a_defaults_to_eight_bounded_workers() -> None:
-    args = gate_a.build_parser().parse_args(["candidates.jsonl"])
+    args = gate_a.build_parser().parse_args(
+        ["candidates.jsonl", "--report", "gate-a.json"]
+    )
 
     assert args.workers == 8
 
@@ -96,7 +98,11 @@ def test_gate_a_reports_raw_metrics_and_writes_secret_free_evidence(
     assert payload["sample_count"] == 4
     assert payload["workers"] == 1
     assert payload["input_sha256"] == hashlib.sha256(candidates.read_bytes()).hexdigest()
-    assert payload["base_url"] == "https://router.test"
+    assert payload["base_url"] == "https://router.test/v1"
+    assert payload["resolved_config"] == {
+        "base_url": "https://router.test/v1",
+        "model": "configured-glm",
+    }
     assert "nope" not in evidence.read_text(encoding="utf-8")
 
 
@@ -135,11 +141,11 @@ def test_gate_a_evidence_adds_named_pass_at_8_without_removing_pass_at_k(
     [
         (
             "https://user:secret@router.test:8443/v1/chat?api_key=nope#fragment",
-            "https://router.test:8443",
+            "https://router.test:8443/v1/chat",
         ),
         (
             "https://user:secret@[2001:db8::1]:8443/v1?token=nope",
-            "https://[2001:db8::1]:8443",
+            "https://[2001:db8::1]:8443/v1",
         ),
         ("https://router.test:bad-port/v1?api_key=nope", "<configured>"),
     ],
@@ -153,7 +159,8 @@ def test_evidence_base_url_reveals_only_endpoint_identity(
     assert "secret" not in value
     assert "api_key" not in value
     assert "token" not in value
-    assert "/v1" not in value
+    assert "?" not in value
+    assert "#" not in value
 
 
 def test_gate_a_rejects_non_finite_json_cells_before_loading_a_client(
@@ -168,40 +175,38 @@ def test_gate_a_rejects_non_finite_json_cells_before_loading_a_client(
     def should_not_load_client() -> tuple[object, object]:
         raise AssertionError("invalid candidate data must fail before LLM setup")
 
-    monkeypatch.setattr(gate_a, "_load_client", should_not_load_client)
+    monkeypatch.setattr(gate_a, "_load_eval_client", should_not_load_client)
 
-    assert gate_a.main([str(candidates)]) == 2
+    assert gate_a.main([str(candidates), "--report", str(tmp_path / "evidence.json")]) == 2
     assert "finite SQL scalar JSON value" in capsys.readouterr().err
 
 
-def test_gate_a_load_client_uses_repo_dotenv_independent_of_cwd(
-    tmp_path: Path, monkeypatch
-) -> None:
+def test_gate_a_load_eval_client_uses_only_eval_settings(monkeypatch) -> None:
     from app import gpt
 
-    repository_root = tmp_path / "repository"
-    repository_root.mkdir()
-    monkeypatch.chdir(tmp_path)
-    monkeypatch.setattr(gate_a, "REPOSITORY_ROOT", repository_root)
-    captured: dict[str, Path] = {}
-    settings = SimpleNamespace(model="configured-glm", base_url="https://router.test/v1")
+    captured: dict[str, object] = {}
+    settings = SimpleNamespace(
+        api_key="vf-local-eval",
+        model="Qwen2.5-1.5B-Instruct",
+        base_url="http://127.0.0.1:8000/v1",
+    )
 
     class FakeSettings:
         @classmethod
-        def from_env(cls, *, dotenv_path: Path) -> SimpleNamespace:
-            captured["dotenv_path"] = dotenv_path
+        def from_env(cls) -> SimpleNamespace:
+            captured["settings_loader"] = "eval"
             return settings
 
     class FakeClient:
         def __init__(self, received_settings: object) -> None:
             self.settings = received_settings
 
-    monkeypatch.setattr(gpt, "LLMSettings", FakeSettings)
+    monkeypatch.setattr(gpt, "EvalSettings", FakeSettings)
     monkeypatch.setattr(gpt, "LLMClient", FakeClient)
 
-    client, loaded_settings = gate_a._load_client()
+    client, loaded_settings = gate_a._load_eval_client()
 
-    assert captured["dotenv_path"] == repository_root / ".env"
+    assert captured == {"settings_loader": "eval"}
     assert client.settings is settings
     assert loaded_settings is settings
 
@@ -226,7 +231,21 @@ def test_gate_a_accepts_exact_human_threshold_boundaries(
     )
     _install_fake_client(monkeypatch, client)
 
-    assert gate_a.main(["--input", str(candidates), "--k", "2", "--workers", "1"]) == 0
+    assert (
+        gate_a.main(
+            [
+                "--input",
+                str(candidates),
+                "--k",
+                "2",
+                "--workers",
+                "1",
+                "--report",
+                str(tmp_path / "evidence.json"),
+            ]
+        )
+        == 0
+    )
 
 
 def test_gate_a_fails_closed_and_still_records_measured_evidence(
@@ -262,7 +281,20 @@ def test_gate_a_never_renders_provider_exception_text(tmp_path: Path, monkeypatc
 
     _install_fake_client(monkeypatch, FailingClient())
 
-    assert gate_a.main([str(candidates), "--k", "1", "--workers", "1"]) == 2
+    assert (
+        gate_a.main(
+            [
+                str(candidates),
+                "--k",
+                "1",
+                "--workers",
+                "1",
+                "--report",
+                str(tmp_path / "evidence.json"),
+            ]
+        )
+        == 2
+    )
     captured = capsys.readouterr()
     assert "definitely-not-for-output" not in captured.out
     assert "definitely-not-for-output" not in captured.err

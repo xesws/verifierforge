@@ -54,10 +54,6 @@ def build_parser() -> argparse.ArgumentParser:
         help="candidate JSONL (alternative to the positional path)",
     )
     parser.add_argument(
-        "--model",
-        help="optional model override; otherwise use the configured augmentation model",
-    )
-    parser.add_argument(
         "--k",
         type=int,
         default=8,
@@ -74,6 +70,7 @@ def build_parser() -> argparse.ArgumentParser:
         "--evidence",
         dest="report",
         type=Path,
+        required=True,
         help="write a structured, secret-free Gate A evidence JSON file",
     )
     return parser
@@ -97,11 +94,20 @@ def main(argv: Sequence[str] | None = None) -> int:
         return 2
 
     try:
-        client, settings = _load_client()
-        model = args.model or _configured_model(settings)
-        if not isinstance(model, str) or not model.strip():
-            raise ValueError("configured model is unavailable")
-        model = model.strip()
+        client, settings = _load_eval_client()
+        model = settings.model
+        resolved_base_url = _safe_base_url(settings.base_url)
+        print(
+            json.dumps(
+                {
+                    "event": "gate_a_started",
+                    "resolved_base_url": resolved_base_url,
+                    "resolved_model": model,
+                },
+                sort_keys=True,
+            ),
+            file=sys.stderr,
+        )
         run = evaluate_records(
             records,
             client,
@@ -131,7 +137,7 @@ def main(argv: Sequence[str] | None = None) -> int:
                 input_digest=input_digest,
                 metrics=run.metrics,
                 model=model,
-                base_url=getattr(settings, "base_url", None),
+                base_url=settings.base_url,
                 workers=args.workers,
             )
         except OSError:
@@ -217,6 +223,10 @@ def write_evidence(
         },
         "model": model,
         "base_url": _safe_base_url(base_url),
+        "resolved_config": {
+            "base_url": _safe_base_url(base_url),
+            "model": model,
+        },
         "pass_at_1": metrics.baseline_pass_at_1,
         "pass_at_k": metrics.pass_at_k,
         "mixed_fraction": metrics.mixed_fraction,
@@ -253,23 +263,20 @@ def _resolve_candidate_path(parser: argparse.ArgumentParser, args: argparse.Name
     return candidate_path
 
 
-def _load_client() -> tuple[Any, Any]:
-    """Construct the shared client lazily so tests never require provider setup."""
-    from app.gpt import LLMClient, LLMSettings
+def _load_eval_client() -> tuple[Any, Any]:
+    """Construct Gate A's explicit eval client without loading dotenv files."""
+    from app.gpt import EvalSettings, LLMClient
 
-    settings = LLMSettings.from_env(dotenv_path=REPOSITORY_ROOT / ".env")
+    settings = EvalSettings.from_env()
     return LLMClient(settings), settings
-
-
-def _configured_model(settings: object) -> object:
-    """Use the public settings field without embedding a provider/model default."""
-    return getattr(settings, "model", None)
 
 
 def _safe_base_url(value: object) -> str | None:
     """Keep a non-secret endpoint identifier for evidence.
 
-    Explicit credentials, paths, query parameters, and fragments are removed.
+    Explicit credentials, query parameters, and fragments are removed. The
+    API path (for example ``/v1``) remains, because it is part of the resolved
+    OpenAI-compatible endpoint contract.
     """
     if not isinstance(value, str) or not value.strip():
         return None
@@ -287,7 +294,7 @@ def _safe_base_url(value: object) -> str | None:
     netloc = f"[{hostname}]" if ":" in hostname else hostname
     if port is not None:
         netloc = f"{netloc}:{port}"
-    return urlunsplit((parsed.scheme, netloc, "", "", ""))
+    return urlunsplit((parsed.scheme, netloc, parsed.path, "", ""))
 
 
 def _verifier_source_digest() -> str:

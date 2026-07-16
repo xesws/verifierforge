@@ -6,6 +6,7 @@ import app.gpt.client as llm_module
 from app.gpt import (
     DEFAULT_AUGMENT_MODEL,
     DEFAULT_LLM_BASE_URL,
+    EvalSettings,
     LLMClient,
     LLMConfigurationError,
     LLMRequestError,
@@ -36,6 +37,41 @@ def test_settings_require_canonical_key_and_ignore_legacy_key() -> None:
         LLMSettings.from_env({"OPENROUTER_API_KEY": "legacy-secret"})
 
     assert "legacy-secret" not in str(raised.value)
+
+
+def test_eval_settings_require_explicit_eval_variables_without_llm_fallback() -> None:
+    with pytest.raises(LLMConfigurationError, match="VF_EVAL_BASE_URL"):
+        EvalSettings.from_env(
+            {
+                "VF_LLM_API_KEY": "openrouter-key",
+                "VF_LLM_BASE_URL": "https://openrouter.example/v1",
+                "VF_AUGMENT_MODEL": "provider/augmentation-model",
+            }
+        )
+
+    settings = EvalSettings.from_env(
+        {
+            "VF_EVAL_BASE_URL": "http://127.0.0.1:8000/v1",
+            "VF_EVAL_MODEL": "Qwen2.5-1.5B-Instruct",
+        }
+    )
+
+    assert settings.base_url == "http://127.0.0.1:8000/v1"
+    assert settings.model == "Qwen2.5-1.5B-Instruct"
+    assert settings.api_key == "vf-local-eval"
+
+
+def test_eval_settings_can_use_a_distinct_optional_eval_key() -> None:
+    settings = EvalSettings.from_env(
+        {
+            "VF_EVAL_BASE_URL": "https://eval.example/v1",
+            "VF_EVAL_MODEL": "provider/eval-model",
+            "VF_EVAL_API_KEY": "eval-only-key",
+            "VF_LLM_API_KEY": "must-not-be-selected",
+        }
+    )
+
+    assert settings.api_key == "eval-only-key"
 
 
 def test_blank_optional_environment_values_use_generic_defaults() -> None:
@@ -130,7 +166,7 @@ def test_client_redacts_initialization_failure(monkeypatch) -> None:
 
     assert secret not in str(raised.value)
     assert secret not in repr(raised.value)
-    assert "VF_LLM_BASE_URL" in str(raised.value)
+    assert "configured base_url" in str(raised.value)
 
 
 def test_client_uses_configured_model_by_default() -> None:

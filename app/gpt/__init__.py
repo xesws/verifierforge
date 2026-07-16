@@ -3,6 +3,7 @@
 from .client import (
     DEFAULT_AUGMENT_MODEL,
     DEFAULT_LLM_BASE_URL,
+    EvalSettings,
     LLMClient,
     LLMConfigurationError,
     LLMRequestError,
@@ -19,6 +20,7 @@ from .openrouter import (
 __all__ = [
     "DEFAULT_AUGMENT_MODEL",
     "DEFAULT_LLM_BASE_URL",
+    "EvalSettings",
     "LLMClient",
     "LLMConfigurationError",
     "LLMRequestError",

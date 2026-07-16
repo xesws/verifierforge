@@ -70,10 +70,48 @@ class LLMSettings:
         )
 
 
+@dataclass(frozen=True)
+class EvalSettings:
+    """Evaluation-only endpoint settings, intentionally isolated from augmentation.
+
+    This class deliberately does not load ``.env``: Gate A must be explicit about
+    the endpoint it measures, and must never inherit the paid OpenRouter client
+    configuration used by augmentation or Copilot.
+    """
+
+    api_key: str = field(default="vf-local-eval", repr=False)
+    model: str = ""
+    base_url: str = ""
+
+    def __post_init__(self) -> None:
+        model = self.model.strip()
+        base_url = self.base_url.strip()
+        if not base_url:
+            raise LLMConfigurationError("VF_EVAL_BASE_URL must be set for Gate A.")
+        if not model:
+            raise LLMConfigurationError("VF_EVAL_MODEL must be set for Gate A.")
+        api_key = self.api_key.strip() or "vf-local-eval"
+        object.__setattr__(self, "api_key", api_key)
+        object.__setattr__(self, "model", model)
+        object.__setattr__(self, "base_url", base_url)
+
+    @classmethod
+    def from_env(
+        cls, environ: Mapping[str, str] | None = None
+    ) -> "EvalSettings":
+        """Read only explicit Gate A variables, without dotenv or LLM fallback."""
+        values = os.environ if environ is None else environ
+        return cls(
+            api_key=values.get("VF_EVAL_API_KEY", "vf-local-eval"),
+            model=values.get("VF_EVAL_MODEL", ""),
+            base_url=values.get("VF_EVAL_BASE_URL", ""),
+        )
+
+
 class LLMClient:
     """Call any OpenAI-compatible chat-completions endpoint through one surface."""
 
-    def __init__(self, settings: LLMSettings, client: Any | None = None) -> None:
+    def __init__(self, settings: LLMSettings | EvalSettings, client: Any | None = None) -> None:
         self.settings = settings
         if client is not None:
             self._client = client
@@ -82,7 +120,7 @@ class LLMClient:
             self._client = OpenAI(api_key=settings.api_key, base_url=settings.base_url)
         except Exception:
             raise LLMConfigurationError(
-                "VF_LLM_BASE_URL could not initialize an OpenAI-compatible client."
+                "The configured base_url could not initialize an OpenAI-compatible client."
             ) from None
 
     @property
