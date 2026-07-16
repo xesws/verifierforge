@@ -846,20 +846,28 @@ flowing through Storage and `vf watch`.
 
 ## v0.11.1 — W1 kill recovery and W2 Blackwell retest
 
-**Status:** documentation gate complete; W1 pending. M3–M6 remain blocked.
+**Status:** W1 passed; W2 read-only diagnosis pending. M3–M6 remain blocked.
 
 ### W1. `vf kill` process-group recovery
 
-- [ ] Launch every remote job in a recorded `setsid` PGID.
-- [ ] Make `vf kill` remove tmux, TERM→KILL that group, force-stop Ray, and
+- [x] Launch every remote job in a recorded `setsid` PGID.
+- [x] Make `vf kill` remove tmux, TERM→KILL that group, force-stop Ray, and
   fail when `nvidia-smi` reports remaining GPU memory/compute allocation.
-- [ ] Pass the real remote fake-job acceptance exercise: launch, kill, then
+- [x] Pass the real remote fake-job acceptance exercise: launch, kill, then
   prove no tmux session, job process, or GPU memory allocation remains.
 
 **Acceptance:** focused tests, shell syntax, and the remote fake-job teardown
 all pass; logs and PGID evidence are synced locally.
 **Stop:** residual process/GPU allocation or any cleanup failure. Do not begin
 W2 until W1 passes.
+
+**Result:** `w1-kill-v0111` launched the detached `fake_smoke` job under
+recorded PGID `9991`. It produced 39 synced metrics records before the kill
+exercise. `vf kill` removed tmux, signalled the recorded group, invoked the
+Ray fallback (which reported no active Ray processes), and reported GPU memory
+`0 MiB`. An independent remote assertion then found no tmux session, no
+matching job process, no compute application, and `0 MiB` GPU memory. The
+ignored laptop evidence is `runs/w1-kill-v0111/`.
 
 ### W2. Read-only diagnosis, narrow repair, and retest
 
