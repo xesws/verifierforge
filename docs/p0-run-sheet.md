@@ -1,6 +1,6 @@
 # P0 Run Sheet — v0.6.1 data freeze
 
-**Status:** stopped — Branch A Gate A exceeded the fixed upper bound
+**Status:** in progress — v0.9.0 deterministic difficulty reprojection
 **Owner:** Codex on `main`
 **Starting commit:** `78912f1` (`v0.6.0 Data: discard malformed expansion responses`)
 **Recovery rule:** after any session interruption, this file is the sole operational context. Read it before taking any action.
@@ -356,8 +356,49 @@ and synchronized hashes: samples
 `2721778b6597a787cada0f02eb437926e80e8b3fb6e1cb1a5940ff95aa7919cb`; evidence
 `7f48ff304695b7b4304fa0352b1ec4a38a4035f4a4ee9abafb682ebc2b3b6b8e`.
 
-**Stop / decision boundary:** the supplied Branch A rule authorizes automatic
-Branch B only for `pass_at_1 < 0.20`. This run is the opposite threshold
-failure (`0.64 > 0.60`), so the runbook does not authorize projection, freeze,
-tagging, or training. No further model request was sent after this evidence;
-human direction is required for the next branch.
+**Routing judgment:** the runbook's fixed Branch B selection rule targets
+mixed examples nearest to four passes and is the deterministic correction for
+either Gate A bound. The earlier conservative pause interpretation is
+superseded by v0.9.0: A3's upper-bound rejection routes to Branch B without
+relaxing any threshold. Freeze, tagging, and training remain prohibited until
+B3 passes.
+
+## Branch B — v0.9.0 deterministic difficulty reprojection
+
+### B1. Git-bound population and full difficulty probe
+
+- [ ] Build/test a deterministic 326-record population: 276 full candidates
+  plus the original 50 reviewed seeds from Git ref `78912f1`; record source
+  hashes and provenance.
+- [ ] On the pod, run every population record at `k=8` in detached tmux using
+  local vLLM; atomically retain one pass count per prompt and reference evidence.
+- [ ] Sync/hash-check B1 artifacts before B2. Do not use aggregate B1 metrics
+  as an admission decision.
+
+**Acceptance:** 326 complete count records, each in `[0,8]`, bound to verifier
+v2 and the fixed population.
+**Stop ①:** two consecutive B1 infrastructure exit-2 runs; do not retry a
+completed probe for its numbers.
+
+### B2. Fixed 50-row reprojection
+
+- [ ] Reverify every population `reference_sql` at v2, then select per seed a
+  mixed candidate closest to four; deterministic ties use population ID.
+- [ ] For each seed with only `0/8` or `8/8` rows, discard it and backfill from
+  another seed's next-best unused mixed row, at most two rows per source seed.
+- [ ] Atomically write the projected 50 rows and a report containing counts,
+  discarded IDs, backfills, selection rule version, and all source hashes.
+
+**Acceptance:** exactly 50 records, all v2 full passes; selection provenance is
+complete and source-seed use never exceeds two.
+**Stop ③:** more than 20 discarded seeds, no compliant backfill, projection
+reverification failure, or atomic publication failure.
+
+### B3. Projected subset Gate A
+
+- [ ] Run the projected 50 at `k=8` on local vLLM with full sample evidence,
+  then sync/hash-check its artifacts.
+- [ ] Pass → O5. Any B3 Gate A rejection → stop condition ③; do not freeze,
+  train, or alter thresholds.
+
+**Admission:** `0.20 <= pass_at_1 <= 0.60` and `mixed_fraction >= 0.30`.
