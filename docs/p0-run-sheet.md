@@ -1157,6 +1157,14 @@ as a root-cause stack trace.
   deterministic random reward), M5 frozen held-out after-evaluation, and M6
   artifact/curve/sync SHA checks. **Stop:** any job, evaluation, or artifact
   failure; do not claim a gain from training-pool or random-control metrics.
+  **Implementation boundary fixed before code:** M3/M4 consume all 50 frozen
+  training-pool rows; their 10-row monitoring validation slice comes from that
+  same pool, never the 60-row held-out set. M3's 50-step checkpoints export a
+  local HF model for M5. M5 serves each export only on pod loopback and runs
+  held-out `k=8` with full sample/tier evidence, selecting max pass@1 (lowest
+  checkpoint step on ties). Ten post-step-20 entropies below 25% of the
+  first-ten median write `early_stopped` plus evidence and stop without a final
+  model artifact.
 
 **N6 pre-implementation decision:** use a new
 `grpo_v1_1p5b_h100_smoke` target, not the historical Blackwell config. It has
