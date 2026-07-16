@@ -1167,7 +1167,8 @@ as a root-cause stack trace.
   **Implementation boundary fixed before code:** M3/M4 consume all 50 frozen
   training-pool rows; their 10-row monitoring validation slice comes from that
   same pool, never the 60-row held-out set. M3's 50-step checkpoints export a
-  local HF model for M5. M5 serves each export only on pod loopback and runs
+  local HF model at `global_step_<n>/actor/huggingface` for M5. M5 serves each
+  export only on pod loopback and runs
   held-out `k=8` with full sample/tier evidence, selecting max pass@1 (lowest
   checkpoint step on ties). Ten post-step-20 entropies below 25% of the
   first-ten median write `early_stopped` plus evidence and stop without a final
@@ -1176,6 +1177,9 @@ as a root-cause stack trace.
   HF safetensors checkpoints, verify the frozen digest/verifier/sample binding,
   and publish either a complete held-out report or an explicit `unavailable`
   report; it cannot select a partial checkpoint set. Local focused tests passed.
+  **First M3 export observation:** verl's actual HF export location is
+  `global_step_50/actor/huggingface`; M5's checkpoint locator is corrected to
+  this verified native shape before it is used.
 
 **N6 pre-implementation decision:** use a new
 `grpo_v1_1p5b_h100_smoke` target, not the historical Blackwell config. It has
