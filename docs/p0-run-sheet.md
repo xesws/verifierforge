@@ -846,7 +846,8 @@ flowing through Storage and `vf watch`.
 
 ## v0.11.1 — W1 kill recovery and W2 Blackwell retest
 
-**Status:** W1 passed; W2 read-only diagnosis pending. M3–M6 remain blocked.
+**Status:** W1 passed; W2 diagnosed as an engine-initialization hang. The first
+authorized `enforce_eager` repair/retest is pending. M3–M6 remain blocked.
 
 ### W1. `vf kill` process-group recovery
 
@@ -871,10 +872,10 @@ ignored laptop evidence is `runs/w1-kill-v0111/`.
 
 ### W2. Read-only diagnosis, narrow repair, and retest
 
-- [ ] Capture within 15 minutes: raw `ray status`, raw final 100-line vLLM and
+- [x] Capture within 15 minutes: raw `ray status`, raw final 100-line vLLM and
   verl-driver log tails, GPU utilization/memory snapshots, and resolved
   `n_gpus` / TP / GPU-memory configuration.
-- [ ] Classify exactly one: resource waiting, engine-initialization hang, or
+- [x] Classify exactly one: resource waiting, engine-initialization hang, or
   communication-initialization hang; record raw evidence and classification.
 - [ ] If resource waiting, align single-GPU declarations. If engine init hangs,
   first enable `enforce_eager`, then try attention fallbacks one at a time.
@@ -886,3 +887,26 @@ append-only Storage metrics, a curve point, and W1-clean teardown.
 or the second hanging retest. Preserve evidence and stop for human direction.
 Only a passing W2 unblocks M3–M6; retain the existing 6–7 hour single-GPU
 runtime trigger before considering a card change.
+
+**Diagnosis (15-minute read-only window):** `p0-w2-diag-v0111` produced no
+Storage metric, curve point, checkpoint, rollout, or post-update event. The
+unaddressed `ray status` returned `ConnectionError: Could not find any running
+Ray instance`; `ray status --address=172.23.0.2:42207` timed out (`124`). The
+actual raylet resource line nevertheless reported `GPU,1`; the resolved actor
+rollout dump reported `n_gpus_per_node=1`, TP `1`, GPU memory utilization
+`0.5`, and **`enforce_eager=False`**. This rules out the apparent disabled
+reward/teacher defaults that display TP `2`: they are not the active actor.
+
+GPU snapshots progressed from 0/3 MiB to a `ray::WorkerDict` at 8,286 MiB then
+7,192 MiB with 0% utilization. The driver logged model/FSDP initialization and
+vLLM server construction at `19:32:35 UTC`; its final lines were
+`override_generation_config` and `enable_sleep_mode`. There was no engine-ready
+line, `update_weights`, throughput, metric, checkpoint, or CUDA/OOM/Traceback.
+This is classified as **engine-initialization hang**, not resource waiting or
+communication initialization. Raw evidence is preserved under the ignored
+`runs/p0-w2-diag-v0111/` (including `evidence/`, `train.log`, and synced input).
+
+**Authorized repair #1:** stop the diagnostic job with W1, then set only
+`actor_rollout_ref.rollout.enforce_eager=True` for the Blackwell smoke and
+retest once. No attention-backend fallback is permitted unless this retest
+again hangs.
