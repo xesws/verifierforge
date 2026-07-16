@@ -370,9 +370,9 @@ B3 passes.
 - [x] Build/test a deterministic 326-record population: 276 full candidates
   plus the original 50 reviewed seeds from Git ref `78912f1`; record source
   hashes and provenance.
-- [ ] On the pod, run every population record at `k=8` in detached tmux using
+- [x] On the pod, run every population record at `k=8` in detached tmux using
   local vLLM; atomically retain one pass count per prompt and reference evidence.
-- [ ] Sync/hash-check B1 artifacts before B2. Do not use aggregate B1 metrics
+- [x] Sync/hash-check B1 artifacts before B2. Do not use aggregate B1 metrics
   as an admission decision.
 
 **Acceptance:** 326 complete count records, each in `[0,8]`, bound to verifier
@@ -389,19 +389,40 @@ the full candidate input SHA-256
 `0ad88c264bb4488189fc0788b740bdfabf99fc5fb2be0e232f0420953c79c96a` plus the
 original seed object at `78912f1`.
 
+**B1 result:** detached pod probe `vf-b1-v090` completed with exit `0` and
+published all 326 pass counts. Its reference-only triplet is
+`pass_at_1=0.5674846625766872`, `pass_at_8=0.7975460122699386`, and
+`mixed_fraction=0.4938650306748466`. The count JSONL SHA-256 is
+`50125e21b90bb8d45a03b0f201bd371002984b36314334e3db822ceb8c1b44b3`; the
+evidence SHA-256 is
+`cc5ff55bc66573f1b1fdae3f47a2177871d548b0c6c188128459957d29f34c29`.
+Laptop and pod hashes match. Count histogram: `0:66`, `1:17`, `2:21`, `3:29`,
+`4:19`, `5:18`, `6:18`, `7:39`, `8:99`.
+
 ### B2. Fixed 50-row reprojection
 
-- [ ] Reverify every population `reference_sql` at v2, then select per seed a
+- [x] Reverify every population `reference_sql` at v2, then select per seed a
   mixed candidate closest to four; deterministic ties use population ID.
-- [ ] For each seed with only `0/8` or `8/8` rows, discard it and backfill from
+- [x] For each seed with only `0/8` or `8/8` rows, discard it and backfill from
   another seed's next-best unused mixed row, at most two rows per source seed.
-- [ ] Atomically write the projected 50 rows and a report containing counts,
+- [x] Atomically write the projected 50 rows and a report containing counts,
   discarded IDs, backfills, selection rule version, and all source hashes.
 
 **Acceptance:** exactly 50 records, all v2 full passes; selection provenance is
 complete and source-seed use never exceeds two.
 **Stop ③:** more than 20 discarded seeds, no compliant backfill, projection
 reverification failure, or atomic publication failure.
+
+**B2 result:** completed with all 326 stored reference SQL values at v2 score
+`1.0`; no re-verification failures. The 50-row artifact
+`data/nl2sql/v0.9.0-b2-projected-subset.jsonl` has SHA-256
+`8f0a1df0366ec014a16121d357298dbfc1359fdb23419e2cf7adb95a9e6ebec2`; report
+SHA-256 is `3592e74e12c2d9699943b4fad92ea89ce866bb7b2e4eac57643915adc78a981f`.
+Discarded seeds: `v1-004`, `v1-008`, `v1-012`, `v1-020`, `v1-022`, `v1-027`.
+Six backfills came from `v1-032`, `v1-033`, `v1-037`, `v1-003`, `v1-010`, and
+`v1-011`; source-seed use maximum is exactly two. The current loader accepted
+all 50 output rows with the stable 40/10 split. Stop condition ③ is not
+triggered.
 
 ### B3. Projected subset Gate A
 

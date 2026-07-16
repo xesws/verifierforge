@@ -1,0 +1,478 @@
+{
+  "backfills": [
+    {
+      "pass_count": 4,
+      "slot_seed_id": "v1-004",
+      "source_population_id": "candidate:aug-v1-032-004",
+      "source_seed_id": "v1-032"
+    },
+    {
+      "pass_count": 4,
+      "slot_seed_id": "v1-008",
+      "source_population_id": "candidate:aug-v1-033-004",
+      "source_seed_id": "v1-033"
+    },
+    {
+      "pass_count": 4,
+      "slot_seed_id": "v1-012",
+      "source_population_id": "candidate:aug-v1-037-006",
+      "source_seed_id": "v1-037"
+    },
+    {
+      "pass_count": 3,
+      "slot_seed_id": "v1-020",
+      "source_population_id": "candidate:aug-v1-003-002",
+      "source_seed_id": "v1-003"
+    },
+    {
+      "pass_count": 5,
+      "slot_seed_id": "v1-022",
+      "source_population_id": "candidate:aug-v1-010-002",
+      "source_seed_id": "v1-010"
+    },
+    {
+      "pass_count": 5,
+      "slot_seed_id": "v1-027",
+      "source_population_id": "candidate:aug-v1-011-003",
+      "source_seed_id": "v1-011"
+    }
+  ],
+  "discarded_seed_ids": [
+    "v1-004",
+    "v1-008",
+    "v1-012",
+    "v1-020",
+    "v1-022",
+    "v1-027"
+  ],
+  "pass_counts": {
+    "k": 8,
+    "path": "runs/p0-gate-a/v0.9.0-b1-pass-counts.jsonl",
+    "record_count": 326,
+    "sha256": "50125e21b90bb8d45a03b0f201bd371002984b36314334e3db822ceb8c1b44b3"
+  },
+  "population": {
+    "path": "data/nl2sql/v0.9.0-b1-population.jsonl",
+    "record_count": 326,
+    "sha256": "23c269a9de89bb4fdfec21bde56488290f424368e5c2b08c7ce402bc74f31a91"
+  },
+  "projected_subset": {
+    "path": "data/nl2sql/v0.9.0-b2-projected-subset.jsonl",
+    "record_count": 50,
+    "sha256": "8f0a1df0366ec014a16121d357298dbfc1359fdb23419e2cf7adb95a9e6ebec2"
+  },
+  "reference_reverification": {
+    "failures": [],
+    "full_pass_count": 326,
+    "record_count": 326
+  },
+  "schema_version": 1,
+  "selected_count": 50,
+  "selection_rule": "For each seed, select its mixed (1..7) population record nearest to 4; tie-break by population ID. Discard unmixed seeds and fill their slots from another seed's next-best unused mixed record, max two rows per source seed.",
+  "selection_rule_version": "v0.9.0-nearest-four-mixed-backfill-v1",
+  "selections": [
+    {
+      "pass_count": 7,
+      "selection_reason": "nearest_four_mixed",
+      "slot_seed_id": "v1-001",
+      "source_population_id": "candidate:aug-v1-001-002",
+      "source_seed_id": "v1-001"
+    },
+    {
+      "pass_count": 1,
+      "selection_reason": "nearest_four_mixed",
+      "slot_seed_id": "v1-002",
+      "source_population_id": "candidate:aug-v1-002-002",
+      "source_seed_id": "v1-002"
+    },
+    {
+      "pass_count": 4,
+      "selection_reason": "nearest_four_mixed",
+      "slot_seed_id": "v1-003",
+      "source_population_id": "candidate:aug-v1-003-005",
+      "source_seed_id": "v1-003"
+    },
+    {
+      "pass_count": 4,
+      "selection_reason": "backfill_next_best_mixed",
+      "slot_seed_id": "v1-004",
+      "source_population_id": "candidate:aug-v1-032-004",
+      "source_seed_id": "v1-032"
+    },
+    {
+      "pass_count": 3,
+      "selection_reason": "nearest_four_mixed",
+      "slot_seed_id": "v1-005",
+      "source_population_id": "original:v1-005",
+      "source_seed_id": "v1-005"
+    },
+    {
+      "pass_count": 7,
+      "selection_reason": "nearest_four_mixed",
+      "slot_seed_id": "v1-006",
+      "source_population_id": "candidate:aug-v1-006-002",
+      "source_seed_id": "v1-006"
+    },
+    {
+      "pass_count": 4,
+      "selection_reason": "nearest_four_mixed",
+      "slot_seed_id": "v1-007",
+      "source_population_id": "original:v1-007",
+      "source_seed_id": "v1-007"
+    },
+    {
+      "pass_count": 4,
+      "selection_reason": "backfill_next_best_mixed",
+      "slot_seed_id": "v1-008",
+      "source_population_id": "candidate:aug-v1-033-004",
+      "source_seed_id": "v1-033"
+    },
+    {
+      "pass_count": 7,
+      "selection_reason": "nearest_four_mixed",
+      "slot_seed_id": "v1-009",
+      "source_population_id": "original:v1-009",
+      "source_seed_id": "v1-009"
+    },
+    {
+      "pass_count": 4,
+      "selection_reason": "nearest_four_mixed",
+      "slot_seed_id": "v1-010",
+      "source_population_id": "candidate:aug-v1-010-001",
+      "source_seed_id": "v1-010"
+    },
+    {
+      "pass_count": 4,
+      "selection_reason": "nearest_four_mixed",
+      "slot_seed_id": "v1-011",
+      "source_population_id": "candidate:aug-v1-011-006",
+      "source_seed_id": "v1-011"
+    },
+    {
+      "pass_count": 4,
+      "selection_reason": "backfill_next_best_mixed",
+      "slot_seed_id": "v1-012",
+      "source_population_id": "candidate:aug-v1-037-006",
+      "source_seed_id": "v1-037"
+    },
+    {
+      "pass_count": 5,
+      "selection_reason": "nearest_four_mixed",
+      "slot_seed_id": "v1-013",
+      "source_population_id": "candidate:aug-v1-013-005",
+      "source_seed_id": "v1-013"
+    },
+    {
+      "pass_count": 4,
+      "selection_reason": "nearest_four_mixed",
+      "slot_seed_id": "v1-014",
+      "source_population_id": "original:v1-014",
+      "source_seed_id": "v1-014"
+    },
+    {
+      "pass_count": 5,
+      "selection_reason": "nearest_four_mixed",
+      "slot_seed_id": "v1-015",
+      "source_population_id": "candidate:aug-v1-015-002",
+      "source_seed_id": "v1-015"
+    },
+    {
+      "pass_count": 5,
+      "selection_reason": "nearest_four_mixed",
+      "slot_seed_id": "v1-016",
+      "source_population_id": "candidate:aug-v1-016-005",
+      "source_seed_id": "v1-016"
+    },
+    {
+      "pass_count": 6,
+      "selection_reason": "nearest_four_mixed",
+      "slot_seed_id": "v1-017",
+      "source_population_id": "candidate:aug-v1-017-001",
+      "source_seed_id": "v1-017"
+    },
+    {
+      "pass_count": 5,
+      "selection_reason": "nearest_four_mixed",
+      "slot_seed_id": "v1-018",
+      "source_population_id": "candidate:aug-v1-018-002",
+      "source_seed_id": "v1-018"
+    },
+    {
+      "pass_count": 1,
+      "selection_reason": "nearest_four_mixed",
+      "slot_seed_id": "v1-019",
+      "source_population_id": "candidate:aug-v1-019-005",
+      "source_seed_id": "v1-019"
+    },
+    {
+      "pass_count": 3,
+      "selection_reason": "backfill_next_best_mixed",
+      "slot_seed_id": "v1-020",
+      "source_population_id": "candidate:aug-v1-003-002",
+      "source_seed_id": "v1-003"
+    },
+    {
+      "pass_count": 5,
+      "selection_reason": "nearest_four_mixed",
+      "slot_seed_id": "v1-021",
+      "source_population_id": "candidate:aug-v1-021-001",
+      "source_seed_id": "v1-021"
+    },
+    {
+      "pass_count": 5,
+      "selection_reason": "backfill_next_best_mixed",
+      "slot_seed_id": "v1-022",
+      "source_population_id": "candidate:aug-v1-010-002",
+      "source_seed_id": "v1-010"
+    },
+    {
+      "pass_count": 6,
+      "selection_reason": "nearest_four_mixed",
+      "slot_seed_id": "v1-023",
+      "source_population_id": "candidate:aug-v1-023-002",
+      "source_seed_id": "v1-023"
+    },
+    {
+      "pass_count": 3,
+      "selection_reason": "nearest_four_mixed",
+      "slot_seed_id": "v1-024",
+      "source_population_id": "candidate:aug-v1-024-002",
+      "source_seed_id": "v1-024"
+    },
+    {
+      "pass_count": 4,
+      "selection_reason": "nearest_four_mixed",
+      "slot_seed_id": "v1-025",
+      "source_population_id": "candidate:aug-v1-025-002",
+      "source_seed_id": "v1-025"
+    },
+    {
+      "pass_count": 4,
+      "selection_reason": "nearest_four_mixed",
+      "slot_seed_id": "v1-026",
+      "source_population_id": "original:v1-026",
+      "source_seed_id": "v1-026"
+    },
+    {
+      "pass_count": 5,
+      "selection_reason": "backfill_next_best_mixed",
+      "slot_seed_id": "v1-027",
+      "source_population_id": "candidate:aug-v1-011-003",
+      "source_seed_id": "v1-011"
+    },
+    {
+      "pass_count": 6,
+      "selection_reason": "nearest_four_mixed",
+      "slot_seed_id": "v1-028",
+      "source_population_id": "candidate:aug-v1-028-004",
+      "source_seed_id": "v1-028"
+    },
+    {
+      "pass_count": 2,
+      "selection_reason": "nearest_four_mixed",
+      "slot_seed_id": "v1-029",
+      "source_population_id": "candidate:aug-v1-029-002",
+      "source_seed_id": "v1-029"
+    },
+    {
+      "pass_count": 4,
+      "selection_reason": "nearest_four_mixed",
+      "slot_seed_id": "v1-030",
+      "source_population_id": "candidate:aug-v1-030-003",
+      "source_seed_id": "v1-030"
+    },
+    {
+      "pass_count": 5,
+      "selection_reason": "nearest_four_mixed",
+      "slot_seed_id": "v1-031",
+      "source_population_id": "candidate:aug-v1-031-001",
+      "source_seed_id": "v1-031"
+    },
+    {
+      "pass_count": 4,
+      "selection_reason": "nearest_four_mixed",
+      "slot_seed_id": "v1-032",
+      "source_population_id": "candidate:aug-v1-032-003",
+      "source_seed_id": "v1-032"
+    },
+    {
+      "pass_count": 4,
+      "selection_reason": "nearest_four_mixed",
+      "slot_seed_id": "v1-033",
+      "source_population_id": "candidate:aug-v1-033-003",
+      "source_seed_id": "v1-033"
+    },
+    {
+      "pass_count": 5,
+      "selection_reason": "nearest_four_mixed",
+      "slot_seed_id": "v1-034",
+      "source_population_id": "candidate:aug-v1-034-001",
+      "source_seed_id": "v1-034"
+    },
+    {
+      "pass_count": 4,
+      "selection_reason": "nearest_four_mixed",
+      "slot_seed_id": "v1-035",
+      "source_population_id": "candidate:aug-v1-035-003",
+      "source_seed_id": "v1-035"
+    },
+    {
+      "pass_count": 3,
+      "selection_reason": "nearest_four_mixed",
+      "slot_seed_id": "v1-036",
+      "source_population_id": "candidate:aug-v1-036-003",
+      "source_seed_id": "v1-036"
+    },
+    {
+      "pass_count": 4,
+      "selection_reason": "nearest_four_mixed",
+      "slot_seed_id": "v1-037",
+      "source_population_id": "candidate:aug-v1-037-002",
+      "source_seed_id": "v1-037"
+    },
+    {
+      "pass_count": 3,
+      "selection_reason": "nearest_four_mixed",
+      "slot_seed_id": "v1-038",
+      "source_population_id": "candidate:aug-v1-038-005",
+      "source_seed_id": "v1-038"
+    },
+    {
+      "pass_count": 7,
+      "selection_reason": "nearest_four_mixed",
+      "slot_seed_id": "v1-039",
+      "source_population_id": "original:v1-039",
+      "source_seed_id": "v1-039"
+    },
+    {
+      "pass_count": 6,
+      "selection_reason": "nearest_four_mixed",
+      "slot_seed_id": "v1-040",
+      "source_population_id": "candidate:aug-v1-040-005",
+      "source_seed_id": "v1-040"
+    },
+    {
+      "pass_count": 4,
+      "selection_reason": "nearest_four_mixed",
+      "slot_seed_id": "v1-041",
+      "source_population_id": "candidate:aug-v1-041-005",
+      "source_seed_id": "v1-041"
+    },
+    {
+      "pass_count": 5,
+      "selection_reason": "nearest_four_mixed",
+      "slot_seed_id": "v1-042",
+      "source_population_id": "candidate:aug-v1-042-002",
+      "source_seed_id": "v1-042"
+    },
+    {
+      "pass_count": 2,
+      "selection_reason": "nearest_four_mixed",
+      "slot_seed_id": "v1-043",
+      "source_population_id": "candidate:aug-v1-043-003",
+      "source_seed_id": "v1-043"
+    },
+    {
+      "pass_count": 3,
+      "selection_reason": "nearest_four_mixed",
+      "slot_seed_id": "v1-044",
+      "source_population_id": "candidate:aug-v1-044-004",
+      "source_seed_id": "v1-044"
+    },
+    {
+      "pass_count": 4,
+      "selection_reason": "nearest_four_mixed",
+      "slot_seed_id": "v1-045",
+      "source_population_id": "candidate:aug-v1-045-001",
+      "source_seed_id": "v1-045"
+    },
+    {
+      "pass_count": 4,
+      "selection_reason": "nearest_four_mixed",
+      "slot_seed_id": "v1-046",
+      "source_population_id": "candidate:aug-v1-046-002",
+      "source_seed_id": "v1-046"
+    },
+    {
+      "pass_count": 3,
+      "selection_reason": "nearest_four_mixed",
+      "slot_seed_id": "v1-047",
+      "source_population_id": "candidate:aug-v1-047-002",
+      "source_seed_id": "v1-047"
+    },
+    {
+      "pass_count": 3,
+      "selection_reason": "nearest_four_mixed",
+      "slot_seed_id": "v1-048",
+      "source_population_id": "candidate:aug-v1-048-001",
+      "source_seed_id": "v1-048"
+    },
+    {
+      "pass_count": 1,
+      "selection_reason": "nearest_four_mixed",
+      "slot_seed_id": "v1-049",
+      "source_population_id": "candidate:aug-v1-049-002",
+      "source_seed_id": "v1-049"
+    },
+    {
+      "pass_count": 5,
+      "selection_reason": "nearest_four_mixed",
+      "slot_seed_id": "v1-050",
+      "source_population_id": "candidate:aug-v1-050-004",
+      "source_seed_id": "v1-050"
+    }
+  ],
+  "source_seed_use": {
+    "v1-001": 1,
+    "v1-002": 1,
+    "v1-003": 2,
+    "v1-005": 1,
+    "v1-006": 1,
+    "v1-007": 1,
+    "v1-009": 1,
+    "v1-010": 2,
+    "v1-011": 2,
+    "v1-013": 1,
+    "v1-014": 1,
+    "v1-015": 1,
+    "v1-016": 1,
+    "v1-017": 1,
+    "v1-018": 1,
+    "v1-019": 1,
+    "v1-021": 1,
+    "v1-023": 1,
+    "v1-024": 1,
+    "v1-025": 1,
+    "v1-026": 1,
+    "v1-028": 1,
+    "v1-029": 1,
+    "v1-030": 1,
+    "v1-031": 1,
+    "v1-032": 2,
+    "v1-033": 2,
+    "v1-034": 1,
+    "v1-035": 1,
+    "v1-036": 1,
+    "v1-037": 2,
+    "v1-038": 1,
+    "v1-039": 1,
+    "v1-040": 1,
+    "v1-041": 1,
+    "v1-042": 1,
+    "v1-043": 1,
+    "v1-044": 1,
+    "v1-045": 1,
+    "v1-046": 1,
+    "v1-047": 1,
+    "v1-048": 1,
+    "v1-049": 1,
+    "v1-050": 1
+  },
+  "status": "completed",
+  "stop_reason": null,
+  "verifier": {
+    "identity": "core.rewards.nl2sql.NL2SQLVerifier",
+    "source_sha256": "b76707e5c0603d227393d03ffc0bdc7c66ec072a139c6aa717c282f4082de47f",
+    "version": 2
+  }
+}
