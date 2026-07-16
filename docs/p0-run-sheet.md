@@ -1000,3 +1000,39 @@ artifact synchronization.
 is vLLM's explicit recommendation and is the sole allowed repair. The one
 retest ends at the original `20:40:48 UTC` deadline, then W1 teardown and a
 zero-MiB check are mandatory.
+
+## v0.12.0 — Fresh H100 rebuild and D4 execution
+
+**Status:** planned; the former RTX PRO 6000/old volume have no remaining
+completion credit. Start again on the new H100 SXM executor.
+
+- [ ] **N1 — connection:** update local `runpod` SSH entry to
+  `157.66.254.39:14694`; prove one H100 80 GB and empty `/workspace` (or only
+  `lost+found`). **Stop:** SSH/GPU/volume acceptance fails.
+- [ ] **N2 — repository access:** create the new pod key, add a read-only
+  deploy key with authenticated `gh`, preserve it only on the new workspace
+  volume for the existing 0600 copy logic, and prove `ssh -T git@github.com`.
+  **Stop:** `gh auth` or GitHub authentication fails.
+- [ ] **N3 — bootstrap:** run `vf bootstrap`; prove imports and exact runtime
+  versions: torch `2.8.0+cu128`, vLLM `0.10.2`, verl `0.8.0`, ray `2.56.0`.
+  **Stop:** clone/install/import/version mismatch.
+- [ ] **N4 — models:** snapshot only Qwen 2.5 0.5B and 1.5B into
+  `/workspace/hf-cache`; prove both snapshot directories are complete. **Stop:**
+  either download/snapshot check fails; do not download gpt-oss-20b.
+- [ ] **N5 — freeze:** prove tag `v0.10.2-p0-three-piece-freeze` and compare
+  training-pool SHA-256
+  `c97a5adea789fae3be249bc9ac95a1902ae5a9769de9eefbc08277f056878e8c`
+  plus held-out SHA-256
+  `482f0e7678e7603311f72aeead381364cd92f0596c20745cc58c96916a9177e8`.
+  **Stop:** tag/hash mismatch.
+- [ ] **N6 — M2′ H100 smoke:** create/document the H100-specific 1.5B config
+  (one GPU, TP 1, `0.45` rollout memory, Hugging Face `sdpa`), run 20–30 steps,
+  require at least 20 nonempty metric rows, record tokens/s, step time and M3
+  estimate, then W1 kill with 0 MiB. **Stop:** any missing metric, error, or
+  cleanup failure.
+- [ ] **N7 — M3–M6:** only after N6 passes, launch detached 1.5B main training
+  (300–500 steps, `k=8`, 50-step checkpoints, held-out-best, entropy brake),
+  then serial 0.5B random-reward control at half steps; evaluate the frozen
+  held-out 60 against `0.583 / 0.767 / 0.467`; archive Storage artifacts,
+  curve PNG/final checkpoint and `vf watch` SHA consistency. **Stop:** any
+  implementation, training, evaluation, or artifact-validation failure.
