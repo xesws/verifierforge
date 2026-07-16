@@ -1,6 +1,6 @@
 # P0 Run Sheet — v0.6.1 data freeze
 
-**Status:** in progress — v0.9.0 deterministic difficulty reprojection
+**Status:** stopped — B3 Gate A rejection (runbook stop condition ③)
 **Owner:** Codex on `main`
 **Starting commit:** `78912f1` (`v0.6.0 Data: discard malformed expansion responses`)
 **Recovery rule:** after any session interruption, this file is the sole operational context. Read it before taking any action.
@@ -426,9 +426,24 @@ triggered.
 
 ### B3. Projected subset Gate A
 
-- [ ] Run the projected 50 at `k=8` on local vLLM with full sample evidence,
+- [x] Run the projected 50 at `k=8` on local vLLM with full sample evidence,
   then sync/hash-check its artifacts.
-- [ ] Pass → O5. Any B3 Gate A rejection → stop condition ③; do not freeze,
+- [x] Pass → O5. Any B3 Gate A rejection → stop condition ③; do not freeze,
   train, or alter thresholds.
 
 **Admission:** `0.20 <= pass_at_1 <= 0.60` and `mixed_fraction >= 0.30`.
+
+**Result (stop condition ③):** detached pod job `vf-b3-v090` completed all
+400 samples with exit `1`, a Gate A rejection rather than infrastructure exit
+`2`. Raw v2 metrics are exactly `pass_at_1=0.66`, `pass_at_8=0.92`, and
+`mixed_fraction=0.82`; the only failed condition is the fixed upper pass@1
+limit (`0.66 > 0.60`). The input SHA-256 is
+`8f0a1df0366ec014a16121d357298dbfc1359fdb23419e2cf7adb95a9e6ebec2`; sample
+and evidence SHA-256 values match on laptop and pod:
+`1c11829a411138017e91d24999204541d0a265cb9f3b2d35235fceba27737a83` and
+`0a35a057f4908520256874e53d40297807582d3bac94dc62f46d38cef6c8959b`.
+
+**Stopped:** B3 rejection is explicitly stop condition ③. O5 freeze/tag and
+O6 Gate B are not authorized. No threshold change, new dataset, retry, or
+additional model request follows this evidence; await human data-layer
+direction.
