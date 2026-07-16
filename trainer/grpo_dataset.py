@@ -66,13 +66,31 @@ def write_parquet(rows: Sequence[Mapping[str, Any]], destination: Path) -> Path:
     return destination
 
 
-def prepare_v1_inputs(runs_root: Path, job_id: str) -> VerlInputPaths:
-    """Create the deterministic 40/10 remote-only Parquet split for one job."""
-    from trainer.data.nl2sql_v1 import split_cases
+def prepare_v1_inputs(
+    runs_root: Path,
+    job_id: str,
+    *,
+    dataset_mode: str = "d2_split",
+) -> VerlInputPaths:
+    """Create a deterministic local Parquet view of an approved training input.
 
-    train_cases, validation_cases = split_cases(seed=42)
-    if len(train_cases) != 40 or len(validation_cases) != 10:
-        raise ValueError("D2 V1 fixture must split into exactly 40 train and 10 validation cases")
+    ``frozen_training_pool`` deliberately trains on all 50 frozen rows. Its
+    ten-row validation file is a monitoring-only copy from that same pool, so
+    the immutable 60-row held-out file never reaches verl.
+    """
+    from trainer.data.nl2sql_v1 import load_cases, split_cases
+
+    if dataset_mode == "d2_split":
+        train_cases, validation_cases = split_cases(seed=42)
+        if len(train_cases) != 40 or len(validation_cases) != 10:
+            raise ValueError("D2 V1 fixture must split into exactly 40 train and 10 validation cases")
+    elif dataset_mode == "frozen_training_pool":
+        train_cases = load_cases()
+        if len(train_cases) != 50:
+            raise ValueError("frozen training-pool alias must contain exactly 50 cases")
+        validation_cases = sorted(train_cases, key=lambda case: str(case["id"]))[:10]
+    else:
+        raise ValueError(f"unknown dataset_mode: {dataset_mode}")
 
     input_dir = Path(runs_root) / job_id / "input"
     train = write_parquet(build_verl_rows(train_cases), input_dir / "train.parquet")

@@ -3,21 +3,23 @@
 from __future__ import annotations
 
 import argparse
+import json
 import os
 import signal
 import subprocess
 import sys
 import time
 from collections.abc import Callable
-from dataclasses import asdict
+from dataclasses import asdict, dataclass
 from datetime import datetime, timezone
 from pathlib import Path
+from statistics import median
 
 from core.storage.local import LocalStorage
 from trainer.checkpoint_bridge import CheckpointBridge, latest_storage_resume_path
 from trainer.grpo_config import GrpoSmokeConfig
 from trainer.grpo_dataset import prepare_v1_inputs
-from trainer.metric_bridge import VerlMetricBridge
+from trainer.metric_bridge import NormalizedMetric, VerlMetricBridge
 from trainer.plot_metrics import render_curve
 
 
@@ -29,6 +31,54 @@ RUNTIME_EVIDENCE_ENVIRONMENT = (
     "RAY_DEDUP_LOGS",
     "PYTHONFAULTHANDLER",
 )
+
+ENTROPY_BRAKE_START_STEP = 20
+ENTROPY_BRAKE_BASELINE_COUNT = 10
+ENTROPY_BRAKE_WINDOW = 10
+ENTROPY_BRAKE_FRACTION = 0.25
+
+
+@dataclass(frozen=True)
+class EntropyBrakeDecision:
+    """The immutable evidence needed to explain an intentional early stop."""
+
+    trigger_step: int
+    baseline_entropies: tuple[float, ...]
+    baseline_median: float
+    threshold: float
+    below_threshold_window: tuple[tuple[int, float], ...]
+
+
+class EntropyBrake:
+    """Observe bridged metrics without changing their append-only publication."""
+
+    def __init__(self) -> None:
+        self._baseline: list[float] = []
+        self._below_threshold: list[tuple[int, float]] = []
+
+    def observe(self, *, step: int, entropy: float) -> EntropyBrakeDecision | None:
+        if len(self._baseline) < ENTROPY_BRAKE_BASELINE_COUNT:
+            self._baseline.append(entropy)
+            return None
+        if step <= ENTROPY_BRAKE_START_STEP:
+            return None
+
+        baseline_median = median(self._baseline)
+        threshold = baseline_median * ENTROPY_BRAKE_FRACTION
+        if entropy < threshold:
+            self._below_threshold.append((step, entropy))
+        else:
+            self._below_threshold.clear()
+
+        if len(self._below_threshold) < ENTROPY_BRAKE_WINDOW:
+            return None
+        return EntropyBrakeDecision(
+            trigger_step=step,
+            baseline_entropies=tuple(self._baseline),
+            baseline_median=baseline_median,
+            threshold=threshold,
+            below_threshold_window=tuple(self._below_threshold),
+        )
 
 
 def capture_runtime_evidence(
@@ -154,7 +204,7 @@ def run(
     else:
         print(f"Starting {job_id} from scratch", flush=True)
 
-    inputs = prepare_v1_inputs(runs_root, job_id)
+    inputs = prepare_v1_inputs(runs_root, job_id, dataset_mode=config.dataset_mode)
     # FileLogger opens this path in write mode on every native invocation.  Clear
     # stale lines before the child starts; append-only public metrics are kept in
     # LocalStorage and de-duplicated by the metric bridge.
@@ -194,6 +244,8 @@ def run(
         start_new_session=True,
     )
     interrupted = False
+    brake_decision: EntropyBrakeDecision | None = None
+    entropy_brake = EntropyBrake() if config.entropy_brake else None
     termination_deadline: float | None = None
 
     def forward_signal(signum: int, _frame: object) -> None:
@@ -216,7 +268,26 @@ def run(
     }
     try:
         while process.poll() is None:
-            _drain_bridges(metric_bridge, checkpoint_bridge)
+            metrics = _drain_bridges(metric_bridge, checkpoint_bridge)
+            if entropy_brake is not None and brake_decision is None:
+                for metric in metrics:
+                    decision = entropy_brake.observe(step=metric.step, entropy=metric.entropy)
+                    if decision is None:
+                        continue
+                    brake_decision = decision
+                    _publish_entropy_brake(storage, job_id, config, decision)
+                    if termination_deadline is None:
+                        termination_deadline = time.monotonic() + 20
+                    try:
+                        os.killpg(process.pid, signal.SIGTERM)
+                    except ProcessLookupError:
+                        pass
+                    print(
+                        f"entropy brake at step={decision.trigger_step:04d}; "
+                        "terminating without a final-model artifact",
+                        flush=True,
+                    )
+                    break
             if termination_deadline is not None and time.monotonic() >= termination_deadline:
                 try:
                     os.killpg(process.pid, signal.SIGKILL)
@@ -230,6 +301,9 @@ def run(
             signal.signal(signum, handler)
         _drain_bridges(metric_bridge, checkpoint_bridge)
 
+    if brake_decision is not None:
+        print(f"{job_id} early-stopped by entropy brake", flush=True)
+        return 75
     if interrupted:
         print(f"{job_id} interrupted; published Storage checkpoints remain resumable", flush=True)
         return return_code if return_code else 130
@@ -249,8 +323,11 @@ def run(
     return 0
 
 
-def _drain_bridges(metric_bridge: VerlMetricBridge, checkpoint_bridge: CheckpointBridge) -> None:
-    for metric in metric_bridge.drain():
+def _drain_bridges(
+    metric_bridge: VerlMetricBridge, checkpoint_bridge: CheckpointBridge
+) -> list[NormalizedMetric]:
+    metrics = metric_bridge.drain()
+    for metric in metrics:
         print(
             f"metric step={metric.step:04d} reward={metric.reward_mean:.3f} "
             f"pass_at_1={metric.pass_at_1:.3f} entropy={metric.entropy:.3f}",
@@ -258,6 +335,52 @@ def _drain_bridges(metric_bridge: VerlMetricBridge, checkpoint_bridge: Checkpoin
         )
     for step in checkpoint_bridge.publish_available():
         print(f"Published Storage checkpoint step_{step}", flush=True)
+    return metrics
+
+
+def _publish_entropy_brake(
+    storage: LocalStorage,
+    job_id: str,
+    config: GrpoSmokeConfig,
+    decision: EntropyBrakeDecision,
+) -> Path:
+    """Atomically persist the stop reason before terminating the GPU child."""
+    run_dir = storage.root / job_id
+    evidence_dir = run_dir / "evidence"
+    evidence_dir.mkdir(parents=True, exist_ok=True)
+    checkpoint = latest_storage_resume_path(storage, job_id)
+    checkpoint_step = _native_step(checkpoint) if checkpoint else None
+    payload = {
+        "job_id": job_id,
+        "status": "early_stopped",
+        "trigger_step": decision.trigger_step,
+        "baseline_entropies": list(decision.baseline_entropies),
+        "baseline_median": decision.baseline_median,
+        "threshold": decision.threshold,
+        "below_threshold_window": [
+            {"step": step, "entropy": entropy}
+            for step, entropy in decision.below_threshold_window
+        ],
+        "latest_storage_checkpoint_step": checkpoint_step,
+        "config": asdict(config),
+        "generated_at": datetime.now(timezone.utc).isoformat(),
+    }
+    evidence = evidence_dir / "entropy-brake.json"
+    _write_json_atomic(evidence, payload)
+    _write_text_atomic(run_dir / "early_stopped", "entropy brake\n")
+    storage.put_artifact(job_id, "entropy-brake.json", evidence)
+    return evidence
+
+
+def _write_json_atomic(path: Path, payload: object) -> None:
+    _write_text_atomic(path, json.dumps(payload, indent=2, sort_keys=True) + "\n")
+
+
+def _write_text_atomic(path: Path, content: str) -> None:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    temporary = path.with_suffix(path.suffix + ".tmp")
+    temporary.write_text(content, encoding="utf-8")
+    os.replace(temporary, path)
 
 
 def _native_step(path: Path) -> int:
@@ -282,7 +405,7 @@ def _publish_final_artifacts(
                 f"model: {config.model_path}",
                 f"completed_step: {_native_step(final_checkpoint)}",
                 f"storage_checkpoint: {final_checkpoint}",
-                "checkpoint_contents: model, optimizer, extra",
+                f"checkpoint_contents: {config.checkpoint_save_contents}",
                 f"generated_at: {datetime.now(timezone.utc).isoformat()}",
                 f"config: {asdict(config)}",
                 "weights remain in ckpt/ and are intentionally not synced by vf watch.",

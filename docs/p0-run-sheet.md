@@ -1130,7 +1130,7 @@ as a root-cause stack trace.
 
 ### v0.12.4 — E1 H100 milestone retest and D4 continuation
 
-**Status:** approved; implementation/launch pending.
+**Status:** E1 passed; M3 implementation validated locally and launch pending.
 
 - [x] Add and test the diagnostic launch environment (`HF_HUB_OFFLINE`,
   `TRANSFORMERS_OFFLINE`, `VLLM_LOGGING_LEVEL=INFO`, `RAY_DEDUP_LOGS=0`, and
@@ -1147,11 +1147,18 @@ as a root-cause stack trace.
   `runtime_env['env_vars'] must be of type Dict[str, str]`. Evidence was
   captured, tmux exited, and GPU remained 0 MiB. Repair scope is limited to
   quoting those Hydra values as strings, then rerunning E1 from a new job ID.
-- [ ] Run `e1-h100-1p5b-smoke-v0124` through `vf train` with unchanged
-  `grpo_v1_1p5b_h100_smoke`, detached tmux, and a 30-minute timebox. Treat
-  engine milestones as health: sleep-mode then spawn, safetensors/GPU growth,
-  then first metric by T+25–30. At T+15 without safetensors only, collect the
-  approved process/socket/py-spy/ABRT bundle. **Pass:** at least 20 metrics.
+- [x] Run `e1-h100-1p5b-smoke-r1-v0124` through `vf train` with unchanged
+  `grpo_v1_1p5b_h100_smoke`, detached tmux, and a 30-minute timebox. **Passed:**
+  the string-quoted worker environment reached Ray; `enable_sleep_mode` at
+  `23:08:58Z`, forced spawn at `23:09:55Z`, EngineCore at `23:10:59Z`, and
+  safetensors loading completed before T+15. The run wrote 30 metrics and
+  Storage checkpoints at 10/20/30, then exited successfully with GPU at 0 MiB.
+  Stable steps 2--30 averaged `1198.881` tokens/s and `7.828` s/step (medians
+  `1302.839` and `6.351`). Metric SHA-256:
+  `f97d9d2a171fe4b2aca29a9b8ceb4e404a31222d02c74dca6fb6440cb61ce392`.
+  A final DataLoader-worker `Killed` traceback appeared during teardown, but
+  the driver returned success, published step 30, and wrote all final artifacts;
+  record it as a nonfatal teardown observation, not an inferred root cause.
 - [ ] E1 pass automatically starts M3 (400-step 1.5B, `k=8`, checkpoints every
   50, entropy brake) under the same environment, then serial M4 (200-step 0.5B
   deterministic random reward), M5 frozen held-out after-evaluation, and M6

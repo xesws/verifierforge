@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import hashlib
 import json
 from typing import Any, Mapping
 
@@ -48,3 +49,28 @@ def compute_score(
     # receives 0.95 after the documented length penalty and still counts as a
     # task pass for the greedy validation curve.
     return {"score": score, "acc": 1.0 if score >= 0.95 else 0.0}
+
+
+def compute_random_score(
+    data_source: str,
+    solution_str: str,
+    ground_truth: Any,
+    extra_info: Mapping[str, Any] | None = None,
+    **_: Any,
+) -> dict[str, float]:
+    """Return a fixed-seed Bernoulli(0.5) control reward without a verifier.
+
+    Hashing the immutable inputs makes the control reproducible across Ray
+    workers and restarts while keeping it independent from SQL correctness.
+    """
+    del extra_info
+    if isinstance(ground_truth, str):
+        ground_truth_text = ground_truth
+    else:
+        ground_truth_text = json.dumps(ground_truth, sort_keys=True, separators=(",", ":"), default=str)
+    payload = "\x1f".join(
+        ("vf-random-control-v0.12.4", data_source, solution_str, ground_truth_text)
+    )
+    draw = int.from_bytes(hashlib.sha256(payload.encode("utf-8")).digest()[:8], "big")
+    reward = float(draw < (1 << 63))
+    return {"score": reward, "acc": reward}

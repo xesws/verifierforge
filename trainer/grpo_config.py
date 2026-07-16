@@ -39,7 +39,7 @@ def _ray_diagnostic_environment_overrides() -> list[str]:
 
 @dataclass(frozen=True)
 class GrpoSmokeConfig:
-    """Values intentionally constrained for the one-L4 D2 smoke run."""
+    """Operator-visible values for a bounded verifier-backed GRPO run."""
 
     model_path: str
     total_steps: int
@@ -56,6 +56,10 @@ class GrpoSmokeConfig:
     vllm_attention_backend: str | None
     checkpoint_every: int
     validation_every: int
+    dataset_mode: str
+    reward_mode: str
+    save_hf_model: bool
+    entropy_brake: bool
 
     @classmethod
     def load(cls, name: str = "grpo_v1_0p5b") -> "GrpoSmokeConfig":
@@ -108,6 +112,27 @@ class GrpoSmokeConfig:
             raise ValueError("enforce_eager must be a boolean")
         if self.vllm_attention_backend not in (None, "TORCH_SDPA"):
             raise ValueError("vllm_attention_backend must be null or TORCH_SDPA")
+        if self.dataset_mode not in ("d2_split", "frozen_training_pool"):
+            raise ValueError("dataset_mode must be d2_split or frozen_training_pool")
+        if self.reward_mode not in ("verifier", "random_bernoulli"):
+            raise ValueError("reward_mode must be verifier or random_bernoulli")
+        if not isinstance(self.save_hf_model, bool):
+            raise ValueError("save_hf_model must be a boolean")
+        if not isinstance(self.entropy_brake, bool):
+            raise ValueError("entropy_brake must be a boolean")
+
+    @property
+    def checkpoint_save_contents(self) -> str:
+        """Return the explicit verl checkpoint payload for this run."""
+        contents = "['model','optimizer','extra']"
+        if self.save_hf_model:
+            contents = "['model','optimizer','extra','hf_model']"
+        return contents
+
+    @property
+    def reward_function_name(self) -> str:
+        """Select a verifier or the independent random-control adapter."""
+        return "compute_score" if self.reward_mode == "verifier" else "compute_random_score"
 
     def with_l4_fallback(self) -> "GrpoSmokeConfig":
         """Apply the one documented OOM retry, without changing the run target."""
@@ -177,7 +202,7 @@ class GrpoSmokeConfig:
             "actor_rollout_ref.actor.kl_loss_type=low_var_kl",
             "actor_rollout_ref.actor.fsdp_config.param_offload=False",
             "actor_rollout_ref.actor.fsdp_config.optimizer_offload=False",
-            "actor_rollout_ref.actor.checkpoint.save_contents=['model','optimizer','extra']",
+            f"actor_rollout_ref.actor.checkpoint.save_contents={self.checkpoint_save_contents}",
             "actor_rollout_ref.rollout.name=vllm",
             "actor_rollout_ref.rollout.tensor_model_parallel_size=1",
             f"actor_rollout_ref.rollout.gpu_memory_utilization={self.rollout_gpu_memory_utilization}",
@@ -201,7 +226,7 @@ class GrpoSmokeConfig:
             "reward.reward_manager.name=naive",
             "reward.num_workers=1",
             f"reward.custom_reward_function.path={reward_file}",
-            "reward.custom_reward_function.name=compute_score",
+            f"reward.custom_reward_function.name={self.reward_function_name}",
             f"trainer.project_name=verifierforge_d2",
             f"trainer.experiment_name={job_id}",
             "trainer.logger=['console','file']",

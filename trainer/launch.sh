@@ -36,6 +36,10 @@ case "$cfg" in
     h100_diagnostic_environment
     exec "$python" -m trainer.grpo_train --job "$job" --config "$cfg"
     ;;
+  grpo_v1_1p5b_h100_main|grpo_v1_0p5b_random_control)
+    h100_diagnostic_environment
+    exec "$python" -m trainer.grpo_train --job "$job" --config "$cfg"
+    ;;
   *)
     echo "unknown trainer config: $cfg" >&2
     exit 2

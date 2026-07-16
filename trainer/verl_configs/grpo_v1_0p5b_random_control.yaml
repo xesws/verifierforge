@@ -1,7 +1,6 @@
-# D2's deliberately small real-GRPO smoke configuration.  trainer.grpo_config
-# loads this file and converts it into the overrides accepted by verl 0.8.0.
+# D4 M4: serial random-reward control; it never invokes the SQL verifier.
 model_path: Qwen/Qwen2.5-0.5B-Instruct
-total_steps: 100
+total_steps: 200
 train_batch_size: 4
 rollout_n: 8
 max_prompt_length: 1024
@@ -14,8 +13,8 @@ rollout_gpu_memory_utilization: 0.40
 enforce_eager: false
 vllm_attention_backend: null
 checkpoint_every: 50
-validation_every: 10
-dataset_mode: d2_split
-reward_mode: verifier
+validation_every: 50
+dataset_mode: frozen_training_pool
+reward_mode: random_bernoulli
 save_hf_model: false
 entropy_brake: false
