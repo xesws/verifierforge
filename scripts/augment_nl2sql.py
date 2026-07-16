@@ -5,6 +5,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import math
 from pathlib import Path
 import sys
 from typing import Sequence
@@ -31,6 +32,12 @@ def _parser() -> argparse.ArgumentParser:
         help="Destination candidate JSONL; it is replaced atomically.",
     )
     parser.add_argument(
+        "--summary",
+        type=Path,
+        required=True,
+        help="Destination count-only run summary JSON; it is replaced atomically.",
+    )
+    parser.add_argument(
         "--variants-per-seed",
         type=int,
         default=8,
@@ -41,6 +48,12 @@ def _parser() -> argparse.ArgumentParser:
         default=None,
         help="Optional model override; otherwise the shared client resolves VF_AUGMENT_MODEL.",
     )
+    parser.add_argument(
+        "--timebox-minutes",
+        type=float,
+        default=None,
+        help="Stop starting new seed requests after this positive number of minutes.",
+    )
     return parser
 
 
@@ -48,6 +61,12 @@ def main(argv: Sequence[str] | None = None) -> int:
     args = _parser().parse_args(argv)
     if args.variants_per_seed < 1:
         _parser().error("--variants-per-seed must be at least 1")
+    if args.timebox_minutes is not None and (
+        not math.isfinite(args.timebox_minutes) or args.timebox_minutes <= 0
+    ):
+        _parser().error("--timebox-minutes must be a positive finite number")
+    if args.output.resolve() == args.summary.resolve():
+        _parser().error("--output and --summary must be different paths")
 
     if str(REPOSITORY_ROOT) not in sys.path:
         sys.path.insert(0, str(REPOSITORY_ROOT))
@@ -60,6 +79,7 @@ def main(argv: Sequence[str] | None = None) -> int:
         augment_seed_cases,
         load_seed_cases,
         write_candidates_jsonl_atomic,
+        write_summary_json_atomic,
     )
 
     try:
@@ -69,8 +89,14 @@ def main(argv: Sequence[str] | None = None) -> int:
             client=client,
             variants_per_seed=args.variants_per_seed,
             model=args.model,
+            timebox_seconds=(
+                args.timebox_minutes * 60
+                if args.timebox_minutes is not None
+                else None
+            ),
         )
         output_path = write_candidates_jsonl_atomic(args.output, candidates)
+        summary_path = write_summary_json_atomic(args.summary, summary)
     except (AugmentationInputError, OSError, RuntimeError, ValueError) as error:
         # The shared client redacts provider responses/credentials. Keep the
         # command's operational failure equally safe and avoid a traceback that
@@ -79,6 +105,7 @@ def main(argv: Sequence[str] | None = None) -> int:
         return 2
     result = summary.as_dict()
     result["output_path"] = str(output_path)
+    result["summary_path"] = str(summary_path)
     print(json.dumps(result, sort_keys=True))
     return 0
 

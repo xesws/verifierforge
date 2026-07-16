@@ -2,13 +2,15 @@
 
 from __future__ import annotations
 
-from collections.abc import Mapping, Sequence
+from collections.abc import Callable, Mapping, Sequence
 from dataclasses import dataclass
 import json
+import math
 import os
 from pathlib import Path
 import re
 import tempfile
+import time
 from typing import Any, Protocol
 
 from core.rewards.nl2sql import NL2SQLVerifier
@@ -51,7 +53,11 @@ class SeedCase:
 
 @dataclass(frozen=True)
 class AugmentationSummary:
-    """Count-only evidence from an augmentation run, safe to persist or print."""
+    """Safe, deterministic operational evidence from an augmentation run.
+
+    The only non-count values are seed identifiers. Provider responses, prompts,
+    model configuration, and credentials are intentionally never retained.
+    """
 
     seed_count: int
     variants_per_seed: int
@@ -63,9 +69,46 @@ class AugmentationSummary:
     duplicate_count: int
     discarded_excess_count: int
     malformed_response_count: int
+    processed_seed_ids: tuple[str, ...] = ()
+    unprocessed_seed_ids: tuple[str, ...] = ()
+    retry_count: int = 0
 
-    def as_dict(self) -> dict[str, int]:
-        """Return stable JSON-safe counters without provider payloads or secrets."""
+    @property
+    def processed_seed_count(self) -> int:
+        """Return the number of seeds whose request cycle reached a terminal state."""
+        return len(self.processed_seed_ids)
+
+    @property
+    def unprocessed_seed_count(self) -> int:
+        """Return the number of seeds not started before the timebox deadline."""
+        return len(self.unprocessed_seed_ids)
+
+    @property
+    def total_requested_slot_count(self) -> int:
+        """Return the requested capacity across every input seed."""
+        return self.seed_count * self.variants_per_seed
+
+    @property
+    def processed_requested_slot_count(self) -> int:
+        """Return the requested capacity for seeds that were actually processed."""
+        return self.processed_seed_count * self.variants_per_seed
+
+    @property
+    def main_yield(self) -> float | None:
+        """Return accepted / processed requested slots, or ``None`` when no seed ran."""
+        if self.processed_requested_slot_count == 0:
+            return None
+        return self.accepted_count / self.processed_requested_slot_count
+
+    @property
+    def reference_yield(self) -> float | None:
+        """Return accepted / full requested slots, or ``None`` for no input seeds."""
+        if self.total_requested_slot_count == 0:
+            return None
+        return self.accepted_count / self.total_requested_slot_count
+
+    def as_dict(self) -> dict[str, Any]:
+        """Return stable JSON-safe operational evidence without provider payloads."""
         return {
             "seed_count": self.seed_count,
             "variants_per_seed": self.variants_per_seed,
@@ -77,6 +120,15 @@ class AugmentationSummary:
             "duplicate_count": self.duplicate_count,
             "discarded_excess_count": self.discarded_excess_count,
             "malformed_response_count": self.malformed_response_count,
+            "retry_count": self.retry_count,
+            "processed_seed_ids": list(self.processed_seed_ids),
+            "processed_seed_count": self.processed_seed_count,
+            "unprocessed_seed_ids": list(self.unprocessed_seed_ids),
+            "unprocessed_seed_count": self.unprocessed_seed_count,
+            "processed_requested_slot_count": self.processed_requested_slot_count,
+            "total_requested_slot_count": self.total_requested_slot_count,
+            "main_yield": self.main_yield,
+            "reference_yield": self.reference_yield,
         }
 
 
@@ -175,6 +227,8 @@ def augment_seed_cases(
     client: JSONCompletionClient,
     variants_per_seed: int = 8,
     model: str | None = None,
+    timebox_seconds: float | None = None,
+    clock: Callable[[], float] = time.monotonic,
 ) -> tuple[list[dict[str, Any]], AugmentationSummary]:
     """Generate, validate, deduplicate, and verifier-screen candidate records.
 
@@ -184,6 +238,14 @@ def augment_seed_cases(
     """
     if variants_per_seed < 1:
         raise ValueError("variants_per_seed must be at least 1")
+    if timebox_seconds is not None:
+        if (
+            isinstance(timebox_seconds, bool)
+            or not isinstance(timebox_seconds, (int, float))
+            or not math.isfinite(timebox_seconds)
+            or timebox_seconds <= 0
+        ):
+            raise ValueError("timebox_seconds must be a positive finite number or None")
 
     ordered_seeds = sorted(seeds, key=lambda seed: seed.seed_id)
     if len({seed.seed_id for seed in ordered_seeds}) != len(ordered_seeds):
@@ -200,26 +262,33 @@ def augment_seed_cases(
     duplicate_count = 0
     discarded_excess_count = 0
     malformed_response_count = 0
+    retry_count = 0
+    processed_seed_ids: list[str] = []
+    unprocessed_seed_ids: list[str] = []
+    deadline = clock() + timebox_seconds if timebox_seconds is not None else None
 
-    for seed in ordered_seeds:
-        try:
-            response = client.complete_json(
-                augmentation_messages(seed, variants_per_seed),
-                model=model,
-                temperature=0.4,
+    for index, seed in enumerate(ordered_seeds):
+        if deadline is not None and clock() >= deadline:
+            # The current seed has not started, so neither it nor the
+            # remaining seeds may issue another request. A seed that has
+            # started always completes its one permitted malformed-response
+            # retry, even if the wall clock crosses the deadline mid-request.
+            unprocessed_seed_ids.extend(
+                remaining.seed_id for remaining in ordered_seeds[index:]
             )
-        except ValueError:
-            # A malformed structured response is one failed candidate batch,
-            # not grounds to publish unverified data or discard every other
-            # seed. Transport/authentication errors remain RuntimeErrors and
-            # intentionally fail the whole command without partial output.
-            malformed_response_count += 1
-            rejected_shape_count += 1
-            continue
-        raw_variants = _response_variants(response)
+            break
+
+        raw_variants, retries, malformed_responses = _complete_variants_with_retry(
+            client=client,
+            seed=seed,
+            variants_per_seed=variants_per_seed,
+            model=model,
+        )
+        processed_seed_ids.append(seed.seed_id)
+        retry_count += retries
+        malformed_response_count += malformed_responses
+        rejected_shape_count += malformed_responses
         if raw_variants is None:
-            malformed_response_count += 1
-            rejected_shape_count += 1
             continue
 
         if len(raw_variants) > variants_per_seed:
@@ -277,6 +346,9 @@ def augment_seed_cases(
         duplicate_count=duplicate_count,
         discarded_excess_count=discarded_excess_count,
         malformed_response_count=malformed_response_count,
+        processed_seed_ids=tuple(processed_seed_ids),
+        unprocessed_seed_ids=tuple(unprocessed_seed_ids),
+        retry_count=retry_count,
     )
 
 
@@ -285,6 +357,16 @@ def write_candidates_jsonl_atomic(
 ) -> Path:
     """Atomically replace ``output_path`` with deterministic JSONL candidate rows."""
     payload = "".join(f"{_canonical_json(dict(candidate))}\n" for candidate in candidates)
+    return _write_text_atomic(output_path, payload)
+
+
+def write_summary_json_atomic(output_path: Path, summary: AugmentationSummary) -> Path:
+    """Atomically persist safe augmentation evidence as one canonical JSON document."""
+    return _write_text_atomic(output_path, f"{_canonical_json(summary.as_dict())}\n")
+
+
+def _write_text_atomic(output_path: Path, payload: str) -> Path:
+    """Atomically replace one UTF-8 text artifact without leaving a temp file."""
     output_path.parent.mkdir(parents=True, exist_ok=True)
     temporary_path: Path | None = None
     try:
@@ -305,6 +387,39 @@ def write_candidates_jsonl_atomic(
     finally:
         if temporary_path is not None:
             temporary_path.unlink(missing_ok=True)
+
+
+def _complete_variants_with_retry(
+    *,
+    client: JSONCompletionClient,
+    seed: SeedCase,
+    variants_per_seed: int,
+    model: str | None,
+) -> tuple[list[Any] | None, int, int]:
+    """Return variants after one malformed-response retry, without catching failures.
+
+    ``ValueError`` is the shared client's malformed-response signal. Runtime
+    errors deliberately propagate: they represent transport, authentication,
+    or configuration failures and must fail the whole command rather than
+    publish a partial run.
+    """
+    malformed_response_count = 0
+    for attempt in range(2):
+        try:
+            response = client.complete_json(
+                augmentation_messages(seed, variants_per_seed),
+                model=model,
+                temperature=0.4,
+            )
+        except ValueError:
+            malformed_response_count += 1
+        else:
+            raw_variants = _response_variants(response)
+            if raw_variants is not None:
+                return raw_variants, attempt, malformed_response_count
+            malformed_response_count += 1
+
+    return None, 1, malformed_response_count
 
 
 def _read_jsonl(path: Path) -> list[Mapping[str, Any]]:
