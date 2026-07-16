@@ -716,7 +716,8 @@ artifact publication and is retained verbatim in the synced log.
 
 ## v0.11.0 — D4 Blackwell main training
 
-**Status:** M0/M0′ documentation gates and M1′ bootstrap complete; M2′ pending.
+**Status:** M0/M0′ documentation gates and M1′ bootstrap complete; M2′ was
+attempted and stopped without admission evidence. M3–M6 are blocked.
 
 This D4 section supersedes P0's former prohibition on trainer changes only for
 the documented main/control configuration, entropy brake, checkpoint-selection
@@ -769,15 +770,35 @@ present. No laptop `.env` or credential was transferred.
 
 ### M2′. 30-step single-Blackwell compatibility smoke
 
-- [ ] Implement/test the explicit 1.5B single-GPU Blackwell configuration.
-- [ ] Run 30 steps on the frozen training pool; require FSDP ranks, vLLM
-  rollout/weight-update evidence, Storage metric lines, and curve points.
-- [ ] Kill the job after curve evidence is present and preserve its log.
+- [x] Implement/test the explicit 1.5B single-GPU Blackwell configuration.
+- [x] Launch the 30-step smoke on the frozen training pool and preserve the
+  pod/laptop logs. It was stopped before a training step, so it did **not**
+  produce the required FSDP-to-vLLM update, Storage metrics, or curve points.
+- [x] Stop the time-boxed job and preserve its log; clean up the orphaned
+  process group after `vf kill` stopped tmux but did not reap its descendants.
 
 **Acceptance:** no CUDA capability/OOM/synchronization error; storage and
 laptop sync work; throughput and at least one post-update rollout are proven.
 **Stop:** any setup, CUDA, OOM, vLLM, throughput, bridge, checkpoint, or sync
 failure. Do not start M3/M4.
+
+**Result (STOP — not admitted):** `p0-m2-blackwell-v110` started on the
+verified 96 GB Blackwell worker with the frozen 50-row training pool. The
+preserved log shows FSDP rank 0 initialization, `NCCL version 2.27.3+cuda12.9`,
+and the vLLM serve command for `Qwen/Qwen2.5-1.5B-Instruct` with
+`CUDA_VISIBLE_DEVICES: 0`. It never reached a rollout result, weight update,
+throughput line, JSONL metric line, curve point, or checkpoint before the
+approximately 15-minute M2′ timebox expired. No CUDA/OOM/Traceback line was
+emitted, so the evidence does not establish a specific root cause; it
+establishes only that the required end-to-end bridge was not ready in time.
+
+`vf kill` removed the tmux session but left the launch process group (`2111`)
+and a `ray::WorkerDict` using 7,192 MiB of GPU memory. After syncing
+`runs/p0-m2-blackwell-v110/train.log` to the laptop, the operator sent
+`SIGTERM` to that known job process group. A follow-up process/GPU check showed
+no matching job process and no compute-app GPU allocation. This exposes a
+control-plane teardown gap, but no fix or retry is authorized in this run.
+M3–M6 remain prohibited until a separately approved M2′ repair/retest passes.
 
 ### M3. 1.5B main run
 
