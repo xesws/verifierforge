@@ -1041,11 +1041,14 @@ completion credit. Start again on the new H100 SXM executor.
   `989aa7980e4cf806f80c7fef2b1adb7bc71aa306` each contain 10 readable files,
   required config/tokenizer metadata, and one nonempty safetensors file. Cache
   size is 3.9 GB; no gpt-oss request was made.
-- [ ] **N5 — freeze:** prove tag `v0.10.2-p0-three-piece-freeze` and compare
+- [x] **N5 — freeze:** prove tag `v0.10.2-p0-three-piece-freeze` and compare
   training-pool SHA-256
   `c97a5adea789fae3be249bc9ac95a1902ae5a9769de9eefbc08277f056878e8c`
   plus held-out SHA-256
   `482f0e7678e7603311f72aeead381364cd92f0596c20745cc58c96916a9177e8`.
+  **Passed:** tag resolves to `ad3d36b5860c66567a9f60f94c34101c787aaef3`;
+  remote values are exactly `c97a5adea789fae3be249bc9ac95a1902ae5a9769de9eefbc08277f056878e8c`
+  and `482f0e7678e7603311f72aeead381364cd92f0596c20745cc58c96916a9177e8`.
   **Stop:** tag/hash mismatch.
 - [ ] **N6 — M2′ H100 smoke:** create/document the H100-specific 1.5B config
   (one GPU, TP 1, `0.45` rollout memory, Hugging Face `sdpa`), run 20–30 steps,
