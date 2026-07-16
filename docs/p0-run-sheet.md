@@ -1033,9 +1033,14 @@ completion credit. Start again on the new H100 SXM executor.
   `torch=2.8.0+cu128`, `vllm=0.10.2`, `verl=0.8.0`, and `ray=2.56.0`, all with
   status `0`; `runtime-install.status` is `state=success`. **Stop:**
   clone/install/import/version mismatch.
-- [ ] **N4 — models:** snapshot only Qwen 2.5 0.5B and 1.5B into
+- [x] **N4 — models:** snapshot only Qwen 2.5 0.5B and 1.5B into
   `/workspace/hf-cache`; prove both snapshot directories are complete. **Stop:**
   either download/snapshot check fails; do not download gpt-oss-20b.
+  **Passed:** 0.5B snapshot
+  `7ae557604adf67be50417f59c2c2f167def9a775` and 1.5B snapshot
+  `989aa7980e4cf806f80c7fef2b1adb7bc71aa306` each contain 10 readable files,
+  required config/tokenizer metadata, and one nonempty safetensors file. Cache
+  size is 3.9 GB; no gpt-oss request was made.
 - [ ] **N5 — freeze:** prove tag `v0.10.2-p0-three-piece-freeze` and compare
   training-pool SHA-256
   `c97a5adea789fae3be249bc9ac95a1902ae5a9769de9eefbc08277f056878e8c`
