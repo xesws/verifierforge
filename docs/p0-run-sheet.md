@@ -510,6 +510,10 @@ not a pass/fail metric result. The synchronized 74-byte launch log has SHA-256
 Do not repair or rerun without new human direction; U3 and training remain
 prohibited.
 
+**Superseded for execution:** v0.10.1 E1 explicitly authorized the one
+entrypoint recovery. Its completed training-pool gate and held-out baseline are
+recorded below; this historical launch failure remains evidence only.
+
 ### U3. Three-piece freeze and held-out baseline
 
 - [ ] Only after U2 passes, freeze training pool + held-out set + verifier v2.
@@ -562,12 +566,12 @@ session was created.
 
 ### E2. Authorized U2 rerun and held-out baseline
 
-- [ ] Run the 50-row training pool at `k=8` with full samples/evidence using
+- [x] Run the 50-row training pool at `k=8` with full samples/evidence using
   only pod-local vLLM; record all three U2 predicates.
-- [ ] After its completed evaluation, run the 60-row held-out set at `k=8` in
+- [x] After its completed evaluation, run the 60-row held-out set at `k=8` in
   reference mode with full samples/evidence; preserve its triplet as D4's
   before snapshot regardless of the training-pool admission outcome.
-- [ ] Sync and hash-check both artifact pairs before making a decision.
+- [x] Sync and hash-check both artifact pairs before making a decision.
 
 **Acceptance:** valid, hash-bound evidence for both inputs. Training admission
 requires `0.20 <= pass@1 <= 0.60`, `mixed >= 0.30`, and `pass@8 >= 0.85`;
@@ -575,6 +579,24 @@ held-out is descriptive only.
 **Stop:** import/preflight or evaluation/evidence failure; preserve facts and do
 not freeze or train. A completed U2 predicate failure is reported after the
 requested held-out baseline, then stops without threshold change.
+
+**Result:** pod-local `Qwen2.5-1.5B-Instruct` completed the training pool with
+`pass_at_1=0.28`, `pass_at_8=0.88`, and `mixed_fraction=0.84`; every U2
+predicate passes. Training evidence/sample SHA-256:
+`53b99f50358e1bec9eb9f0ee27706cc1ebcc8a86ebbd18b8cf4bd5c092480228` /
+`ecc8eee0e5274a2b2a7da05e8a055a8d2e5ace215dc8d818c517f84fe904cf3a`, with
+400 samples and input SHA-256
+`c97a5adea789fae3be249bc9ac95a1902ae5a9769de9eefbc08277f056878e8c`.
+
+The held-out reference-only D4-before snapshot is
+`pass_at_1=0.5833333333333334`, `pass_at_8=0.7666666666666667`, and
+`mixed_fraction=0.4666666666666667`. Its evidence/sample SHA-256:
+`28ff3730b80cdd2f64cf2ab492f399165d5e2cec4a8ae4ce66e6466588a5f8d4` /
+`7b1500857a6f4368c70fff10cf0245180b377e37faf4e5a201c4cc311c3f16da`, with
+480 samples and input SHA-256
+`482f0e7678e7603311f72aeead381364cd92f0596c20745cc58c96916a9177e8`.
+All four artifact hashes match between pod and laptop. This baseline is not a
+gate predicate; it is the only allowed pre-training before number.
 
 ### E3. Automatic post-decision path
 
