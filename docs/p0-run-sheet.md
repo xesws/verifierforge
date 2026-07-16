@@ -716,7 +716,7 @@ artifact publication and is retained verbatim in the synced log.
 
 ## v0.11.0 — D4 Blackwell main training
 
-**Status:** M0/M0′ documentation gates complete; M1′ bootstrap pending.
+**Status:** M0/M0′ documentation gates and M1′ bootstrap complete; M2′ pending.
 
 This D4 section supersedes P0's former prohibition on trainer changes only for
 the documented main/control configuration, entropy brake, checkpoint-selection
@@ -752,12 +752,20 @@ one GPU.
 
 ### M1′. Bootstrap the same-volume Blackwell worker
 
-- [ ] Run `vf bootstrap` twice on the verified mounted volume and record the
+- [x] Run `vf bootstrap` twice on the verified mounted volume and record the
   Blackwell runtime/venv result.
 
 **Acceptance:** `nvidia-smi` identifies the one 96 GB Blackwell card,
 `/workspace` persists, the repository can pull, and bootstrap is idempotent.
 **Stop:** missing volume, SSH, or bootstrap failure. Do not launch M2′.
+
+**Result:** Step 0 reported `NVIDIA RTX PRO 6000 Blackwell Server Edition`,
+97,887 MiB, driver `580.126.20`, and `/workspace` contained `verifierforge`,
+`hf-cache`, and `pip-cache` before bootstrap. The first `vf bootstrap`
+fast-forwarded `/workspace/verifierforge` from `ad3d36b` to `74697d7`; the
+second reported `Already up to date`. The persistent venv is Python `3.12.3`,
+the pinned requirements were already satisfied, and the cache/checkout remain
+present. No laptop `.env` or credential was transferred.
 
 ### M2′. 30-step single-Blackwell compatibility smoke
 
