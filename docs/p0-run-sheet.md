@@ -1062,6 +1062,14 @@ completion credit. Start again on the new H100 SXM executor.
   curve PNG/final checkpoint and `vf watch` SHA consistency. **Stop:** any
   implementation, training, evaluation, or artifact-validation failure.
 
+**N6 pre-implementation decision:** use a new
+`grpo_v1_1p5b_h100_smoke` target, not the historical Blackwell config. It has
+30 steps, 1.5B, `k=8`, one GPU/TP 1, `rollout_gpu_memory_utilization=0.45`,
+Hugging Face `sdpa`, `enforce_eager=false`, and no vLLM attention environment
+override. Focused config/entrypoint tests must pass before the H100 pulls it.
+**Validated:** `bash -n trainer/launch.sh`, focused tests, and `pytest -q`
+passed (`185 passed, 1 skipped`).
+
 ### v0.12.1 — N3 diagnostic and completion-semantics repair
 
 **D1 raw result:**

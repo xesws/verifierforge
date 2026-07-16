@@ -153,6 +153,31 @@ def test_blackwell_smoke_config_is_bounded_single_gpu_probe(tmp_path: Path) -> N
     assert "trainer.resume_mode=disable" in command
 
 
+def test_h100_smoke_config_is_bounded_single_gpu_probe(tmp_path: Path) -> None:
+    config = GrpoSmokeConfig.load("grpo_v1_1p5b_h100_smoke")
+    command = build_verl_command(
+        config=config,
+        job_id="h100-smoke",
+        train_file=tmp_path / "train.parquet",
+        validation_file=tmp_path / "validation.parquet",
+        staging_dir=tmp_path / "staging",
+        resume_path=None,
+        python="python",
+    )
+
+    assert config.model_path == "Qwen/Qwen2.5-1.5B-Instruct"
+    assert config.total_steps == 30
+    assert config.rollout_n == 8
+    assert config.rollout_gpu_memory_utilization == 0.45
+    assert config.enforce_eager is False
+    assert config.vllm_attention_backend is None
+    assert "+actor_rollout_ref.model.override_config.attn_implementation=sdpa" in command
+    assert "trainer.n_gpus_per_node=1" in command
+    assert "actor_rollout_ref.rollout.tensor_model_parallel_size=1" in command
+    assert "actor_rollout_ref.rollout.enforce_eager=false" in command
+    assert not any("VLLM_ATTENTION_BACKEND=" in argument for argument in command)
+
+
 def test_dataset_rows_and_curve_artifact_are_portable(tmp_path: Path) -> None:
     rows = build_verl_rows(
         [
