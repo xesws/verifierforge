@@ -1180,6 +1180,13 @@ as a root-cause stack trace.
   **First M3 export observation:** verl's actual HF export location is
   `global_step_50/actor/huggingface`; M5's checkpoint locator is corrected to
   this verified native shape before it is used.
+- [ ] **M3 live evidence (not complete):** `d4-m3-1p5b-v0124` reached step 61
+  with append-only metrics and no entropy-brake artifact. At step 50, verl
+  saved `actor/huggingface/model-00001-of-00002.safetensors` (4,998,359,624
+  bytes) plus shard two (2,183,955,544 bytes); the bridge then published the
+  complete native/HF checkpoint atomically as `Storage/ckpt/step_50`. Local
+  `vf watch` had synced metrics through step 60. This proves the M5 input shape
+  but is not a held-out result or an M3 completion claim.
 
 **N6 pre-implementation decision:** use a new
 `grpo_v1_1p5b_h100_smoke` target, not the historical Blackwell config. It has
