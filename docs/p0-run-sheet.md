@@ -1130,7 +1130,8 @@ as a root-cause stack trace.
 
 ### v0.12.4 — E1 H100 milestone retest and D4 continuation
 
-**Status:** E1 passed; M3 implementation validated locally and launch pending.
+**Status:** E1 passed; M3 stopped below its approved 400-step target. M4--M6
+were not launched.
 
 - [x] Add and test the diagnostic launch environment (`HF_HUB_OFFLINE`,
   `TRANSFORMERS_OFFLINE`, `VLLM_LOGGING_LEVEL=INFO`, `RAY_DEDUP_LOGS=0`, and
@@ -1180,13 +1181,24 @@ as a root-cause stack trace.
   **First M3 export observation:** verl's actual HF export location is
   `global_step_50/actor/huggingface`; M5's checkpoint locator is corrected to
   this verified native shape before it is used.
-- [ ] **M3 live evidence (not complete):** `d4-m3-1p5b-v0124` reached step 61
-  with append-only metrics and no entropy-brake artifact. At step 50, verl
-  saved `actor/huggingface/model-00001-of-00002.safetensors` (4,998,359,624
-  bytes) plus shard two (2,183,955,544 bytes); the bridge then published the
-  complete native/HF checkpoint atomically as `Storage/ckpt/step_50`. Local
-  `vf watch` had synced metrics through step 60. This proves the M5 input shape
-  but is not a held-out result or an M3 completion claim.
+- [x] **M3 live evidence and stop:** `d4-m3-1p5b-v0124` reached step 120 with
+  append-only metrics and no entropy-brake artifact. At step 50, verl saved
+  `actor/huggingface/model-00001-of-00002.safetensors` (4,998,359,624 bytes)
+  plus shard two (2,183,955,544 bytes); the bridge published complete
+  native/HF checkpoints atomically at Storage steps 50 and 100. The configured
+  `trainer.total_training_steps=400` was passed to verl, but the train loader
+  had 12 batches and the fixed `trainer.total_epochs=10` exhausted its outer
+  loop at exactly `12 * 10 = 120` steps. The bridge correctly refused to
+  publish a final artifact: `RuntimeError: verl completed but Storage has no
+  final checkpoint through step 400; refusing to publish a final artifact`.
+  `latest_checkpointed_iteration.txt` records 100; no step-120 checkpoint was
+  published. Metrics SHA-256 is
+  `5634ccfb7b3c6fbb8db0e38d1232e9b6251bc9c394e53c5c54b2c62ef4977d09`.
+  Remote checkpoint and staging trees each occupied 28 GiB. GPU was released
+  to 0 MiB. This is a trainer-loop configuration stop, not an OOM, NCCL, or
+  vLLM-health conclusion. M4, M5, and M6 remain unstarted; do not use the
+  partial checkpoints for a held-out or gain claim, and do not retry without a
+  separately approved versioned repair plan.
 
 **N6 pre-implementation decision:** use a new
 `grpo_v1_1p5b_h100_smoke` target, not the historical Blackwell config. It has
