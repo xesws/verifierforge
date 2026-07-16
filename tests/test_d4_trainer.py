@@ -8,6 +8,13 @@ from trainer import grpo_dataset
 from trainer.grpo_config import GrpoSmokeConfig
 from trainer.grpo_reward import compute_random_score
 from trainer.grpo_train import EntropyBrake, EntropyBrakeDecision, _publish_entropy_brake, build_verl_command
+from trainer.heldout_eval import (
+    CheckpointResult,
+    HeldoutEvaluationError,
+    eligible_checkpoints,
+    select_best_checkpoint,
+    verify_evaluation_evidence,
+)
 
 
 def test_d4_main_and_control_configs_are_explicit_and_separate(tmp_path: Path) -> None:
@@ -126,3 +133,72 @@ def test_random_control_reward_is_deterministic_and_never_constructs_a_verifier(
         for index in range(32)
     }
     assert draws == {0.0, 1.0}
+
+
+def test_heldout_evaluator_requires_exported_hf_checkpoint_and_tie_breaks_lowest_step(
+    tmp_path: Path,
+) -> None:
+    hf = tmp_path / "m3" / "ckpt" / "step_50" / "global_step_50" / "huggingface"
+    hf.mkdir(parents=True)
+    (hf / "model.safetensors").write_bytes(b"weights")
+
+    checkpoints = eligible_checkpoints(tmp_path, "m3")
+
+    assert [(checkpoint.step, checkpoint.hf_path) for checkpoint in checkpoints] == [(50, hf)]
+    first = CheckpointResult(50, "a", "b", "c", {"pass_at_1": 0.6}, "completed", None)
+    second = CheckpointResult(100, "d", "e", "f", {"pass_at_1": 0.6}, "completed", None)
+    assert select_best_checkpoint([second, first]) == first
+
+    (hf / "model.safetensors").unlink()
+    try:
+        eligible_checkpoints(tmp_path, "m3")
+    except HeldoutEvaluationError as error:
+        assert "lacks an exported" in str(error)
+    else:  # pragma: no cover - documents the required failure boundary.
+        raise AssertionError("missing HF export must not be evaluated")
+
+
+def test_heldout_evaluator_rejects_mismatched_or_incomplete_sample_evidence(
+    monkeypatch, tmp_path: Path
+) -> None:
+    import trainer.heldout_eval as heldout
+
+    dataset = tmp_path / "heldout.jsonl"
+    dataset.write_text('{"id":"one"}\n', encoding="utf-8")
+    samples = tmp_path / "samples.jsonl"
+    samples.write_text("sample\n", encoding="utf-8")
+    evidence = tmp_path / "evidence.json"
+    monkeypatch.setattr(heldout, "HELDOUT_PATH", dataset)
+    monkeypatch.setattr(heldout, "SAMPLE_COUNT", 1)
+    evidence.write_text(
+        json.dumps(
+            {
+                "status": "completed",
+                "mode": "reference",
+                "input_sha256": heldout._sha256_file(dataset),
+                "candidate_count": 60,
+                "k": 8,
+                "sample_count": 1,
+                "sample_evidence": {"sample_count": 1, "sha256": heldout._sha256_file(samples)},
+                "verifier": {"version": 2},
+                "pass_at_1": 0.6,
+                "pass_at_8": 0.8,
+                "mixed_fraction": 0.4,
+            }
+        ),
+        encoding="utf-8",
+    )
+
+    assert verify_evaluation_evidence(evidence, samples) == {
+        "pass_at_1": 0.6,
+        "pass_at_8": 0.8,
+        "mixed_fraction": 0.4,
+    }
+
+    evidence.write_text("{}", encoding="utf-8")
+    try:
+        verify_evaluation_evidence(evidence, samples)
+    except HeldoutEvaluationError as error:
+        assert "not a completed" in str(error)
+    else:  # pragma: no cover - documents the required failure boundary.
+        raise AssertionError("incomplete evidence must not be selected")

@@ -1172,6 +1172,10 @@ as a root-cause stack trace.
   checkpoint step on ties). Ten post-step-20 entropies below 25% of the
   first-ten median write `early_stopped` plus evidence and stop without a final
   model artifact.
+  **M5 implementation ready:** `trainer.heldout_eval` will only accept exported
+  HF safetensors checkpoints, verify the frozen digest/verifier/sample binding,
+  and publish either a complete held-out report or an explicit `unavailable`
+  report; it cannot select a partial checkpoint set. Local focused tests passed.
 
 **N6 pre-implementation decision:** use a new
 `grpo_v1_1p5b_h100_smoke` target, not the historical Blackwell config. It has
