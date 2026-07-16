@@ -131,7 +131,7 @@ def eligible_checkpoints(runs_root: Path, job_id: str) -> list[Checkpoint]:
         except ValueError:
             continue
         native = wrapper / f"global_step_{step}"
-        hf_path = native / "huggingface"
+        hf_path = native / "actor" / "huggingface"
         if not native.is_dir() or not hf_path.is_dir() or not list(hf_path.glob("*.safetensors")):
             raise HeldoutEvaluationError(
                 f"checkpoint step {step} lacks an exported Hugging Face safetensors model"

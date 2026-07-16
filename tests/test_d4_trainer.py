@@ -138,7 +138,15 @@ def test_random_control_reward_is_deterministic_and_never_constructs_a_verifier(
 def test_heldout_evaluator_requires_exported_hf_checkpoint_and_tie_breaks_lowest_step(
     tmp_path: Path,
 ) -> None:
-    hf = tmp_path / "m3" / "ckpt" / "step_50" / "global_step_50" / "huggingface"
+    hf = (
+        tmp_path
+        / "m3"
+        / "ckpt"
+        / "step_50"
+        / "global_step_50"
+        / "actor"
+        / "huggingface"
+    )
     hf.mkdir(parents=True)
     (hf / "model.safetensors").write_bytes(b"weights")
 
