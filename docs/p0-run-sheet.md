@@ -1011,10 +1011,15 @@ completion credit. Start again on the new H100 SXM executor.
   `lost+found`). **Passed 2026-07-16 20:53 UTC:** `nvidia-smi` reported one
   `NVIDIA H100 80GB HBM3`, 81,559 MiB, 0 MiB used; `/workspace` contained only
   `.` and `..`. **Stop:** SSH/GPU/volume acceptance fails.
-- [ ] **N2 — repository access:** create the new pod key, add a read-only
+- [x] **N2 — repository access:** create the new pod key, add a read-only
   deploy key with authenticated `gh`, preserve it only on the new workspace
   volume for the existing 0600 copy logic, and prove `ssh -T git@github.com`.
-  **Stop:** `gh auth` or GitHub authentication fails.
+  **Passed 2026-07-16 20:54 UTC:** `gh auth status` succeeded; the new pod key
+  fingerprint is `SHA256:3YrpkWzdsabAgzNO6j6AKvJRWsxRLH1e5pa7BbVmqSo` and was
+  added without `--allow-write`; GitHub returned `Hi xesws/verifierforge!
+  You've successfully authenticated`. The new volume exposes stored key files
+  as `666`, so bootstrap's existing root-only `0600` copy is required and has
+  not been bypassed. **Stop:** `gh auth` or GitHub authentication fails.
 - [ ] **N3 — bootstrap:** run `vf bootstrap`; prove imports and exact runtime
   versions: torch `2.8.0+cu128`, vLLM `0.10.2`, verl `0.8.0`, ray `2.56.0`.
   **Stop:** clone/install/import/version mismatch.
