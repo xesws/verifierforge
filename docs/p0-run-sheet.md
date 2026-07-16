@@ -300,18 +300,24 @@ separate verifier-version documentation is committed.
 
 ### A1. Extraction normalization and verifier v2
 
-- [ ] Commit v0.8.0 verifier/evaluation/infrastructure documentation before
+- [x] Commit v0.8.0 verifier/evaluation/infrastructure documentation before
   code.
-- [ ] Recognize only SQL/untagged Markdown code fences; strip the fence and
+- [x] Recognize only SQL/untagged Markdown code fences; strip the fence and
   use `sqlparse` to send the first extracted statement through the unchanged
   scorer.
-- [ ] Preserve raw sample completion evidence while recording scored completion
+- [x] Preserve raw sample completion evidence while recording scored completion
   and extraction facts; add verifier version `2` to Gate A evidence.
 
 **Acceptance:** a fenced exact query receives the exact same legacy tier facts
 as its inner SQL; unfenced multi-statement input remains rejected. No scoring
 threshold or trainer behavior changes.
 **Stop:** any scorer parity/safety/test failure blocks A2.
+
+**Implementation result:** verifier v2 preserves v1's raw tier implementation
+behind a fenced-SQL extraction wrapper. SQL/untagged fences retain the raw
+model completion and record `scored_completion`, extraction kind, and version
+in sample evidence; unfenced multi-statement SQL remains rejected. Focused and
+full test validation completed with `154 passed, 1 skipped`.
 
 ### A2. Full candidate v2 re-verification
 

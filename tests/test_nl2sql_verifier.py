@@ -66,6 +66,42 @@ def test_nl2sql_does_not_treat_a_sql_keyword_in_a_string_as_a_write() -> None:
     assert verifier.score("return the word", "SELECT 'DELETE'") == 1.0
 
 
+def test_nl2sql_v2_extracts_fenced_sql_before_the_unchanged_tier_scorer() -> None:
+    verifier = NL2SQLVerifier(SCHEMA, [("Ada",)])
+    completion = "```sql\nSELECT name FROM employees WHERE id = 1;\n```"
+
+    breakdown = verifier.score_breakdown("find Ada", completion)
+
+    assert verifier.score("find Ada", completion) == 1.0
+    assert breakdown.verifier_version == NL2SQLVerifier.VERSION == 2
+    assert breakdown.extraction_applied is True
+    assert breakdown.extraction_kind == "markdown_sql_fence"
+    assert breakdown.scored_completion == "SELECT name FROM employees WHERE id = 1;"
+    assert breakdown.as_dict()["extraction"] == {
+        "applied": True,
+        "kind": "markdown_sql_fence",
+        "scored_completion": "SELECT name FROM employees WHERE id = 1;",
+    }
+
+
+def test_nl2sql_v2_uses_the_first_statement_inside_a_fenced_sql_block() -> None:
+    verifier = NL2SQLVerifier(SCHEMA, [("Ada",)])
+    completion = "```\nSELECT name FROM employees WHERE id = 1; SELECT 'later';\n```"
+
+    assert verifier.score("find Ada", completion) == 1.0
+
+
+def test_nl2sql_v2_keeps_unfenced_multi_statement_safety_rejection() -> None:
+    verifier = NL2SQLVerifier(SCHEMA, [("Ada",)])
+    completion = "SELECT name FROM employees WHERE id = 1; DELETE FROM employees"
+
+    breakdown = verifier.score_breakdown("find Ada", completion)
+
+    assert breakdown.final_score == 0.2
+    assert breakdown.extraction_applied is False
+    assert breakdown.failure_detail == "not_single_read_only_statement"
+
+
 @pytest.mark.parametrize(
     ("completion", "expected_class", "expected_tiers"),
     [
@@ -91,6 +127,7 @@ def test_score_breakdown_preserves_existing_score_and_exposes_tiers(
     breakdown = verifier.score_breakdown("find Ada", completion)
 
     assert breakdown.final_score == verifier.score("find Ada", completion)
+    assert breakdown.verifier_version == 2
     assert breakdown.failure_class == expected_class
     assert (
         breakdown.parse_score,

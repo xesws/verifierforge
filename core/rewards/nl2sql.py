@@ -3,7 +3,8 @@
 from __future__ import annotations
 
 from collections import Counter
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
+import re
 import sqlite3
 from typing import Any, Sequence
 
@@ -11,6 +12,20 @@ import sqlparse
 from sqlparse import tokens as sql_tokens
 
 from core.verifier_base import Verifier
+
+
+_FENCED_SQL_BLOCK = re.compile(
+    r"(?ims)^[ \t]*```(?:sql)?[ \t]*\r?\n(?P<sql>.*?)(?:\r?\n)?[ \t]*```"
+)
+
+
+@dataclass(frozen=True)
+class NL2SQLExtraction:
+    """The exact completion text handed to the unchanged tier scorer."""
+
+    scored_completion: str
+    applied: bool
+    kind: str | None
 
 
 @dataclass(frozen=True)
@@ -28,6 +43,10 @@ class NL2SQLScoreBreakdown:
     length_penalty: float
     failure_class: str
     failure_detail: str | None
+    verifier_version: int = 2
+    scored_completion: str = ""
+    extraction_applied: bool = False
+    extraction_kind: str | None = None
 
     def as_dict(self) -> dict[str, Any]:
         """Return the JSON-ready, sample-evidence representation."""
@@ -47,11 +66,19 @@ class NL2SQLScoreBreakdown:
             "final_score": self.final_score,
             "failure_class": self.failure_class,
             "failure_detail": self.failure_detail,
+            "verifier_version": self.verifier_version,
+            "extraction": {
+                "applied": self.extraction_applied,
+                "kind": self.extraction_kind,
+                "scored_completion": self.scored_completion,
+            },
         }
 
 
 class NL2SQLVerifier(Verifier):
     """Score SQL by parseability, execution, and result-set correctness."""
+
+    VERSION = 2
 
     def __init__(
         self, schema_sql: str, expected_results: Sequence[Sequence[Any]]
@@ -68,11 +95,49 @@ class NL2SQLVerifier(Verifier):
         }
 
     def score(self, prompt: str, completion: str) -> float:
-        """Return the legacy scalar score without changing its semantics."""
+        """Return the versioned scalar score from the unchanged raw tier scorer."""
         return self.score_breakdown(prompt, completion).final_score
 
     def score_breakdown(self, prompt: str, completion: str) -> NL2SQLScoreBreakdown:
-        """Return all existing tier outcomes alongside the exact final score."""
+        """Extract fenced SQL, then return unchanged tier outcomes plus audit facts."""
+        extraction = self.extract_completion(completion)
+        raw_breakdown = self._score_breakdown_raw(prompt, extraction.scored_completion)
+        return replace(
+            raw_breakdown,
+            verifier_version=self.VERSION,
+            scored_completion=extraction.scored_completion,
+            extraction_applied=extraction.applied,
+            extraction_kind=extraction.kind,
+        )
+
+    @staticmethod
+    def extract_completion(completion: str) -> NL2SQLExtraction:
+        """Strip one Markdown SQL fence and select its first SQL statement.
+
+        Unfenced text intentionally remains unchanged. That preserves the
+        legacy multi-statement safety gate instead of silently truncating a
+        raw ``SELECT; DELETE`` completion. The raw scorer continues to own all
+        SQL validation and tier scoring.
+        """
+        match = _FENCED_SQL_BLOCK.search(completion)
+        if match is None:
+            return NL2SQLExtraction(
+                scored_completion=completion,
+                applied=False,
+                kind=None,
+            )
+        fenced_sql = match.group("sql")
+        statements = [statement for statement in sqlparse.split(fenced_sql) if statement.strip()]
+        return NL2SQLExtraction(
+            scored_completion=statements[0] if statements else fenced_sql,
+            applied=True,
+            kind="markdown_sql_fence",
+        )
+
+    def _score_breakdown_raw(
+        self, prompt: str, completion: str
+    ) -> NL2SQLScoreBreakdown:
+        """Run the v1 tier algorithm unchanged on already-selected SQL text."""
         del prompt  # The schema and expected rows define this verifier's reward.
 
         try:

@@ -106,6 +106,7 @@ def test_gate_a_reports_raw_metrics_and_writes_secret_free_evidence(
         "base_url": "https://router.test/v1",
         "model": "configured-glm",
     }
+    assert payload["verifier"]["version"] == 2
     assert "nope" not in evidence.read_text(encoding="utf-8")
 
 
@@ -551,6 +552,11 @@ def test_save_samples_persists_full_completion_tiers_and_taxonomy(
         "failure_class": "parse_failure",
         "failure_detail": "empty_or_no_statement",
         "final_score": 0.0,
+        "extraction": {
+            "applied": False,
+            "kind": None,
+            "scored_completion": "",
+        },
         "record_id": "case-1",
         "record_index": 1,
         "request_ordinal": 1,
@@ -563,6 +569,7 @@ def test_save_samples_persists_full_completion_tiers_and_taxonomy(
             "result_matched": False,
         },
         "tier_scores": {"execution": 0.0, "parse": 0.0, "result_match": 0.0},
+        "verifier_version": 2,
     }
     assert rows[-1]["completion"] == "SELECT name FROM people"
     assert rows[-1]["final_score"] == 1.0

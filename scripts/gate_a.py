@@ -34,6 +34,7 @@ from core.eval_runner import (  # noqa: E402 - path setup above is intentional.
     evaluate_records,
     parse_evaluation_record,
 )
+from core.rewards.nl2sql import NL2SQLVerifier  # noqa: E402 - path setup above.
 
 
 PASS_AT_1_MIN = 0.20
@@ -368,6 +369,7 @@ def write_evidence(
         "input_sha256": input_digest,
         "verifier": {
             "identity": "core.rewards.nl2sql.NL2SQLVerifier",
+            "version": NL2SQLVerifier.VERSION,
             "source_sha256": _verifier_source_digest(),
             "full_pass_score": 1.0,
         },
@@ -577,6 +579,7 @@ def write_failure_evidence(
         "candidate_count": record_count,
         "verifier": {
             "identity": "core.rewards.nl2sql.NL2SQLVerifier",
+            "version": NL2SQLVerifier.VERSION,
             "source_sha256": _verifier_source_digest(),
             "full_pass_score": 1.0,
         },
