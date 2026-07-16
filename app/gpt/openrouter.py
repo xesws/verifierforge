@@ -5,6 +5,7 @@ from .client import (
     DEFAULT_LLM_BASE_URL,
     LLMClient,
     LLMConfigurationError,
+    LLMRequestError,
     LLMResponseError,
     LLMSettings,
 )
@@ -16,6 +17,7 @@ OPENROUTER_BASE_URL = DEFAULT_LLM_BASE_URL
 DEFAULT_MODEL = DEFAULT_AUGMENT_MODEL
 OpenRouterClient = LLMClient
 OpenRouterConfigurationError = LLMConfigurationError
+OpenRouterRequestError = LLMRequestError
 OpenRouterResponseError = LLMResponseError
 OpenRouterSettings = LLMSettings
 
@@ -25,6 +27,7 @@ __all__ = [
     "OPENROUTER_BASE_URL",
     "OpenRouterClient",
     "OpenRouterConfigurationError",
+    "OpenRouterRequestError",
     "OpenRouterResponseError",
     "OpenRouterSettings",
 ]

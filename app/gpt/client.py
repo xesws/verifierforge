@@ -20,8 +20,12 @@ class LLMConfigurationError(RuntimeError):
     """Raised when required LLM environment configuration is absent."""
 
 
-class LLMResponseError(RuntimeError):
-    """Raised when an LLM response cannot be used safely."""
+class LLMResponseError(ValueError):
+    """Raised when an LLM response cannot be parsed or used safely."""
+
+
+class LLMRequestError(RuntimeError):
+    """Raised when a configured compatible endpoint cannot complete a request."""
 
 
 @dataclass(frozen=True)
@@ -107,7 +111,7 @@ class LLMClient:
         try:
             response = self._client.chat.completions.create(**request)
         except Exception as error:
-            raise LLMResponseError(_request_error_message(error)) from None
+            raise LLMRequestError(_request_error_message(error)) from None
 
         try:
             choices = response.choices

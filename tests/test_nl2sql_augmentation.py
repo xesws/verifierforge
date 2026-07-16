@@ -147,6 +147,38 @@ def test_augmentation_rejects_malformed_payload_and_duplicate_seed_ids():
         )
 
 
+def test_augmentation_discards_one_invalid_structured_response_and_keeps_other_seeds():
+    class PartlyMalformedClient:
+        def __init__(self) -> None:
+            self.calls = 0
+
+        def complete_json(self, messages, *, model=None, temperature=0.2):
+            del messages, model, temperature
+            self.calls += 1
+            if self.calls == 1:
+                raise ValueError("not valid structured JSON")
+            return {
+                "variants": [
+                    _variant(
+                        question="Name active employees.",
+                        prompt="Return active employee names.",
+                        sql="SELECT name FROM employees WHERE active = 1 ORDER BY name",
+                        expected_results=[["Ada"], ["Grace"]],
+                    )
+                ]
+            }
+
+    candidates, summary = augment_seed_cases(
+        seeds=[_seed("seed-a"), _seed("seed-b")],
+        client=PartlyMalformedClient(),
+        variants_per_seed=1,
+    )
+
+    assert [candidate["seed_id"] for candidate in candidates] == ["seed-b"]
+    assert summary.malformed_response_count == 1
+    assert summary.rejected_shape_count == 1
+
+
 def test_v1_prompt_is_host_rendered_from_the_ddl_only_template():
     seed = load_seed_cases(
         Path(__file__).resolve().parents[1] / "trainer" / "data" / "nl2sql_v1.jsonl"

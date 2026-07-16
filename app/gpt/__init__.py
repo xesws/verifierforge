@@ -5,6 +5,7 @@ from .client import (
     DEFAULT_LLM_BASE_URL,
     LLMClient,
     LLMConfigurationError,
+    LLMRequestError,
     LLMResponseError,
     LLMSettings,
 )
@@ -20,6 +21,7 @@ __all__ = [
     "DEFAULT_LLM_BASE_URL",
     "LLMClient",
     "LLMConfigurationError",
+    "LLMRequestError",
     "LLMResponseError",
     "LLMSettings",
     "OpenRouterClient",

@@ -202,11 +202,20 @@ def augment_seed_cases(
     malformed_response_count = 0
 
     for seed in ordered_seeds:
-        response = client.complete_json(
-            augmentation_messages(seed, variants_per_seed),
-            model=model,
-            temperature=0.4,
-        )
+        try:
+            response = client.complete_json(
+                augmentation_messages(seed, variants_per_seed),
+                model=model,
+                temperature=0.4,
+            )
+        except ValueError:
+            # A malformed structured response is one failed candidate batch,
+            # not grounds to publish unverified data or discard every other
+            # seed. Transport/authentication errors remain RuntimeErrors and
+            # intentionally fail the whole command without partial output.
+            malformed_response_count += 1
+            rejected_shape_count += 1
+            continue
         raw_variants = _response_variants(response)
         if raw_variants is None:
             malformed_response_count += 1

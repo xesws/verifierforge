@@ -11,6 +11,7 @@ from pydantic import BaseModel, Field, ValidationError, model_validator
 from app.gpt import (
     LLMClient,
     LLMConfigurationError,
+    LLMRequestError,
     LLMResponseError,
     LLMSettings,
 )
@@ -201,7 +202,12 @@ class VerifierCopilot:
                         f"Batch {batch_number} returned {len(batch.cases)} cases; expected {count}."
                     )
                 return batch
-            except (LLMResponseError, ValidationError, CopilotGenerationError) as error:
+            except (
+                LLMRequestError,
+                LLMResponseError,
+                ValidationError,
+                CopilotGenerationError,
+            ) as error:
                 last_error = error
         raise CopilotGenerationError(
             f"Copilot batch {batch_number} remained invalid after one repair request: {last_error}"

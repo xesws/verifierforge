@@ -8,6 +8,7 @@ from app.gpt import (
     DEFAULT_LLM_BASE_URL,
     LLMClient,
     LLMConfigurationError,
+    LLMRequestError,
     LLMResponseError,
     LLMSettings,
 )
@@ -194,7 +195,7 @@ def test_client_redacts_provider_error_text() -> None:
         client=SimpleNamespace(chat=SimpleNamespace(completions=FakeCompletions())),
     )
 
-    with pytest.raises(LLMResponseError) as raised:
+    with pytest.raises(LLMRequestError) as raised:
         client.complete([{"role": "user", "content": "Hello"}])
 
     assert secret not in str(raised.value)
@@ -216,7 +217,7 @@ def test_client_reports_http_status_without_provider_error_text() -> None:
         LLMSettings(api_key=secret),
         client=SimpleNamespace(chat=SimpleNamespace(completions=FakeCompletions())),
     )
-    with pytest.raises(LLMResponseError) as raised:
+    with pytest.raises(LLMRequestError) as raised:
         client.complete([{"role": "user", "content": "Hello"}])
 
     assert str(raised.value) == "LLM request failed with HTTP status 429."

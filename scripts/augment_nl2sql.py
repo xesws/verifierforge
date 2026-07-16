@@ -56,19 +56,27 @@ def main(argv: Sequence[str] | None = None) -> int:
     # need an SDK client or any environment configuration.
     from app.gpt import LLMClient, LLMSettings
     from core.nl2sql_augmentation import (
+        AugmentationInputError,
         augment_seed_cases,
         load_seed_cases,
         write_candidates_jsonl_atomic,
     )
 
-    client = LLMClient(LLMSettings.from_env(dotenv_path=REPOSITORY_ROOT / ".env"))
-    candidates, summary = augment_seed_cases(
-        seeds=load_seed_cases(args.input),
-        client=client,
-        variants_per_seed=args.variants_per_seed,
-        model=args.model,
-    )
-    output_path = write_candidates_jsonl_atomic(args.output, candidates)
+    try:
+        client = LLMClient(LLMSettings.from_env(dotenv_path=REPOSITORY_ROOT / ".env"))
+        candidates, summary = augment_seed_cases(
+            seeds=load_seed_cases(args.input),
+            client=client,
+            variants_per_seed=args.variants_per_seed,
+            model=args.model,
+        )
+        output_path = write_candidates_jsonl_atomic(args.output, candidates)
+    except (AugmentationInputError, OSError, RuntimeError, ValueError) as error:
+        # The shared client redacts provider responses/credentials. Keep the
+        # command's operational failure equally safe and avoid a traceback that
+        # could expose a caller's environment context.
+        print(f"augmentation error: {error}", file=sys.stderr)
+        return 2
     result = summary.as_dict()
     result["output_path"] = str(output_path)
     print(json.dumps(result, sort_keys=True))
