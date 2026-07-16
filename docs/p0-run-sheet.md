@@ -1020,9 +1020,16 @@ completion credit. Start again on the new H100 SXM executor.
   You've successfully authenticated`. The new volume exposes stored key files
   as `666`, so bootstrap's existing root-only `0600` copy is required and has
   not been bypassed. **Stop:** `gh auth` or GitHub authentication fails.
-- [ ] **N3 — bootstrap:** run `vf bootstrap`; prove imports and exact runtime
+- [ ] **N3 — bootstrap (FAILED):** run `vf bootstrap`; prove imports and exact runtime
   versions: torch `2.8.0+cu128`, vLLM `0.10.2`, verl `0.8.0`, ray `2.56.0`.
-  **Stop:** clone/install/import/version mismatch.
+  **Failed 2026-07-16 20:54 UTC:** cloning reached remote `82c2712`; the
+  workspace key was copied to `/root/.ssh/id_ed25519` at `0600`, but
+  `.venv/bin/python -c 'import torch, vllm, verl, ray'` stopped at
+  `ModuleNotFoundError: No module named 'torch'`. Read-only evidence: Python
+  `3.12.3`, pip `26.1.2`, and `pip show torch vllm verl ray` reported all four
+  packages absent; the remote requirements file digest is
+  `fd71886bad76ddaf9384269a726187696679ed1b667c001b9bcf4a4f51db0f50`.
+  N4–N7 are not authorized. **Stop:** clone/install/import/version mismatch.
 - [ ] **N4 — models:** snapshot only Qwen 2.5 0.5B and 1.5B into
   `/workspace/hf-cache`; prove both snapshot directories are complete. **Stop:**
   either download/snapshot check fails; do not download gpt-oss-20b.
