@@ -600,13 +600,19 @@ gate predicate; it is the only allowed pre-training before number.
 
 ### E3. Automatic post-decision path
 
-- [ ] All U2 predicates pass: freeze exactly training pool + held-out set +
+- [x] All U2 predicates pass: freeze exactly training pool + held-out set +
   verifier v2 provenance, then launch detached 0.5B Gate B against training
   pool only.
 - [ ] Any U2 predicate fails: record both triplets and stop.
 
 **Stop:** any freeze/tag/push/baseline/train failure. No trainer change,
 replacement sampling, or retry beyond this authorized entrypoint recovery.
+
+**Result:** all U2 predicates passed, so U3 executed in v0.10.2: the
+three-piece freeze was tagged `v0.10.2-p0-three-piece-freeze` and the detached
+0.5B Gate B was launched from that tag. The completion evidence and
+training-monitoring conclusion are recorded in F3 below. The rejected branch
+was not taken.
 
 ## v0.10.2 — U3 three-piece freeze and Gate B
 
@@ -672,7 +678,7 @@ hash recomputation matched the frozen training/held-out SHA-256 values.
 
 - [x] On RunPod, check out the freeze tag, stop `vf-eval-vllm`, verify its GPU
   memory release, then run `vf train p0-gateb-v102 grpo_v1_0p5b`.
-- [ ] Verify tmux detachment, then poll at least 120 seconds apart until the
+- [x] Verify tmux detachment, then poll at least 120 seconds apart until the
   job completes; sync metrics/log/artifact and record a training-monitoring
   conclusion only.
 
@@ -683,3 +689,26 @@ Held-out evaluation is a later D4 step; no Gate B metric is a gain claim.
 stopped `vf-eval-vllm`; tmux, vLLM process list, port 8000 listener, and GPU
 compute list were all empty before launch. `vf train p0-gateb-v102
 grpo_v1_0p5b` returned immediately and tmux session `p0-gateb-v102` exists.
+
+**Completion result:** the pod tmux session stopped after 100/100 steps.
+`trainer/grpo_train.py` emitted `Finished p0-gateb-v102` only after its child
+returned zero and it had published `step_100`; the run contains checkpoints at
+steps 50 and 100, `artifacts/curve.png`, and `artifacts/final/model.txt`.
+The ignored laptop sync has 100 metric records, exactly matching the pod:
+metrics SHA-256
+`8fae5fffbed41ef70a2dda696a7c8fdfa6c73a9888abc6f1bc7a86eb9f1e2043`, log
+SHA-256 `49a2c4c238164e33a9e1814ab8511ee2c42c9cb462237fcb7bd15852d6a2cbbb`,
+curve SHA-256 `25da531f6430ab6d55b362529e36e40c19a4c1448d238056f711767656c721eb`,
+and final-model manifest SHA-256
+`41283172e9e6646c39527709a10f17559e6bccbe6a91a4316a73e5ba7fe21ff5`.
+
+The training-pool monitoring curve starts at pass@1 `0.50` / reward
+`0.528124988079071` / entropy `0.331699013710022` (step 1), ranges over
+pass@1 `[0.50, 0.70]`, and ends at pass@1 `0.60` / reward `0.609375` /
+entropy `0.3518005311489105` (step 100). It is available as
+`runs/p0-gateb-v102/metrics.jsonl` and `runs/p0-gateb-v102/artifacts/curve.png`
+on the laptop. This is training monitoring only, not a held-out gain claim;
+the fixed D4 held-out comparison remains pending. The preserved pod log also
+contains a Ray/DataLoader-worker `Killed` traceback during teardown, before
+the final validation/checkpoint/`Finished` lines; it did not prevent final
+artifact publication and is retained verbatim in the synced log.
