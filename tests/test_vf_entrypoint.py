@@ -26,3 +26,10 @@ def test_vf_train_preflights_gate_a_import_before_tmux_detach() -> None:
 
     assert import_command in script
     assert script.index(import_command) < script.index("tmux new-session -d -s $job")
+
+
+def test_blackwell_smoke_is_an_explicit_launch_target() -> None:
+    launch = (REPOSITORY_ROOT / "trainer" / "launch.sh").read_text(encoding="utf-8")
+
+    assert "grpo_v1_1p5b_blackwell_smoke)" in launch
+    assert 'trainer.grpo_train --job "$job" --config "$cfg"' in launch

@@ -21,6 +21,9 @@ case "$cfg" in
   grpo_v1_0p5b_preflight)
     exec "$python" -m trainer.grpo_train --job "$job" --config grpo_v1_0p5b --steps 2
     ;;
+  grpo_v1_1p5b_blackwell_smoke)
+    exec "$python" -m trainer.grpo_train --job "$job" --config "$cfg"
+    ;;
   *)
     echo "unknown trainer config: $cfg" >&2
     exit 2

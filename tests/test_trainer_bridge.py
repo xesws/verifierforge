@@ -126,6 +126,29 @@ def test_grpo_config_builds_storage_only_resume_command(tmp_path: Path) -> None:
     assert config.with_total_steps(2).checkpoint_every == 2
 
 
+def test_blackwell_smoke_config_is_bounded_single_gpu_probe(tmp_path: Path) -> None:
+    config = GrpoSmokeConfig.load("grpo_v1_1p5b_blackwell_smoke")
+    command = build_verl_command(
+        config=config,
+        job_id="blackwell-smoke",
+        train_file=tmp_path / "train.parquet",
+        validation_file=tmp_path / "validation.parquet",
+        staging_dir=tmp_path / "staging",
+        resume_path=None,
+        python="python",
+    )
+
+    assert config.model_path == "Qwen/Qwen2.5-1.5B-Instruct"
+    assert config.total_steps == 30
+    assert config.rollout_n == 8
+    assert config.checkpoint_every == 10
+    assert config.rollout_gpu_memory_utilization == 0.50
+    assert "trainer.n_gpus_per_node=1" in command
+    assert "actor_rollout_ref.rollout.tensor_model_parallel_size=1" in command
+    assert "trainer.total_training_steps=30" in command
+    assert "trainer.resume_mode=disable" in command
+
+
 def test_dataset_rows_and_curve_artifact_are_portable(tmp_path: Path) -> None:
     rows = build_verl_rows(
         [

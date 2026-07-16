@@ -1,0 +1,15 @@
+# M2′: a bounded compatibility and throughput probe on one 96 GB Blackwell GPU.
+# This is intentionally not a multi-card configuration or a main-run claim.
+model_path: Qwen/Qwen2.5-1.5B-Instruct
+total_steps: 30
+train_batch_size: 4
+rollout_n: 8
+max_prompt_length: 1024
+max_response_length: 512
+lora_rank: 16
+lora_alpha: 32
+learning_rate: 1.0e-6
+kl_loss_coef: 0.001
+rollout_gpu_memory_utilization: 0.50
+checkpoint_every: 10
+validation_every: 10
