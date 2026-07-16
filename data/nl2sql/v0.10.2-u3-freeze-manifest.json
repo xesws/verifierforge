@@ -1,0 +1,85 @@
+{
+  "evidence": {
+    "eval_config": {
+      "base_url": "http://127.0.0.1:8000/v1",
+      "model": "Qwen2.5-1.5B-Instruct"
+    },
+    "heldout_baseline": {
+      "evidence": {
+        "byte_count": 1744,
+        "path": "runs/p0-gate-a/v0.10.1-e2-heldout-evidence.json",
+        "record_count": 1,
+        "sha256": "28ff3730b80cdd2f64cf2ab492f399165d5e2cec4a8ae4ce66e6466588a5f8d4"
+      },
+      "metrics": {
+        "mixed_fraction": 0.4666666666666667,
+        "pass_at_1": 0.5833333333333334,
+        "pass_at_8": 0.7666666666666667
+      },
+      "samples": {
+        "byte_count": 378393,
+        "path": "runs/p0-gate-a/v0.10.1-e2-heldout-samples.jsonl",
+        "record_count": 480,
+        "sha256": "7b1500857a6f4368c70fff10cf0245180b377e37faf4e5a201c4cc311c3f16da"
+      }
+    },
+    "training_gate": {
+      "evidence": {
+        "byte_count": 1716,
+        "path": "runs/p0-gate-a/v0.10.1-e2-training-evidence.json",
+        "record_count": 1,
+        "sha256": "53b99f50358e1bec9eb9f0ee27706cc1ebcc8a86ebbd18b8cf4bd5c092480228"
+      },
+      "metrics": {
+        "mixed_fraction": 0.84,
+        "pass_at_1": 0.28,
+        "pass_at_8": 0.88
+      },
+      "samples": {
+        "byte_count": 355262,
+        "path": "runs/p0-gate-a/v0.10.1-e2-training-samples.jsonl",
+        "record_count": 400,
+        "sha256": "ecc8eee0e5274a2b2a7da05e8a055a8d2e5ace215dc8d818c517f84fe904cf3a"
+      }
+    }
+  },
+  "frozen_identities": {
+    "heldout_evaluation_set": {
+      "byte_count": 221130,
+      "path": "data/nl2sql/v0.10.0-heldout.jsonl",
+      "record_count": 60,
+      "sha256": "482f0e7678e7603311f72aeead381364cd92f0596c20745cc58c96916a9177e8"
+    },
+    "training_pool": {
+      "byte_count": 191301,
+      "path": "data/nl2sql/v0.10.0-training-pool.jsonl",
+      "record_count": 50,
+      "sha256": "c97a5adea789fae3be249bc9ac95a1902ae5a9769de9eefbc08277f056878e8c"
+    },
+    "verifier": {
+      "git_blob_id": "b91d3872feab82d3ef29715746935149eed11efa",
+      "identity": "core.rewards.nl2sql.NL2SQLVerifier",
+      "source_path": "core/rewards/nl2sql.py",
+      "source_sha256": "b76707e5c0603d227393d03ffc0bdc7c66ec072a139c6aa717c282f4082de47f",
+      "version": 2
+    }
+  },
+  "git": {
+    "source_commit": "ee68f1c7706a47d3e2627aed2f57720bcf35e02a"
+  },
+  "reference_reverification": {
+    "failures": [],
+    "full_pass_count": 110,
+    "record_count": 110,
+    "verifier_version": 2
+  },
+  "runtime_training_fixture_alias": {
+    "byte_count": 191301,
+    "path": "trainer/data/nl2sql_v1.jsonl",
+    "record_count": 50,
+    "sha256": "c97a5adea789fae3be249bc9ac95a1902ae5a9769de9eefbc08277f056878e8c",
+    "source_identity": "training_pool"
+  },
+  "schema_version": 1,
+  "zero_source_population_overlap": true
+}

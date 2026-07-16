@@ -629,18 +629,27 @@ the freeze helper was created.
 
 ### F1. Validate and publish the three-piece manifest
 
-- [ ] Validate 50/60 counts, zero source-record overlap, exact reference SQL
+- [x] Validate 50/60 counts, zero source-record overlap, exact reference SQL
   score `1.0`, training Gate A admission, held-out reference baseline, and
   verifier v2 source/blob identity.
-- [ ] Atomically publish `data/nl2sql/v0.10.2-u3-freeze-manifest.json` and a
+- [x] Atomically publish `data/nl2sql/v0.10.2-u3-freeze-manifest.json` and a
   byte-identical `trainer/data/nl2sql_v1.jsonl` training-pool alias.
-- [ ] Recompute every manifest/fixture hash and validate the loader's 40/10
+- [x] Recompute every manifest/fixture hash and validate the loader's 40/10
   split without changing trainer logic.
 
 **Acceptance:** the manifest binds exactly the required three identities and
 the alias hash equals the training-pool hash.
 **Stop:** any validation, overlap, reference, evidence, or publication failure;
 do not commit/tag/train.
+
+**Result:** the manifest reports `110/110` verifier-v2 reference full passes,
+zero source-population overlap, and both matching Gate A evidence/sample pairs.
+Manifest SHA-256: `bf54f7a57b612f594ce96191ea53bd7750a8f43db8d5c81b373b83ed8dabc471`.
+The runtime fixture and frozen training pool are byte-identical at SHA-256
+`c97a5adea789fae3be249bc9ac95a1902ae5a9769de9eefbc08277f056878e8c`;
+the unchanged loader accepted 50 cases and produced its stable 40/10 split.
+Focused freeze/fixture tests passed `8 passed`; full validation passed
+`179 passed, 1 skipped`.
 
 ### F2. Commit and tag the immutable freeze
 
