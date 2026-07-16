@@ -1142,6 +1142,11 @@ as a root-cause stack trace.
   `runtime-environment.txt` atomically captures effective values, `pip freeze`,
   and driver/GPU output before every GRPO child. `pytest -q` passed
   (`187 passed, 1 skipped`); `bash -n trainer/launch.sh` passed.
+  **First remote attempt failed before worker creation:** Hydra parsed unquoted
+  `1`/`0` worker-env overrides as integers and Ray rejected
+  `runtime_env['env_vars'] must be of type Dict[str, str]`. Evidence was
+  captured, tmux exited, and GPU remained 0 MiB. Repair scope is limited to
+  quoting those Hydra values as strings, then rerunning E1 from a new job ID.
 - [ ] Run `e1-h100-1p5b-smoke-v0124` through `vf train` with unchanged
   `grpo_v1_1p5b_h100_smoke`, detached tmux, and a 30-minute timebox. Treat
   engine milestones as health: sleep-mode then spawn, safetensors/GPU growth,
