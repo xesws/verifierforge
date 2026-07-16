@@ -1068,10 +1068,13 @@ the only runtime install lines are `47` (`pip install --upgrade pip`) and `48`
 bootstrap. This is branch B: installation was neither in progress nor
 auditable, and N3 must not be treated as complete.
 
-- [ ] **v0.12.1 repair:** before a new install, make `vf bootstrap` create a
+- [x] **v0.12.1 repair:** before a new install, make `vf bootstrap` create a
   named tmux installation session, append a raw runtime-install log, publish a
   success/failure status artifact from an EXIT trap, and wait for that artifact
-  synchronously. No failure masking or version relaxation is permitted.
+  synchronously. **Implemented/validated locally:** focused control-plane tests,
+  `bash -n scripts/vf trainer/bootstrap.sh`, and `pytest -q` passed
+  (`184 passed, 1 skipped`). No failure masking or version relaxation is
+  permitted.
 - [ ] **N3 retry:** run the explicit tmux-backed installation, preserve its raw
   log/status, then import/print torch `2.8.0+cu128`, vLLM `0.10.2`, verl
   `0.8.0`, and ray `2.56.0`. **Stop:** any installation/status/import/version

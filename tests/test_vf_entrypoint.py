@@ -40,6 +40,28 @@ def test_vf_kill_owns_recorded_job_process_groups_and_gpu_cleanup() -> None:
     assert "vf kill failed: GPU still has" in script
 
 
+def test_vf_bootstrap_waits_for_a_durable_runtime_install_status() -> None:
+    script = (REPOSITORY_ROOT / "scripts" / "vf").read_text(encoding="utf-8")
+
+    assert 'session="vf-bootstrap"' in script
+    assert 'status_file="$provisioning_dir/runtime-install.status"' in script
+    assert 'log_file="$provisioning_dir/runtime-install.log"' in script
+    assert 'while tmux has-session -t "$session"' in script
+    assert "grep -qx 'state=success'" in script
+    assert "vf bootstrap failed: runtime installation did not complete successfully" in script
+
+
+def test_bootstrap_publishes_log_and_exit_status_without_masking_pip_failure() -> None:
+    script = (REPOSITORY_ROOT / "trainer" / "bootstrap.sh").read_text(encoding="utf-8")
+
+    assert "set -euo pipefail" in script
+    assert 'RUNTIME_INSTALL_LOG="$PROVISIONING_DIR/runtime-install.log"' in script
+    assert 'RUNTIME_INSTALL_STATUS="$PROVISIONING_DIR/runtime-install.status"' in script
+    assert "trap publish_runtime_status EXIT" in script
+    assert 'exec > >(tee -a "$RUNTIME_INSTALL_LOG") 2>&1' in script
+    assert ".venv/bin/python -m pip install -r requirements-trainer.txt" in script
+
+
 def test_blackwell_smoke_is_an_explicit_launch_target() -> None:
     launch = (REPOSITORY_ROOT / "trainer" / "launch.sh").read_text(encoding="utf-8")
 

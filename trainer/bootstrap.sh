@@ -40,6 +40,30 @@ if [[ ! -d "$ROOT/.git" ]]; then
 fi
 cd "$ROOT"
 
+PROVISIONING_DIR="$ROOT/runs/provisioning"
+RUNTIME_INSTALL_LOG="$PROVISIONING_DIR/runtime-install.log"
+RUNTIME_INSTALL_STATUS="$PROVISIONING_DIR/runtime-install.status"
+mkdir -p "$PROVISIONING_DIR"
+
+publish_runtime_status() {
+  local exit_status=$?
+  local state=failed
+  ((exit_status == 0)) && state=success
+
+  {
+    printf 'state=%s\n' "$state"
+    printf 'finished_at_utc='; date -u +%Y-%m-%dT%H:%M:%SZ
+    printf 'exit_status=%s\n' "$exit_status"
+  } > "$RUNTIME_INSTALL_STATUS.tmp"
+  mv "$RUNTIME_INSTALL_STATUS.tmp" "$RUNTIME_INSTALL_STATUS"
+  trap - EXIT
+  exit "$exit_status"
+}
+
+trap publish_runtime_status EXIT
+exec > >(tee -a "$RUNTIME_INSTALL_LOG") 2>&1
+printf 'runtime_install_started_at_utc='; date -u +%Y-%m-%dT%H:%M:%SZ
+
 if [[ ! -x .venv/bin/python ]]; then
   python3 -m venv .venv
 fi
