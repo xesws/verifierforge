@@ -1003,8 +1003,8 @@ zero-MiB check are mandatory.
 
 ## v0.12.0 — Fresh H100 rebuild and D4 execution
 
-**Status:** planned; the former RTX PRO 6000/old volume have no remaining
-completion credit. Start again on the new H100 SXM executor.
+**Status:** N1–N5 passed on the fresh executor; N6 was attempted and failed
+its no-metrics gate. N7 is blocked and must not start.
 
 - [x] **N1 — connection:** update local `runpod` SSH entry to
   `157.66.254.39:14694`; prove one H100 80 GB and empty `/workspace` (or only
@@ -1050,17 +1050,33 @@ completion credit. Start again on the new H100 SXM executor.
   remote values are exactly `c97a5adea789fae3be249bc9ac95a1902ae5a9769de9eefbc08277f056878e8c`
   and `482f0e7678e7603311f72aeead381364cd92f0596c20745cc58c96916a9177e8`.
   **Stop:** tag/hash mismatch.
-- [ ] **N6 — M2′ H100 smoke:** create/document the H100-specific 1.5B config
+- [x] **N6 — M2′ H100 smoke (failed):** create/document the H100-specific 1.5B config
   (one GPU, TP 1, `0.45` rollout memory, Hugging Face `sdpa`), run 20–30 steps,
   require at least 20 nonempty metric rows, record tokens/s, step time and M3
   estimate, then W1 kill with 0 MiB. **Stop:** any missing metric, error, or
-  cleanup failure.
+  cleanup failure. **Failed 2026-07-16 21:39 UTC:** the detached job began at
+  approximately 21:27:55 UTC with the required command overrides (one GPU,
+  TP 1, rollout memory `0.45`, `sdpa`, `k=8`, 30 steps). It reached a
+  `WorkerDict` process after dataset preparation, but after 11 minutes
+  `metrics.jsonl` was still absent, GPU use was fixed at 7,188 MiB with 0%
+  utilization, and no throughput or completed step was logged. Ray had
+  reserved `0.3333/1.0` GPU but reported no pending demand. There is no
+  tokens/s, step-time, or M3 estimate to record because no step occurred.
+  Raw evidence remains in
+  `/workspace/verifierforge/runs/n6-h100-smoke/train.log`. W1 passed:
+  `vf kill` removed the tmux session and job process group and reported
+  `GPU memory: 0 MiB`; an independent `nvidia-smi` check showed 0 MiB/0%.
 - [ ] **N7 — M3–M6:** only after N6 passes, launch detached 1.5B main training
   (300–500 steps, `k=8`, 50-step checkpoints, held-out-best, entropy brake),
   then serial 0.5B random-reward control at half steps; evaluate the frozen
   held-out 60 against `0.583 / 0.767 / 0.467`; archive Storage artifacts,
   curve PNG/final checkpoint and `vf watch` SHA consistency. **Stop:** any
   implementation, training, evaluation, or artifact-validation failure.
+
+**N6 disposition:** do not infer a root cause from this evidence. The observed
+failure is an initialization stall after FSDP worker creation, not an OOM,
+NCCL, or vLLM error (none was logged). A separately versioned diagnostic and
+repair plan is required before any retry; M3–M6 remain prohibited.
 
 **N6 pre-implementation decision:** use a new
 `grpo_v1_1p5b_h100_smoke` target, not the historical Blackwell config. It has
