@@ -1,6 +1,6 @@
 # P0 Run Sheet — v0.6.1 data freeze
 
-**Status:** stopped at S3 pending human direction
+**Status:** in progress — v0.6.2 pod-local Gate A recovery
 **Owner:** Codex on `main`
 **Starting commit:** `78912f1` (`v0.6.0 Data: discard malformed expansion responses`)
 **Recovery rule:** after any session interruption, this file is the sole operational context. Read it before taking any action.
@@ -95,3 +95,72 @@
 **Stop:** nonzero exit, missing metrics/final artifact, or sync failure. Preserve logs/checkpoints; do not auto-retry or alter training settings.
 
 **Result:** pending.
+
+## v0.6.2 recovery — F1 through F5
+
+### F0. Documentation gate
+
+- [x] Create the v0.6.2 version/area documents and record the recovery decisions here before implementation.
+
+**Acceptance:** documentation names the eval-only environment contract, failure-evidence contract, local pod server command, and all stop gates.
+**Stop:** no F1 code change before this documentation commit.
+
+### F1. Eval configuration separation
+
+- [ ] Add `EvalSettings`: require only `VF_EVAL_BASE_URL` and `VF_EVAL_MODEL`; optionally honor `VF_EVAL_API_KEY`; otherwise use the non-secret local SDK placeholder `vf-local-eval`.
+- [ ] Gate A uses only `EvalSettings`, does not load `.env`, and never reads/falls back to `VF_LLM_*` or `VF_AUGMENT_MODEL`.
+- [ ] Remove the Gate A `--model` override. Require `--report`; print resolved sanitized base URL and model before any request and store both in all evidence.
+
+**Acceptance:** missing eval base/model fails closed before client creation; generic augmentation/copilot client behavior remains unchanged.
+**Stop:** any observed `VF_LLM_*` fallback, key/log leak, or failed focused/full test.
+
+### F2. Failure evidence and bounded execution
+
+- [ ] Preserve provider exception chains, HTTP status, request ordinal, record/sample, two-attempt history, and a redacted 4 KiB provider-body cap.
+- [ ] Replace all-at-once submission with at most eight in-flight logical samples. Retry each failed sample once; after ten consecutive terminal failures in request-ordinal order, stop submitting new jobs and record circuit-open state.
+- [ ] Any terminal sample failure makes the run exit `2` with failure evidence and invalid metrics; it never becomes verifier score `0`. No automatic whole-run retry occurs.
+
+**Acceptance:** failure evidence is atomically persisted on every configuration/input/completion failure; stdout/stderr remain secret-free.
+**Stop:** failure evidence cannot be written, retry/circuit tests fail, or a partial run produces Gate A metrics.
+
+### F3. Pod-local vLLM exam server
+
+- [ ] Pull the verified implementation to RunPod and start detached tmux session `vf-eval-vllm` using `/workspace/verifierforge/.venv/bin/vllm`.
+- [ ] Serve the local snapshot at `127.0.0.1:8000` as `Qwen2.5-1.5B-Instruct`, with offline cache flags, BF16, 0.70 GPU memory utilization, and 4096 max model length.
+- [ ] Record tmux session, port, log path, and raw `/v1/models` response.
+
+**Acceptance:** port 8000 was free before launch; tmux remains alive; `/v1/models` contains `Qwen2.5-1.5B-Instruct`.
+**Stop:** cache, vLLM startup, GPU, tmux, or health check fails. No Gate A.
+
+### F4a. Pod subset Gate A
+
+- [ ] Run the 50-row subset inside detached tmux on the pod with `VF_EVAL_BASE_URL=http://127.0.0.1:8000/v1` and `VF_EVAL_MODEL=Qwen2.5-1.5B-Instruct`; do not set `VF_LLM_*`.
+- [ ] Sync the evidence/log, validate the local input SHA-256, and record the raw `pass_at_1`, `pass_at_8`, and `mixed_fraction`.
+
+**Acceptance:** completed subset evidence has matching input/verifier hashes and passes `0.20 <= pass_at_1 <= 0.60`, `mixed_fraction >= 0.30`.
+**Stop:** exit 2/circuit/terminal failure, evidence mismatch, or threshold failure. Do not run full reference or train.
+
+### F4b. Pod full Gate A reference
+
+- [ ] Only after F4a passes, run the full candidate set with `--reference`, preserving the same eval config and evidence contract.
+- [ ] Sync/validate evidence and record the same raw metric triplet. Full-set threshold status is reference-only.
+
+**Acceptance:** completed evidence with matching full-dataset/verifier hashes.
+**Stop:** exit 2/circuit/terminal failure or evidence mismatch. No freeze or train.
+
+### F5. Freeze and Gate B
+
+- [ ] Update the freeze manifest helper to bind v2 completed evidence and the shared eval model/base URL. Generate and verify the manifest.
+- [ ] Commit freeze artifacts; create annotated `v0.6.2-p0-data-freeze` tag whose message names `eval_model=Qwen2.5-1.5B-Instruct`; push `main` and tag.
+- [ ] Stop `vf-eval-vllm`, verify port/GPU release, then launch `p0-gateb-v062` through `vf train` with `grpo_v1_0p5b`.
+- [ ] Sync final metrics/curve/artifact, append the measured pass@1 series and smoke-only conclusion to the remote log and this sheet, then commit.
+
+**Acceptance:** the tag binds full/subset/evidence/verifier hashes and eval model; Gate B runs against that tagged checkout and completes with synchronized artifacts.
+**Stop:** any manifest/tag/push/server-release/train/sync failure; preserve evidence and do not auto-tune/retry.
+
+## Recovery assumptions
+
+- `VF_EVAL_API_KEY` is an optional override only; absent it uses `vf-local-eval`, never a laptop or OpenRouter key.
+- The scheduler permits at most seven already-in-flight logical samples beyond a circuit-open event; no new samples are submitted after the tenth consecutive terminal failure.
+- An observed terminal failure invalidates that Gate A run. A human may request one later whole-run retry; two consecutive whole-run invalidations due to isolated terminal failures mean the vLLM service is unhealthy and require a stop/report.
+- The earlier OpenRouter key must be rotated before any future external-provider call. This recovery path does not use it.
