@@ -1078,6 +1078,30 @@ failure is an initialization stall after FSDP worker creation, not an OOM,
 NCCL, or vLLM error (none was logged). A separately versioned diagnostic and
 repair plan is required before any retry; M3–M6 remain prohibited.
 
+### v0.12.3 — C1 Gate B control replay diagnosis
+
+**Status:** approved; documentation gate complete, execution pending.
+
+- [ ] Verify the original Gate B tag/config/data identity before launch:
+  tag `v0.10.2-p0-three-piece-freeze` commit
+  `ad3d36b5860c66567a9f60f94c34101c787aaef3`; config SHA-256
+  `e2b8e973cf2400040dd83684e9bd7f4b0f191390ebce24ee43281f9ed5b81171`; frozen
+  50-row alias SHA-256
+  `c97a5adea789fae3be249bc9ac95a1902ae5a9769de9eefbc08277f056878e8c`.
+  Run the tag worktree's literal 0.5B Gate B configuration in detached tmux,
+  writing all state to `runs/c1-gateb-replay-v0123/` under the primary
+  workspace. **Stop:** identity or launch failure.
+- [ ] At T+3 minutes, install only `py-spy` into the runtime venv and atomically
+  preserve the complete native `WorkerDict` dump, PID manifest, and install/
+  version output under that run's `evidence/`. This is required regardless of
+  whether a metric already exists. **Stop:** do not claim a branch conclusion
+  without this artifact.
+- [ ] At or before the 15-minute timebox, preserve the metric/no-metric result,
+  perform W1 teardown, and require tmux/process absence plus 0 MiB GPU. One
+  JSONL metric selects C2 (new-config investigation); no metric selects C3
+  (environment-regression investigation). C2/C3 repairs are not authorized by
+  this C1 scope; N7 remains blocked.
+
 **N6 pre-implementation decision:** use a new
 `grpo_v1_1p5b_h100_smoke` target, not the historical Blackwell config. It has
 30 steps, 1.5B, `k=8`, one GPU/TP 1, `rollout_gpu_memory_utilization=0.45`,
