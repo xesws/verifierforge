@@ -4,20 +4,15 @@ from typing import Any
 
 from fastapi.testclient import TestClient
 
-from app.api.copilot import (
-    DEFAULT_MODEL,
-    ProposalRequest,
-    VerifierCopilot,
-    get_copilot,
-    get_sandbox,
-)
+from app.api.copilot import ProposalRequest, VerifierCopilot, get_copilot, get_sandbox
 from app.api.main import app
 from app.sandbox import SandboxResult
 
 
 class FakeStructuredClient:
-    def __init__(self, responses: list[dict[str, Any]]) -> None:
+    def __init__(self, responses: list[dict[str, Any]], model: str = "test/configured") -> None:
         self.responses = list(responses)
+        self.model = model
         self.calls: list[dict[str, Any]] = []
 
     def complete_json(self, messages, *, model=None, temperature=0.2):
@@ -50,18 +45,21 @@ def _batch(start: int, count: int, *, design: bool) -> dict[str, Any]:
     return payload
 
 
-def test_copilot_batches_cases_with_explicit_grok_model() -> None:
-    client = FakeStructuredClient([_batch(1, 10, design=True), _batch(11, 2, design=False)])
+def test_copilot_batches_cases_with_configured_client_model() -> None:
+    client = FakeStructuredClient(
+        [_batch(1, 10, design=True), _batch(11, 2, design=False)],
+        model="provider/selected-from-env",
+    )
     copilot = VerifierCopilot(client)
 
     proposal = copilot.propose(
         ProposalRequest(task="answer SQL", schema_sql="CREATE TABLE things (id INTEGER)", seed_count=12)
     )
 
-    assert proposal.model == DEFAULT_MODEL
+    assert proposal.model == "provider/selected-from-env"
     assert len(proposal.cases) == 12
     assert proposal.review_required is True
-    assert [call["model"] for call in client.calls] == [DEFAULT_MODEL, DEFAULT_MODEL]
+    assert [call["model"] for call in client.calls] == [None, None]
     assert "exactly 10" in client.calls[0]["messages"][1]["content"]
     assert "exactly 2" in client.calls[1]["messages"][1]["content"]
 
@@ -114,7 +112,7 @@ def test_proposal_route_uses_injected_copilot() -> None:
         app.dependency_overrides.clear()
 
     assert response.status_code == 200
-    assert response.json()["model"] == DEFAULT_MODEL
+    assert response.json()["model"] == fake.model
     assert response.json()["cases"][0]["case_id"] == "case-1"
 
 

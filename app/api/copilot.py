@@ -8,12 +8,11 @@ from typing import Any, Protocol
 from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel, Field, ValidationError, model_validator
 
-from app.gpt.openrouter import (
-    DEFAULT_MODEL,
-    OpenRouterClient,
-    OpenRouterConfigurationError,
-    OpenRouterResponseError,
-    OpenRouterSettings,
+from app.gpt import (
+    LLMClient,
+    LLMConfigurationError,
+    LLMResponseError,
+    LLMSettings,
 )
 from app.sandbox import DockerSandbox, SandboxResult, SandboxUnavailableError
 
@@ -76,6 +75,11 @@ class ValidationResponse(BaseModel):
 
 class StructuredCompletionClient(Protocol):
     """The small structured-completion surface required by the Copilot."""
+
+    @property
+    def model(self) -> str:
+        """Configured model to report with a generated proposal."""
+        ...
 
     def complete_json(
         self,
@@ -162,7 +166,7 @@ class VerifierCopilot:
             raise CopilotGenerationError("Copilot returned duplicate case_id values.")
 
         return ProposalResponse(
-            model=DEFAULT_MODEL,
+            model=self._client.model,
             verifier_code=first.verifier_code,
             test_code=first.test_code,
             tiers=first.tiers,
@@ -189,7 +193,6 @@ class VerifierCopilot:
                         include_design=include_design,
                         repair_error=str(last_error) if last_error else None,
                     ),
-                    model=DEFAULT_MODEL,
                     temperature=0.2,
                 )
                 batch = _ProposalBatch.model_validate(payload)
@@ -198,7 +201,7 @@ class VerifierCopilot:
                         f"Batch {batch_number} returned {len(batch.cases)} cases; expected {count}."
                     )
                 return batch
-            except (OpenRouterResponseError, ValidationError, CopilotGenerationError) as error:
+            except (LLMResponseError, ValidationError, CopilotGenerationError) as error:
                 last_error = error
         raise CopilotGenerationError(
             f"Copilot batch {batch_number} remained invalid after one repair request: {last_error}"
@@ -251,12 +254,12 @@ def _proposal_messages(
 
 
 def get_copilot() -> VerifierCopilot:
-    """Construct the laptop-only OpenRouter client when the route is invoked."""
+    """Construct the laptop-only configured LLM client when the route is invoked."""
     try:
-        settings = OpenRouterSettings.from_env()
-    except OpenRouterConfigurationError as error:
+        settings = LLMSettings.from_env()
+    except LLMConfigurationError as error:
         raise HTTPException(status_code=503, detail=str(error)) from error
-    return VerifierCopilot(OpenRouterClient(settings))
+    return VerifierCopilot(LLMClient(settings))
 
 
 def get_sandbox() -> DockerSandbox:

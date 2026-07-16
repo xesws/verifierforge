@@ -1,5 +1,13 @@
-"""GPT runtime integrations for VerifierForge."""
+"""OpenAI-compatible LLM runtime integrations for VerifierForge."""
 
+from .client import (
+    DEFAULT_AUGMENT_MODEL,
+    DEFAULT_LLM_BASE_URL,
+    LLMClient,
+    LLMConfigurationError,
+    LLMResponseError,
+    LLMSettings,
+)
 from .openrouter import (
     OpenRouterClient,
     OpenRouterConfigurationError,
@@ -8,6 +16,12 @@ from .openrouter import (
 )
 
 __all__ = [
+    "DEFAULT_AUGMENT_MODEL",
+    "DEFAULT_LLM_BASE_URL",
+    "LLMClient",
+    "LLMConfigurationError",
+    "LLMResponseError",
+    "LLMSettings",
     "OpenRouterClient",
     "OpenRouterConfigurationError",
     "OpenRouterResponseError",
