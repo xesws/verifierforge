@@ -25,7 +25,13 @@ Metrics are append-only JSONL; checkpoints publish through a temporary directory
 
 Pre-1.0 scaffold: **`v0.1.0`**. `docs/dev_doc_v0.md`'s `v0` and `v2.1` are document revisions, not product releases. Every change needs one target version in its branch name, commit subject, and PR title. Increment the minor for a new capability (`v0.2.0`) and the patch for a bug, compatibility, infrastructure, or docs-only change (`v0.1.1`, then `v0.1.2`). Examples: `feature/v0.2.0-verifier-copilot`, `fix/v0.1.1-checkpoint-resume`, and `docs/v0.1.2-runbook`; commit subjects begin `v0.2.0 Verifier: ...`.
 
-Create each worktree from current `origin/main`: `git fetch origin && git worktree add -b feature/v0.2.0-name ../vf-v0.2.0 origin/main`. Each active worktree owns one version and file area. Never concurrently edit `core/contracts.py` or the same source file; contract changes need explicit human approval, mock updates, and tests in the same branch. Before merge, rebase on `origin/main`, resolve conflicts manually (never blindly choose ours/theirs), run `pytest -q` and relevant smoke checks, then only the integration worktree merges and pushes `main`. Remaining worktrees must `git pull --ff-only` before new edits.
+**Trunk-first default.** Develop on `main` by default. Branches are allowed only for a single purpose and must be created and merged the same day. Do not leave long-lived parallel feature branches.
+
+**`core/` serialization.** Any change under `core/` is its own merge wave and must land first. Never allow two branches to edit `core/` (including `core/contracts.py`) at the same time. Contracts stay additive: do not rename or remove fields consumed by the mock or frontend. If a merge conflict touches `core/contracts.py`, stop and escalate both sides to a human—do not auto-resolve the contract.
+
+**Merge gate and cleanup.** Before merging: rebase onto the latest `main`, resolve non-contract conflicts manually (never blindly choose ours/theirs), and require `pytest -q` fully green. After merging: delete the branch and any matching worktree immediately. Prefer trunk commits for same-day docs/infra patches; use a branch only when isolation is required.
+
+Optional worktrees (when needed) come from current `origin/main`: `git fetch origin && git worktree add -b feature/v0.2.0-name ../vf-v0.2.0 origin/main`. Each active worktree owns one version and file area. Contract changes need explicit human approval, mock updates, and tests in the same wave. Remaining worktrees must `git pull --ff-only` before new edits.
 
 ## Documentation-First Delivery Gate
 
