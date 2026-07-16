@@ -9,7 +9,9 @@
 
 - Work only on `main`; do not create a parallel worktree.
 - Do not change `trainer/` training logic, GRPO configuration, or a trainer data-path configuration. The existing `trainer/data/nl2sql_v1.jsonl` contents may be replaced only by the frozen 50-row projection.
-- Use the shared environment-configured OpenRouter client only. Never print, commit, rsync, SSH-forward, or copy `.env` / API keys to RunPod.
+- Evaluation uses only `VF_EVAL_BASE_URL` / `VF_EVAL_MODEL` against pod-local
+  vLLM. Never print, commit, rsync, SSH-forward, or copy `.env` / API keys to
+  RunPod; this runbook has no OpenRouter budget.
 - Keep the pre-existing unstaged `AGENTS.md` change out of every P0 commit.
 - Every completed numbered step: tick it here, record factual results, commit only its scoped files, then report one concise line. A stop condition ends the run; no threshold, budget, or trainer change is allowed without human direction.
 
@@ -293,3 +295,39 @@ configuration change is authorized outside the runbook.
 **Route:** Branch A. The direct sample evidence shows that the dominant failure
 is Markdown fence formatting, not SQL difficulty. Begin A1 only after its
 separate verifier-version documentation is committed.
+
+## Branch A — v0.8.0 fenced-SQL extraction
+
+### A1. Extraction normalization and verifier v2
+
+- [ ] Commit v0.8.0 verifier/evaluation/infrastructure documentation before
+  code.
+- [ ] Recognize only SQL/untagged Markdown code fences; strip the fence and
+  use `sqlparse` to send the first extracted statement through the unchanged
+  scorer.
+- [ ] Preserve raw sample completion evidence while recording scored completion
+  and extraction facts; add verifier version `2` to Gate A evidence.
+
+**Acceptance:** a fenced exact query receives the exact same legacy tier facts
+as its inner SQL; unfenced multi-statement input remains rejected. No scoring
+threshold or trainer behavior changes.
+**Stop:** any scorer parity/safety/test failure blocks A2.
+
+### A2. Full candidate v2 re-verification
+
+- [ ] Atomically re-verify all 276 stored candidate `reference_sql` values
+  offline under verifier v2 and record source hash/version/full-pass count.
+
+**Acceptance:** exactly 276/276 are `1.0`.
+**Stop ③:** any record drops below `1.0`; do not start Gate A, freeze, or train.
+
+### A3. Branch A subset Gate A rerun
+
+- [ ] Only after A2 passes, run the 50-row subset at `k=8` on pod-local vLLM,
+  save sample evidence, and sync/hash-check it.
+- [ ] If Gate A passes, proceed to O5. If it completes but `pass_at_1 < 0.20`,
+  continue to Branch B with verifier v2. Any other non-passing Gate A outcome
+  is recorded exactly and handled by the existing stop rules.
+
+**Admission:** the v2 subset run, not v0.7.0's diagnostic triplet, is the Gate
+A decision. Thresholds are unchanged.
