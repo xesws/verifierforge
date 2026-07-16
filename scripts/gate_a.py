@@ -83,6 +83,11 @@ def build_parser() -> argparse.ArgumentParser:
         action="store_true",
         help="record metrics without rejecting a completed full-set reference run",
     )
+    parser.add_argument(
+        "--per-prompt-output",
+        type=Path,
+        help="reference-only JSONL output with one full-pass count per prompt",
+    )
     return parser
 
 
@@ -95,6 +100,8 @@ def main(argv: Sequence[str] | None = None) -> int:
     """
     parser = build_parser()
     args = parser.parse_args(argv)
+    if args.per_prompt_output is not None and not args.reference:
+        parser.error("--per-prompt-output requires --reference")
     candidate_path = _resolve_candidate_path(parser, args)
     mode = "reference" if args.reference else "gate"
     input_digest: str | None = None
@@ -204,6 +211,30 @@ def main(argv: Sequence[str] | None = None) -> int:
         print("gate_a internal error: see evidence report", file=sys.stderr)
         return 2
 
+    per_prompt_artifact: dict[str, Any] | None = None
+    if args.per_prompt_output is not None:
+        try:
+            per_prompt_artifact = write_per_prompt_pass_counts(
+                args.per_prompt_output,
+                groups=run.groups,
+                k=args.k,
+            )
+        except (OSError, ValueError) as error:
+            _write_failure_or_report(
+                args.report,
+                candidate_path=candidate_path,
+                input_digest=input_digest,
+                record_count=len(records),
+                settings=settings,
+                k=args.k,
+                workers=args.workers,
+                mode=mode,
+                category="artifact",
+                error=error,
+            )
+            print("gate_a artifact error: could not write per-prompt output", file=sys.stderr)
+            return 2
+
     decision = gate_passes(run.metrics)
     if args.report is not None:
         try:
@@ -216,6 +247,7 @@ def main(argv: Sequence[str] | None = None) -> int:
                 base_url=settings.base_url,
                 workers=args.workers,
                 mode=mode,
+                per_prompt_artifact=per_prompt_artifact,
             )
         except OSError:
             print("gate_a evidence error: could not write evidence file", file=sys.stderr)
@@ -289,6 +321,7 @@ def write_evidence(
     base_url: object,
     workers: int,
     mode: str = "gate",
+    per_prompt_artifact: Mapping[str, Any] | None = None,
 ) -> None:
     """Atomically write freeze-ready evidence without prompts, completions, or keys."""
     payload = {
@@ -327,7 +360,52 @@ def write_evidence(
         # Preserve the stable pass_at_k/k fields while making the fixed Gate A
         # metric directly addressable in freeze evidence.
         payload["pass_at_8"] = metrics.pass_at_k
+    if per_prompt_artifact is not None:
+        payload["per_prompt_pass_counts"] = dict(per_prompt_artifact)
     _write_json_atomic(path, payload)
+
+
+def write_per_prompt_pass_counts(
+    path: Path,
+    *,
+    groups: Sequence[Any],
+    k: int,
+) -> dict[str, Any]:
+    """Atomically persist only the full-pass count for each evaluated prompt.
+
+    This is intentionally a reference-probe artifact: it identifies the source
+    record and its count out of ``k`` without retaining prompt or completion text.
+    """
+    rows: list[dict[str, int | str | None]] = []
+    for record_index, group in enumerate(groups, start=1):
+        full_passes = getattr(group, "full_passes", None)
+        record_id = getattr(group, "record_id", None)
+        if not isinstance(full_passes, tuple) or len(full_passes) != k:
+            raise ValueError("per-prompt groups must contain exactly k pass labels")
+        if not all(isinstance(value, bool) for value in full_passes):
+            raise ValueError("per-prompt groups must contain boolean pass labels")
+        pass_count = sum(full_passes)
+        if not 0 <= pass_count <= k:
+            raise ValueError("per-prompt pass count is outside the sampling range")
+        rows.append(
+            {
+                "record_index": record_index,
+                "record_id": record_id if isinstance(record_id, str) else None,
+                "pass_count": pass_count,
+                "k": k,
+            }
+        )
+
+    content = "".join(json.dumps(row, sort_keys=True) + "\n" for row in rows)
+    _write_text_atomic(path, content)
+    raw = path.read_bytes()
+    histogram = Counter(str(row["pass_count"]) for row in rows)
+    return {
+        "path": str(path),
+        "sha256": hashlib.sha256(raw).hexdigest(),
+        "record_count": len(rows),
+        "histogram": dict(sorted(histogram.items(), key=lambda item: int(item[0]))),
+    }
 
 
 def _write_failure_or_report(
@@ -407,6 +485,11 @@ def write_failure_evidence(
 
 def _write_json_atomic(path: Path, payload: Mapping[str, Any]) -> None:
     """Durably replace an evidence file, preserving an older complete report on failure."""
+    _write_text_atomic(path, json.dumps(dict(payload), indent=2, sort_keys=True) + "\n")
+
+
+def _write_text_atomic(path: Path, content: str) -> None:
+    """Durably replace text output, preserving an older complete file on failure."""
     path.parent.mkdir(parents=True, exist_ok=True)
     temporary_path: Path | None = None
     try:
@@ -418,8 +501,7 @@ def _write_json_atomic(path: Path, payload: Mapping[str, Any]) -> None:
             delete=False,
         ) as temporary:
             temporary_path = Path(temporary.name)
-            json.dump(dict(payload), temporary, indent=2, sort_keys=True)
-            temporary.write("\n")
+            temporary.write(content)
             temporary.flush()
             os.fsync(temporary.fileno())
         os.replace(temporary_path, path)

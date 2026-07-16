@@ -412,3 +412,88 @@ def test_reference_mode_records_threshold_status_but_does_not_reject(
     assert payload["status"] == "completed"
     assert payload["mode"] == "reference"
     assert payload["passed"] is False
+
+
+def test_reference_probe_writes_one_atomic_pass_count_per_prompt(
+    tmp_path: Path, monkeypatch
+) -> None:
+    candidates = tmp_path / "candidates.jsonl"
+    evidence = tmp_path / "probe-evidence.json"
+    counts = tmp_path / "pass-counts.jsonl"
+    _write_candidates(candidates, [_record(1), _record(2)])
+    _install_fake_client(
+        monkeypatch,
+        SequenceClient(
+            [
+                "SELECT name FROM people",
+                "SELECT name FROM people WHERE name = 'Nobody'",
+                "SELECT name FROM people WHERE name = 'Nobody'",
+                "SELECT name FROM people",
+            ]
+        ),
+    )
+
+    assert (
+        gate_a.main(
+            [
+                str(candidates),
+                "--k",
+                "2",
+                "--workers",
+                "1",
+                "--report",
+                str(evidence),
+                "--reference",
+                "--per-prompt-output",
+                str(counts),
+            ]
+        )
+        == 0
+    )
+
+    rows = [json.loads(line) for line in counts.read_text(encoding="utf-8").splitlines()]
+    assert rows == [
+        {"k": 2, "pass_count": 1, "record_id": "case-1", "record_index": 1},
+        {"k": 2, "pass_count": 1, "record_id": "case-2", "record_index": 2},
+    ]
+    payload = json.loads(evidence.read_text(encoding="utf-8"))
+    assert payload["per_prompt_pass_counts"] == {
+        "histogram": {"1": 2},
+        "path": str(counts),
+        "record_count": 2,
+        "sha256": hashlib.sha256(counts.read_bytes()).hexdigest(),
+    }
+
+
+def test_per_prompt_output_is_reference_only(tmp_path: Path) -> None:
+    with pytest.raises(SystemExit, match="2"):
+        gate_a.main(
+            [
+                "candidates.jsonl",
+                "--report",
+                str(tmp_path / "evidence.json"),
+                "--per-prompt-output",
+                str(tmp_path / "counts.jsonl"),
+            ]
+        )
+
+
+def test_per_prompt_output_keeps_prior_file_when_atomic_publish_fails(
+    tmp_path: Path, monkeypatch
+) -> None:
+    output = tmp_path / "pass-counts.jsonl"
+    output.write_text('{"previous":true}\n', encoding="utf-8")
+    groups = [
+        SimpleNamespace(record_id="case-1", full_passes=(True, False)),
+    ]
+
+    def fail_replace(source: Path, destination: Path) -> None:
+        del source, destination
+        raise OSError("simulated publish failure")
+
+    monkeypatch.setattr(gate_a.os, "replace", fail_replace)
+    with pytest.raises(OSError, match="simulated publish failure"):
+        gate_a.write_per_prompt_pass_counts(output, groups=groups, k=2)
+
+    assert output.read_text(encoding="utf-8") == '{"previous":true}\n'
+    assert not list(tmp_path.glob(".pass-counts.jsonl.*"))

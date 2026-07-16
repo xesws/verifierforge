@@ -197,7 +197,7 @@ reconstructed honestly without rerunning the subset, which is prohibited.
 
 ### T2. Full reference-mode difficulty probe
 
-- [ ] Add an atomic per-prompt pass-count artifact path and validate it locally.
+- [x] Add an atomic per-prompt pass-count artifact path and validate it locally.
 - [ ] Launch 276 rows × `k=8` in detached pod tmux against the existing local vLLM.
 - [ ] Record the artifact/evidence destination, then stop without projection, freeze, or training.
 
@@ -206,3 +206,11 @@ prompt with `0 <= pass_count <= 8`, and its evidence binds the output to the
 full input/verifier/config. Gate thresholds are informational only.
 **Stop:** after starting the detached probe; do not poll it tonight, alter the
 dataset, or run any other task.
+
+**Implementation result:** `scripts/gate_a.py` now accepts the additive,
+reference-only `--per-prompt-output <jsonl>` option. On a completed evaluation,
+it atomically writes one row with `record_index`, `record_id`, `pass_count`, and
+`k`, then hashes/counts that artifact in normal completed evidence. Local tests
+cover reference-only use, exact counts, evidence binding, and failed atomic
+publication; the full suite passed `135 passed, 1 skipped`. This does not make
+the branch decision: launch remains blocked on O1's unavailable D value.
