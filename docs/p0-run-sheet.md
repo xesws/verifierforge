@@ -517,3 +517,60 @@ prohibited.
   refer only to this held-out artifact. Gate B/D4 consume training pool only.
 
 **Stop:** any manifest/tag/push/baseline failure; do not train.
+
+## v0.10.1 — E1–E3 authorized entrypoint recovery
+
+The human authorized this single recovery after the v0.10.0 launch-layer stop.
+It replaces only the prior prohibition on repairing/retrying the entrypoint;
+all U1/U2/U3 thresholds, data identities, and no-external-provider boundary
+remain fixed.
+
+### E0. Documentation gate
+
+- [ ] Commit the v0.10.1 version document plus evaluation-serving,
+  infrastructure, and model-trainer area documents before code.
+
+**Acceptance:** the chosen canonical invocation, dry-run preflight, baseline
+scope, Gate B dependency, and stop conditions are committed before any code.
+**Stop:** do not repair or rerun if the documentation commit fails.
+
+### E1. Canonical package entrypoint and vf preflight
+
+- [ ] Add the minimal `scripts/__init__.py` package marker; use repository-root
+  `python -m scripts.gate_a` locally and on RunPod.
+- [ ] Before `vf` detaches any remote job, run
+  `/workspace/verifierforge/.venv/bin/python -c "import scripts.gate_a"` from
+  the repository root and fail synchronously on import error.
+- [ ] Validate the same import on RunPod before the U2 tmux session exists.
+
+**Selection and reason:** package marker rather than a second absolute-path
+entrypoint. It gives one importable canonical command in laptop and pod
+environments and makes the preflight directly test the command that tmux runs.
+**Stop:** package/import/shell-validation failure; do not create a Gate A tmux
+session.
+
+### E2. Authorized U2 rerun and held-out baseline
+
+- [ ] Run the 50-row training pool at `k=8` with full samples/evidence using
+  only pod-local vLLM; record all three U2 predicates.
+- [ ] After its completed evaluation, run the 60-row held-out set at `k=8` in
+  reference mode with full samples/evidence; preserve its triplet as D4's
+  before snapshot regardless of the training-pool admission outcome.
+- [ ] Sync and hash-check both artifact pairs before making a decision.
+
+**Acceptance:** valid, hash-bound evidence for both inputs. Training admission
+requires `0.20 <= pass@1 <= 0.60`, `mixed >= 0.30`, and `pass@8 >= 0.85`;
+held-out is descriptive only.
+**Stop:** import/preflight or evaluation/evidence failure; preserve facts and do
+not freeze or train. A completed U2 predicate failure is reported after the
+requested held-out baseline, then stops without threshold change.
+
+### E3. Automatic post-decision path
+
+- [ ] All U2 predicates pass: freeze exactly training pool + held-out set +
+  verifier v2 provenance, then launch detached 0.5B Gate B against training
+  pool only.
+- [ ] Any U2 predicate fails: record both triplets and stop.
+
+**Stop:** any freeze/tag/push/baseline/train failure. No trainer change,
+replacement sampling, or retry beyond this authorized entrypoint recovery.
