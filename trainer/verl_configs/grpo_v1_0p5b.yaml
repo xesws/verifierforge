@@ -11,5 +11,6 @@ lora_alpha: 32
 learning_rate: 1.0e-6
 kl_loss_coef: 0.001
 rollout_gpu_memory_utilization: 0.40
+enforce_eager: false
 checkpoint_every: 50
 validation_every: 10

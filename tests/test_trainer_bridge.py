@@ -143,8 +143,10 @@ def test_blackwell_smoke_config_is_bounded_single_gpu_probe(tmp_path: Path) -> N
     assert config.rollout_n == 8
     assert config.checkpoint_every == 10
     assert config.rollout_gpu_memory_utilization == 0.50
+    assert config.enforce_eager is True
     assert "trainer.n_gpus_per_node=1" in command
     assert "actor_rollout_ref.rollout.tensor_model_parallel_size=1" in command
+    assert "actor_rollout_ref.rollout.enforce_eager=true" in command
     assert "trainer.total_training_steps=30" in command
     assert "trainer.resume_mode=disable" in command
 

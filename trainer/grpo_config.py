@@ -24,6 +24,7 @@ class GrpoSmokeConfig:
     learning_rate: float
     kl_loss_coef: float
     rollout_gpu_memory_utilization: float
+    enforce_eager: bool
     checkpoint_every: int
     validation_every: int
 
@@ -74,6 +75,8 @@ class GrpoSmokeConfig:
             raise ValueError("learning_rate must be positive and kl_loss_coef non-negative")
         if not 0 < self.rollout_gpu_memory_utilization <= 1:
             raise ValueError("rollout_gpu_memory_utilization must be in (0, 1]")
+        if not isinstance(self.enforce_eager, bool):
+            raise ValueError("enforce_eager must be a boolean")
 
     def with_l4_fallback(self) -> "GrpoSmokeConfig":
         """Apply the one documented OOM retry, without changing the run target."""
@@ -153,6 +156,7 @@ class GrpoSmokeConfig:
             "actor_rollout_ref.rollout.top_k=-1",
             "actor_rollout_ref.rollout.max_num_batched_tokens=8192",
             "actor_rollout_ref.rollout.enable_chunked_prefill=True",
+            f"actor_rollout_ref.rollout.enforce_eager={str(self.enforce_eager).lower()}",
             "actor_rollout_ref.rollout.free_cache_engine=True",
             "actor_rollout_ref.rollout.load_format=auto",
             "actor_rollout_ref.rollout.val_kwargs.n=1",

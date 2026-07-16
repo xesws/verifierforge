@@ -11,5 +11,7 @@ lora_alpha: 32
 learning_rate: 1.0e-6
 kl_loss_coef: 0.001
 rollout_gpu_memory_utilization: 0.50
+# W2 repair #1: bypass CUDA graph capture during Blackwell engine startup.
+enforce_eager: true
 checkpoint_every: 10
 validation_every: 10
