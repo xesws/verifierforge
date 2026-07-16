@@ -501,6 +501,15 @@ held-out representation for every B1 pass-count bucket `0..8`.
 **Stop:** any rejected predicate, exit `2`, or evidence/hash mismatch. No
 freeze, trainer promotion, or training on failure.
 
+**STOP (launch layer):** the detached pod session `vf-u2-v010` exited `1`
+before importing Gate A, with the exact log line
+`/workspace/verifierforge/.venv/bin/python: No module named scripts.gate_a`.
+No Gate A evidence, sample artifact, or completion request exists, so this is
+not a pass/fail metric result. The synchronized 74-byte launch log has SHA-256
+`17d0de36a463417da1db5f887d003cea81df333a1adfec23ec50f904bea83f2b`.
+Do not repair or rerun without new human direction; U3 and training remain
+prohibited.
+
 ### U3. Three-piece freeze and held-out baseline
 
 - [ ] Only after U2 passes, freeze training pool + held-out set + verifier v2.
