@@ -201,7 +201,7 @@ def test_h100_diagnostic_environment_reaches_ray_workers(monkeypatch, tmp_path: 
     )
 
     for name, value in expected.items():
-        assert f"+ray_kwargs.ray_init.runtime_env.env_vars.{name}={value}" in command
+        assert f"+ray_kwargs.ray_init.runtime_env.env_vars.{name}='{value}'" in command
 
 
 def test_runtime_evidence_captures_pip_driver_and_diagnostic_environment(

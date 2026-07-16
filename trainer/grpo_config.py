@@ -18,13 +18,22 @@ RAY_DIAGNOSTIC_ENVIRONMENT = (
 )
 
 
+def _hydra_string_literal(value: str) -> str:
+    """Return a Hydra override value that cannot be coerced to a scalar."""
+    escaped = value.replace("\\", "\\\\").replace("'", "\\'")
+    return f"'{escaped}'"
+
+
 def _ray_diagnostic_environment_overrides() -> list[str]:
     """Propagate explicitly set H100 diagnostics through Ray worker startup."""
     overrides: list[str] = []
     for name in RAY_DIAGNOSTIC_ENVIRONMENT:
         value = os.environ.get(name)
         if value is not None:
-            overrides.append(f"+ray_kwargs.ray_init.runtime_env.env_vars.{name}={value}")
+            overrides.append(
+                "+ray_kwargs.ray_init.runtime_env.env_vars."
+                f"{name}={_hydra_string_literal(value)}"
+            )
     return overrides
 
 
@@ -210,7 +219,8 @@ class GrpoSmokeConfig:
         if self.vllm_attention_backend is not None:
             overrides.append(
                 "+ray_kwargs.ray_init.runtime_env.env_vars."
-                f"VLLM_ATTENTION_BACKEND={self.vllm_attention_backend}"
+                "VLLM_ATTENTION_BACKEND="
+                f"{_hydra_string_literal(self.vllm_attention_backend)}"
             )
         if resume_path is None:
             overrides.append("trainer.resume_mode=disable")
