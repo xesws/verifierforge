@@ -214,3 +214,38 @@ it atomically writes one row with `record_index`, `record_id`, `pass_count`, and
 cover reference-only use, exact counts, evidence binding, and failed atomic
 publication; the full suite passed `135 passed, 1 skipped`. This does not make
 the branch decision: launch remains blocked on O1's unavailable D value.
+
+## v0.7.0 authorized sample-evidence diagnostic and automated routing
+
+### O0. Documentation and durable-evidence implementation
+
+- [x] Record v0.7.0's evidence contract before code changes.
+- [ ] Implement and test atomic sample evidence, unchanged-score tier facts,
+  default 50-row saving, and taxonomy summary.
+- [ ] Commit/push the implementation and verify the pod checkout.
+
+**Acceptance:** every completed subset diagnostic has a hash-bound sample
+artifact, not only aggregate metrics. No existing verifier score changes.
+**Stop:** any score-parity, atomic-publication, or test failure; do not launch
+the diagnostic.
+
+### O1. Authorized local-only subset diagnostic rerun
+
+- [ ] Run 50 rows × `k=8` with `--reference --save-samples` in detached pod tmux.
+- [ ] Sync and validate evidence/sample hashes; persist the taxonomy and up to
+  three full parse-failure completions in evidence.
+
+**Acceptance:** all 400 samples have completion/tier/final-score evidence;
+`D = parse_failure / all final_score < 1.0` is reproducible from the JSONL.
+The diagnostic metric triplet is reference-only.
+**Stop:** exit `2` twice consecutively means unhealthy vLLM; stop and report.
+
+### O2 onward. Automated branch routing
+
+- [ ] `D >= 0.50` routes to documented Branch A; otherwise route to Branch B.
+- [ ] Continue without human pause only through the pasted overnight runbook's
+  branch steps and their stated stop conditions.
+
+**Guardrail:** branch-specific code/version documents must be committed before
+their implementation. No OpenRouter request, threshold relaxation, or trainer
+configuration change is authorized outside the runbook.
