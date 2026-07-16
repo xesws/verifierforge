@@ -1,6 +1,6 @@
 # P0 Run Sheet — v0.6.1 data freeze
 
-**Status:** stopped — B3 Gate A rejection (runbook stop condition ③)
+**Status:** resumed — v0.10.0 U1–U3 training/held-out gate update
 **Owner:** Codex on `main`
 **Starting commit:** `78912f1` (`v0.6.0 Data: discard malformed expansion responses`)
 **Recovery rule:** after any session interruption, this file is the sole operational context. Read it before taking any action.
@@ -447,3 +447,48 @@ and evidence SHA-256 values match on laptop and pod:
 O6 Gate B are not authorized. No threshold change, new dataset, retry, or
 additional model request follows this evidence; await human data-layer
 direction.
+
+## v0.10.0 — U1–U3 superseding data gate
+
+The human authorized U1–U3 after the B3 stop. These rules supersede conflicting
+R1–R4 details without changing verifier score semantics or trainer logic.
+
+### U0. Documentation and implementation gate
+
+- [ ] Commit v0.10.0 version and matching evaluation/verifier/trainer/
+  infrastructure documents before code.
+- [ ] Add focused tests and implement U1 selection, U2 Gate A predicates, and
+  U3 deterministic 50/60 split/provenance.
+
+**Acceptance:** all rules are mechanically testable and no live model request
+has been made during implementation.
+**Stop:** documentation, test, overlap, or verifier-v2 validation failure.
+
+### U1. Deterministic training/held-out construction
+
+- [ ] Reuse the immutable 326-row B1 population/count artifact. Per seed select
+  nearest-to-2 in `[1,4]`; otherwise lowest in `[1,6]`; only then use existing
+  discard/backfill handling.
+- [ ] Atomically write a 50-row training pool and zero-overlap 60-row held-out
+  set, with exact bucket-allocation and verifier-v2 provenance report.
+
+**Acceptance:** 50/60 rows, all reference SQL at `1.0`, no common source
+population ID, and every nonempty B1 difficulty bucket represented in held-out.
+**Stop:** any invalid count, duplicate/overlap, unsupported fallback, or split
+shortfall; do not run a Gate A or freeze.
+
+### U2. Three-predicate training-pool Gate A
+
+- [ ] Run only the new training pool at `k=8` on pod-local vLLM with samples.
+- [ ] Admit only if `pass@1 ∈ [0.20,0.60]`, `mixed ≥ 0.30`, and `pass@8 ≥ 0.85`.
+
+**Stop:** any rejected predicate, exit `2`, or evidence/hash mismatch. No
+freeze, trainer promotion, or training on failure.
+
+### U3. Three-piece freeze and held-out baseline
+
+- [ ] Only after U2 passes, freeze training pool + held-out set + verifier v2.
+- [ ] Record held-out baseline separately; all before/after and DoD statements
+  refer only to this held-out artifact. Gate B/D4 consume training pool only.
+
+**Stop:** any manifest/tag/push/baseline failure; do not train.
