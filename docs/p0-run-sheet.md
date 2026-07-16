@@ -455,14 +455,22 @@ R1–R4 details without changing verifier score semantics or trainer logic.
 
 ### U0. Documentation and implementation gate
 
-- [ ] Commit v0.10.0 version and matching evaluation/verifier/trainer/
+- [x] Commit v0.10.0 version and matching evaluation/verifier/trainer/
   infrastructure documents before code.
-- [ ] Add focused tests and implement U1 selection, U2 Gate A predicates, and
+- [x] Add focused tests and implement U1 selection, U2 Gate A predicates, and
   U3 deterministic 50/60 split/provenance.
 
 **Acceptance:** all rules are mechanically testable and no live model request
 has been made during implementation.
 **Stop:** documentation, test, overlap, or verifier-v2 validation failure.
+
+**Result:** documentation preceded the implementation in `1eb8fe0`. U1 now
+selects nearest-to-2 in `[1,4]`, then lowest in `[1,6]`, retaining the existing
+bounded discard/backfill behavior. U2 requires all three predicates at `k=8`.
+The new split tool verifies 50/60 zero-source-overlap output, B1 bucket
+coverage, and verifier-v2 reference SQL before publication. Focused validation
+passed `35 passed`; the complete suite passed `172 passed, 1 skipped`. No model
+or external-provider request was made.
 
 ### U1. Deterministic training/held-out construction
 

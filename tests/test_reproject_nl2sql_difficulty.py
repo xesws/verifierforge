@@ -48,7 +48,7 @@ def _write_counts(path: Path, rows: list[dict[str, object]], counts: dict[str, i
     )
 
 
-def test_reprojection_selects_nearest_mixed_record_with_deterministic_ties(
+def test_reprojection_prefers_an_exact_two_over_other_preferred_counts(
     tmp_path: Path,
 ) -> None:
     rows = [_population_row(seed_id) for seed_id in reprojection.CANONICAL_SEED_IDS]
@@ -60,7 +60,7 @@ def test_reprojection_selects_nearest_mixed_record_with_deterministic_ties(
     counts = tmp_path / "counts.jsonl"
     _write_jsonl(population, rows)
     pass_counts = {str(row["id"]): 4 for row in rows}
-    pass_counts["candidate:aug-a"] = 3
+    pass_counts["candidate:aug-a"] = 2
     _write_counts(counts, rows, pass_counts)
 
     result = reprojection.reproject_population(population, counts)
@@ -69,9 +69,33 @@ def test_reprojection_selects_nearest_mixed_record_with_deterministic_ties(
     assert len(result.rows) == 50
     first = result.rows[0]
     assert first["id"] == "v1-001"
-    assert first["source_population_id"] == "original:v1-001"
-    assert first["difficulty_pass_count"] == 4
+    assert first["source_population_id"] == "candidate:aug-a"
+    assert first["difficulty_pass_count"] == 2
+    assert first["selection_reason"] == "nearest_two_preferred"
     assert result.report["discarded_seed_ids"] == []
+
+
+def test_reprojection_breaks_preferred_distance_ties_by_population_id(
+    tmp_path: Path,
+) -> None:
+    rows = [_population_row(seed_id) for seed_id in reprojection.CANONICAL_SEED_IDS]
+    extra = _population_row(
+        "v1-001", population_id="candidate:aug-a", source_kind="candidate"
+    )
+    rows.append(extra)
+    population = tmp_path / "population.jsonl"
+    counts = tmp_path / "counts.jsonl"
+    _write_jsonl(population, rows)
+    pass_counts = {str(row["id"]): 2 for row in rows}
+    pass_counts["original:v1-001"] = 3
+    pass_counts["candidate:aug-a"] = 1
+    _write_counts(counts, rows, pass_counts)
+
+    result = reprojection.reproject_population(population, counts)
+
+    assert result.stopped is False
+    assert result.rows[0]["source_population_id"] == "candidate:aug-a"
+    assert result.rows[0]["difficulty_pass_count"] == 1
 
 
 def test_reprojection_backfills_discarded_seed_from_second_mixed_source_row(
@@ -96,17 +120,42 @@ def test_reprojection_backfills_discarded_seed_from_second_mixed_source_row(
     first = result.rows[0]
     assert first["id"] == "v1-001"
     assert first["source_seed_id"] == "v1-002"
-    assert first["source_population_id"] == "candidate:aug-v1-002"
-    assert first["selection_reason"] == "backfill_next_best_mixed"
+    assert first["source_population_id"] == "original:v1-002"
+    assert first["selection_reason"] == "backfill_next_best_eligible"
     assert result.report["backfills"] == [
         {
             "slot_seed_id": "v1-001",
             "source_seed_id": "v1-002",
-            "source_population_id": "candidate:aug-v1-002",
-            "pass_count": 3,
+            "source_population_id": "original:v1-002",
+            "pass_count": 4,
         }
     ]
     assert result.report["source_seed_use"]["v1-002"] == 2
+
+
+def test_reprojection_uses_lowest_relaxed_count_when_no_preferred_row_exists(
+    tmp_path: Path,
+) -> None:
+    rows = [_population_row(seed_id) for seed_id in reprojection.CANONICAL_SEED_IDS]
+    extra = _population_row(
+        "v1-001", population_id="candidate:aug-v1-001", source_kind="candidate"
+    )
+    rows.append(extra)
+    population = tmp_path / "population.jsonl"
+    counts = tmp_path / "counts.jsonl"
+    _write_jsonl(population, rows)
+    pass_counts = {str(row["id"]): 2 for row in rows}
+    pass_counts["original:v1-001"] = 6
+    pass_counts["candidate:aug-v1-001"] = 5
+    _write_counts(counts, rows, pass_counts)
+
+    result = reprojection.reproject_population(population, counts)
+
+    assert result.stopped is False
+    first = result.rows[0]
+    assert first["source_population_id"] == "candidate:aug-v1-001"
+    assert first["difficulty_pass_count"] == 5
+    assert first["selection_reason"] == "lowest_relaxed"
 
 
 def test_reprojection_stops_before_output_when_more_than_twenty_seeds_are_unmixed(

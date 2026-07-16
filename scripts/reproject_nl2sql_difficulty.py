@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Select a deterministic 50-row mixed-difficulty NL2SQL subset for Branch B."""
+"""Project a deterministic U1 NL2SQL training subset from B1 pass counts."""
 
 from __future__ import annotations
 
@@ -24,12 +24,14 @@ from core.rewards.nl2sql import NL2SQLVerifier  # noqa: E402
 
 
 CANONICAL_SEED_IDS = tuple(f"v1-{index:03d}" for index in range(1, 51))
-TARGET_PASS_COUNT = 4
-MIXED_MIN = 1
-MIXED_MAX = 7
+TARGET_PASS_COUNT = 2
+PREFERRED_MIN = 1
+PREFERRED_MAX = 4
+RELAXED_MIN = 1
+RELAXED_MAX = 6
 MAX_SOURCE_SEED_ROWS = 2
 MAX_DISCARDED_SEEDS = 20
-SELECTION_RULE_VERSION = "v0.9.0-nearest-four-mixed-backfill-v1"
+SELECTION_RULE_VERSION = "v0.10.0-nearest-two-preferred-relaxed-backfill-v1"
 
 
 class ReprojectionError(ValueError):
@@ -64,7 +66,7 @@ class ReprojectionResult:
 def build_parser() -> argparse.ArgumentParser:
     """Build the deterministic B2 command-line interface."""
     parser = argparse.ArgumentParser(
-        description="Project B1 NL2SQL pass counts into a fixed 50-row subset."
+        description="Project B1 NL2SQL pass counts into U1's fixed 50-row training pool."
     )
     parser.add_argument("--population", required=True, type=Path)
     parser.add_argument("--pass-counts", required=True, type=Path)
@@ -130,15 +132,16 @@ def reproject_population(population_path: Path, pass_counts_path: Path) -> Repro
         raise ReprojectionError("population must contain all 50 canonical seed IDs")
 
     selections: dict[str, CountedRecord] = {}
+    selection_reasons: dict[str, str] = {}
     source_usage: Counter[str] = Counter()
     discarded: list[str] = []
     for seed_id in CANONICAL_SEED_IDS:
-        mixed = _sorted_mixed(grouped[seed_id])
-        if not mixed:
+        selected, selection_reason = _select_for_seed(grouped[seed_id])
+        if selected is None:
             discarded.append(seed_id)
             continue
-        selected = mixed[0]
         selections[seed_id] = selected
+        selection_reasons[seed_id] = selection_reason
         source_usage[selected.seed_id] += 1
 
     if len(discarded) > MAX_DISCARDED_SEEDS:
@@ -159,7 +162,7 @@ def reproject_population(population_path: Path, pass_counts_path: Path) -> Repro
         (
             record
             for records in grouped.values()
-            for record in _sorted_mixed(records)
+            for record in _sorted_eligible(records)
             if record.population_id not in selected_population_ids
         ),
         key=_selection_key,
@@ -189,6 +192,7 @@ def reproject_population(population_path: Path, pass_counts_path: Path) -> Repro
             )
             return ReprojectionResult(rows=(), report=base_report, stopped=True)
         selections[discarded_seed_id] = replacement
+        selection_reasons[discarded_seed_id] = "backfill_next_best_eligible"
         selected_population_ids.add(replacement.population_id)
         source_usage[replacement.seed_id] += 1
         backfills.append(
@@ -209,11 +213,7 @@ def reproject_population(population_path: Path, pass_counts_path: Path) -> Repro
         _projected_row(
             slot_seed_id,
             selections[slot_seed_id],
-            selection_reason=(
-                "backfill_next_best_mixed"
-                if slot_seed_id in {item["slot_seed_id"] for item in backfills}
-                else "nearest_four_mixed"
-            ),
+            selection_reason=selection_reasons[slot_seed_id],
         )
         for slot_seed_id in CANONICAL_SEED_IDS
     )
@@ -342,19 +342,48 @@ def _reverify_reference_sql(records: Sequence[CountedRecord]) -> list[dict[str, 
     return failures
 
 
-def _sorted_mixed(records: Sequence[CountedRecord]) -> list[CountedRecord]:
+def _select_for_seed(
+    records: Sequence[CountedRecord],
+) -> tuple[CountedRecord | None, str | None]:
+    """Apply U1's preferred range, then its deterministic relaxed fallback."""
+    preferred = [
+        record
+        for record in records
+        if PREFERRED_MIN <= record.pass_count <= PREFERRED_MAX
+    ]
+    if preferred:
+        return min(preferred, key=_selection_key), "nearest_two_preferred"
+    relaxed = [
+        record
+        for record in records
+        if RELAXED_MIN <= record.pass_count <= RELAXED_MAX
+    ]
+    if relaxed:
+        return (
+            min(
+                relaxed,
+                key=lambda record: (record.pass_count, record.population_id),
+            ),
+            "lowest_relaxed",
+        )
+    return None, None
+
+
+def _sorted_eligible(records: Sequence[CountedRecord]) -> list[CountedRecord]:
     return sorted(
         (
             record
             for record in records
-            if MIXED_MIN <= record.pass_count <= MIXED_MAX
+            if RELAXED_MIN <= record.pass_count <= RELAXED_MAX
         ),
         key=_selection_key,
     )
 
 
 def _selection_key(record: CountedRecord) -> tuple[int, str]:
-    return (abs(record.pass_count - TARGET_PASS_COUNT), record.population_id)
+    if PREFERRED_MIN <= record.pass_count <= PREFERRED_MAX:
+        return (abs(record.pass_count - TARGET_PASS_COUNT), record.population_id)
+    return (record.pass_count + 10, record.population_id)
 
 
 def _projected_row(
@@ -392,9 +421,10 @@ def _base_report(
         "schema_version": 1,
         "selection_rule_version": SELECTION_RULE_VERSION,
         "selection_rule": (
-            "For each seed, select its mixed (1..7) population record nearest to 4; "
-            "tie-break by population ID. Discard unmixed seeds and fill their slots "
-            "from another seed's next-best unused mixed record, max two rows per source seed."
+            "For each seed, select its pass-count record nearest to 2 in [1,4]; "
+            "if none exists, select the lowest count in [1,6]; tie-break by population ID. "
+            "Discard seeds with no [1,6] row and fill their slots from another seed's "
+            "next-best unused eligible record, max two rows per source seed."
         ),
         "population": {
             "path": str(population_path),

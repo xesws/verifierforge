@@ -40,6 +40,7 @@ from core.rewards.nl2sql import NL2SQLVerifier  # noqa: E402 - path setup above.
 PASS_AT_1_MIN = 0.20
 PASS_AT_1_MAX = 0.60
 MIXED_FRACTION_MIN = 0.30
+PASS_AT_8_MIN = 0.85
 
 
 def build_parser() -> argparse.ArgumentParser:
@@ -329,9 +330,16 @@ def load_candidate_jsonl(path: Path) -> tuple[list[dict[str, Any]], str]:
 
 
 def gate_passes(metrics: EvaluationMetrics) -> bool:
-    """Apply the human-set Gate A thresholds without any adaptive relaxation."""
+    """Apply all fixed U2 Gate A thresholds without adaptive relaxation.
+
+    Admission is explicitly an eight-sample procedure: a smaller ``k`` cannot
+    establish the required pass@8 floor, even if its generic pass@k happens to
+    look strong. Reference-mode callers still retain their descriptive metrics.
+    """
     return (
-        PASS_AT_1_MIN <= metrics.baseline_pass_at_1 <= PASS_AT_1_MAX
+        metrics.k == 8
+        and PASS_AT_8_MIN <= metrics.pass_at_k
+        and PASS_AT_1_MIN <= metrics.baseline_pass_at_1 <= PASS_AT_1_MAX
         and metrics.mixed_fraction >= MIXED_FRACTION_MIN
     )
 
@@ -390,6 +398,7 @@ def write_evidence(
         "thresholds": {
             "baseline_pass_at_1": [PASS_AT_1_MIN, PASS_AT_1_MAX],
             "mixed_fraction_min": MIXED_FRACTION_MIN,
+            "pass_at_8_min": PASS_AT_8_MIN,
         },
         "passed": gate_passes(metrics),
     }

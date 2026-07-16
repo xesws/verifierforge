@@ -85,7 +85,7 @@ def test_gate_a_reports_raw_metrics_and_writes_secret_free_evidence(
         [str(candidates), "--k", "2", "--workers", "1", "--report", str(evidence)]
     )
 
-    assert exit_code == 0
+    assert exit_code == 1
     assert json.loads(capsys.readouterr().out) == {
         "pass_at_1": 0.5,
         "mixed_fraction": 1.0,
@@ -96,7 +96,7 @@ def test_gate_a_reports_raw_metrics_and_writes_secret_free_evidence(
     assert payload["schema_version"] == 3
     assert payload["status"] == "completed"
     assert payload["mode"] == "gate"
-    assert payload["passed"] is True
+    assert payload["passed"] is False
     assert payload["candidate_count"] == 2
     assert payload["sample_count"] == 4
     assert payload["workers"] == 1
@@ -138,6 +138,7 @@ def test_gate_a_evidence_adds_named_pass_at_8_without_removing_pass_at_k(
     assert payload["k"] == 8
     assert payload["pass_at_k"] == 0.75
     assert payload["pass_at_8"] == 0.75
+    assert payload["thresholds"]["pass_at_8_min"] == 0.85
 
 
 @pytest.mark.parametrize(
@@ -219,41 +220,29 @@ def test_gate_a_load_eval_client_uses_only_eval_settings(monkeypatch) -> None:
     assert loaded_settings is settings
 
 
-def test_gate_a_accepts_exact_human_threshold_boundaries(
-    tmp_path: Path, monkeypatch
-) -> None:
-    candidates = tmp_path / "candidates.jsonl"
-    _write_candidates(candidates, [_record(index) for index in range(10)])
-    # pass@1 = 2/10 = 0.20; mixed = 3/10 = 0.30.  Both inclusive boundaries
-    # must pass instead of being silently made stricter.
-    client = SequenceClient(
-        [
-            "SELECT name FROM people",
-            "SELECT name FROM people WHERE name = 'Nobody'",
-            "SELECT name FROM people",
-            "SELECT name FROM people WHERE name = 'Nobody'",
-            "SELECT name FROM people WHERE name = 'Nobody'",
-            "SELECT name FROM people",
-        ]
-        + ["SELECT name FROM people WHERE name = 'Nobody'"] * 14
+def test_gate_a_accepts_exact_u2_threshold_boundaries() -> None:
+    metrics = EvaluationMetrics(
+        baseline_pass_at_1=0.20,
+        pass_at_k=0.85,
+        mixed_fraction=0.30,
+        record_count=10,
+        k=8,
     )
-    _install_fake_client(monkeypatch, client)
 
-    assert (
-        gate_a.main(
-            [
-                "--input",
-                str(candidates),
-                "--k",
-                "2",
-                "--workers",
-                "1",
-                "--report",
-                str(tmp_path / "evidence.json"),
-            ]
-        )
-        == 0
-    )
+    assert gate_a.gate_passes(metrics) is True
+
+
+@pytest.mark.parametrize(
+    "metrics",
+    [
+        EvaluationMetrics(0.20, 0.84, 0.30, 10, 8),
+        EvaluationMetrics(0.20, 0.85, 0.29, 10, 8),
+        EvaluationMetrics(0.61, 0.85, 0.30, 10, 8),
+        EvaluationMetrics(0.20, 1.0, 0.30, 10, 2),
+    ],
+)
+def test_gate_a_rejects_any_missing_u2_predicate(metrics: EvaluationMetrics) -> None:
+    assert gate_a.gate_passes(metrics) is False
 
 
 def test_gate_a_fails_closed_and_still_records_measured_evidence(
