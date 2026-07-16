@@ -258,9 +258,9 @@ detail `not_single_read_only_statement`; 9 are SQLite execution errors.
 
 ### O1.1 v0.7.1 derived routing evidence
 
-- [ ] Atomically derive a route artifact from the immutable sample evidence.
-- [ ] Retain the raw taxonomy and bind its source hashes.
-- [ ] Record three full fenced completions and compute operational
+- [x] Atomically derive a route artifact from the immutable sample evidence.
+- [x] Retain the raw taxonomy and bind its source hashes.
+- [x] Record three full fenced completions and compute operational
   `D = format_parse_failure / all failed samples`.
 
 **Acceptance:** the narrow, deterministic fenced-SQL predicate accounts for
@@ -269,9 +269,19 @@ derived evidence is hash-bound and atomic.
 **Stop:** an accounting, hash, or atomic-publication failure blocks all branch
 work until reported.
 
+**Result:** `runs/p0-gate-a/v0.7.1-format-route.json` was atomically
+published with SHA-256
+`dfbe6c2c4f7ef4b80b556f6af959c2774f0cd16f5c722d2600190d3ac0822d3f`.
+It binds the immutable v0.7.0 sample/evidence hashes and records all three full
+fenced SQL examples. The raw taxonomy remains `0/331/10` for
+parse/execution/wrong-result failures; the derived operational taxonomy is
+`format_parse_failure=322`, `execution_error=9`,
+`executable_not_full_pass=10`. Therefore
+`D_format_parse_failure_fraction=322/341=0.9442815249266863`.
+
 ### O2 onward. Automated branch routing
 
-- [ ] Route on the derived operational D: `D >= 0.50` is Branch A; otherwise
+- [x] Route on the derived operational D: `D >= 0.50` is Branch A; otherwise
   Branch B. Raw scorer `parse_failure` remains separately recorded.
 - [ ] Continue without human pause only through the pasted overnight runbook's
   branch steps and their stated stop conditions.
@@ -279,3 +289,7 @@ work until reported.
 **Guardrail:** branch-specific code/version documents must be committed before
 their implementation. No OpenRouter request, threshold relaxation, or trainer
 configuration change is authorized outside the runbook.
+
+**Route:** Branch A. The direct sample evidence shows that the dominant failure
+is Markdown fence formatting, not SQL difficulty. Begin A1 only after its
+separate verifier-version documentation is committed.
