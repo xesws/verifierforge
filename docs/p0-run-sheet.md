@@ -843,3 +843,38 @@ tiers, identities, and hashes.
 **Acceptance:** selected backend and artifact paths are recorded; metrics keep
 flowing through Storage and `vf watch`.
 **Stop:** an untested S3 backend never blocks or replaces LocalStorage mid-run.
+
+## v0.11.1 — W1 kill recovery and W2 Blackwell retest
+
+**Status:** documentation gate complete; W1 pending. M3–M6 remain blocked.
+
+### W1. `vf kill` process-group recovery
+
+- [ ] Launch every remote job in a recorded `setsid` PGID.
+- [ ] Make `vf kill` remove tmux, TERM→KILL that group, force-stop Ray, and
+  fail when `nvidia-smi` reports remaining GPU memory/compute allocation.
+- [ ] Pass the real remote fake-job acceptance exercise: launch, kill, then
+  prove no tmux session, job process, or GPU memory allocation remains.
+
+**Acceptance:** focused tests, shell syntax, and the remote fake-job teardown
+all pass; logs and PGID evidence are synced locally.
+**Stop:** residual process/GPU allocation or any cleanup failure. Do not begin
+W2 until W1 passes.
+
+### W2. Read-only diagnosis, narrow repair, and retest
+
+- [ ] Capture within 15 minutes: raw `ray status`, raw final 100-line vLLM and
+  verl-driver log tails, GPU utilization/memory snapshots, and resolved
+  `n_gpus` / TP / GPU-memory configuration.
+- [ ] Classify exactly one: resource waiting, engine-initialization hang, or
+  communication-initialization hang; record raw evidence and classification.
+- [ ] If resource waiting, align single-GPU declarations. If engine init hangs,
+  first enable `enforce_eager`, then try attention fallbacks one at a time.
+- [ ] Retest no more than twice within a 45-minute total W2 timebox.
+
+**Acceptance:** a retest must show rollout + post-update evidence, throughput,
+append-only Storage metrics, a curve point, and W1-clean teardown.
+**Stop:** communication/unclassified result, an ineffective permitted repair,
+or the second hanging retest. Preserve evidence and stop for human direction.
+Only a passing W2 unblocks M3–M6; retain the existing 6–7 hour single-GPU
+runtime trigger before considering a card change.
