@@ -180,3 +180,29 @@ The local and pod subset input hashes matched exactly: `cfa93154cd87013b74606669
 - The scheduler permits at most seven already-in-flight logical samples beyond a circuit-open event; no new samples are submitted after the tenth consecutive terminal failure.
 - An observed terminal failure invalidates that Gate A run. A human may request one later whole-run retry; two consecutive whole-run invalidations due to isolated terminal failures mean the vLLM service is unhealthy and require a stop/report.
 - The earlier OpenRouter key must be rotated before any future external-provider call. This recovery path does not use it.
+
+## v0.6.3 limited overnight difficulty probe
+
+### T1. Read-only subset-evidence audit
+
+- [x] Inspect local synced evidence/log and pod-side artifacts without a model request or file mutation.
+
+**Result:** the completed subset evidence (`schema_version=2`) contains only
+aggregate metrics, candidate/input/verifier identities, and no per-sample
+scores, groups, or completions. The pod artifact directory contains only the
+949-byte JSON evidence, a 183-byte metrics log, and an exit file; vLLM retained
+HTTP 200 access lines but no response bodies. Therefore the requested parse /
+wrong-result / execution-error taxonomy and three completion excerpts cannot be
+reconstructed honestly without rerunning the subset, which is prohibited.
+
+### T2. Full reference-mode difficulty probe
+
+- [ ] Add an atomic per-prompt pass-count artifact path and validate it locally.
+- [ ] Launch 276 rows × `k=8` in detached pod tmux against the existing local vLLM.
+- [ ] Record the artifact/evidence destination, then stop without projection, freeze, or training.
+
+**Acceptance:** a successful run will persist exactly one row per completed
+prompt with `0 <= pass_count <= 8`, and its evidence binds the output to the
+full input/verifier/config. Gate thresholds are informational only.
+**Stop:** after starting the detached probe; do not poll it tonight, alter the
+dataset, or run any other task.
