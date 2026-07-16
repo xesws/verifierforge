@@ -230,6 +230,10 @@ def write_evidence(
         },
         "passed": gate_passes(metrics),
     }
+    if metrics.k == 8:
+        # Preserve the stable pass_at_k/k fields while making the fixed Gate A
+        # metric directly addressable in freeze evidence.
+        payload["pass_at_8"] = metrics.pass_at_k
     path.parent.mkdir(parents=True, exist_ok=True)
     with NamedTemporaryFile(
         mode="w", encoding="utf-8", dir=path.parent, prefix=f".{path.name}.", delete=False
@@ -269,14 +273,18 @@ def _safe_base_url(value: object) -> str | None:
     """
     if not isinstance(value, str) or not value.strip():
         return None
-    parsed = urlsplit(value)
-    if not parsed.scheme or not parsed.hostname:
-        return "<configured>"
-    netloc = parsed.hostname
     try:
+        parsed = urlsplit(value)
+        hostname = parsed.hostname
         port = parsed.port
     except ValueError:
         return "<configured>"
+    if not parsed.scheme or not hostname:
+        return "<configured>"
+
+    # ``hostname`` deliberately excludes any userinfo. Bracket IPv6 when
+    # reconstructing an authority so the emitted endpoint is unambiguous.
+    netloc = f"[{hostname}]" if ":" in hostname else hostname
     if port is not None:
         netloc = f"{netloc}:{port}"
     return urlunsplit((parsed.scheme, netloc, "", "", ""))

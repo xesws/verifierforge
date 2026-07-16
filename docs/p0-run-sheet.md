@@ -1,6 +1,6 @@
 # P0 Run Sheet — v0.6.1 data freeze
 
-**Status:** in progress
+**Status:** stopped at S3 pending human direction
 **Owner:** Codex on `main`
 **Starting commit:** `78912f1` (`v0.6.0 Data: discard malformed expansion responses`)
 **Recovery rule:** after any session interruption, this file is the sole operational context. Read it before taking any action.
@@ -61,15 +61,19 @@
 
 ### 3. S3 — real Gate A
 
-- [ ] Harden Gate A evidence/input validation without changing its thresholds.
+- [x] Harden Gate A evidence/input validation without changing its thresholds.
 - [ ] Run full-candidate reference Gate A first, then the 50-row subset, both at `k=8`; save structured evidence for both.
 - [ ] Record each raw triplet exactly: `pass_at_1`, `pass_at_8`, `mixed_fraction`.
 
 **Acceptance:** both evaluations complete; the subset has `0.20 <= pass_at_1 <= 0.60` and `mixed_fraction >= 0.30`. Full-set values are reference only.
 **Stop:** either evaluation errors, or the subset misses either threshold. Commit raw figures/evidence; do not relax thresholds or train.
 
-**Full result:** pending.
-**Subset result:** pending.
+**STOP:** the full-candidate reference command exited `2` before producing a metric or evidence file, with the deliberately redacted diagnostic `gate_a evaluation error: completion request failed`. Full and subset evidence files are absent; the subset was not started. No thresholds were changed, and S4/S5 are prohibited until a human directs the next action.
+
+**Prepared-only worktree state:** `scripts/freeze_nl2sql.py` and `tests/test_freeze_nl2sql.py` exist locally but are uncommitted and unused; no freeze artifact, tag, or remote action exists. Do not use or commit them unless the human restarts the workflow after resolving S3.
+
+**Full result:** unavailable due to provider completion failure.
+**Subset result:** not started.
 
 ### 4. S4 — immutable freeze
 

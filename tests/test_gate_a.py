@@ -5,6 +5,9 @@ import json
 from pathlib import Path
 from types import SimpleNamespace
 
+import pytest
+
+from core.eval_runner import EvaluationMetrics
 from scripts import gate_a
 
 
@@ -95,6 +98,112 @@ def test_gate_a_reports_raw_metrics_and_writes_secret_free_evidence(
     assert payload["input_sha256"] == hashlib.sha256(candidates.read_bytes()).hexdigest()
     assert payload["base_url"] == "https://router.test"
     assert "nope" not in evidence.read_text(encoding="utf-8")
+
+
+def test_gate_a_evidence_adds_named_pass_at_8_without_removing_pass_at_k(
+    tmp_path: Path,
+) -> None:
+    candidates = tmp_path / "candidates.jsonl"
+    evidence = tmp_path / "gate-a.json"
+    _write_candidates(candidates, [_record(1)])
+    metrics = EvaluationMetrics(
+        baseline_pass_at_1=0.25,
+        pass_at_k=0.75,
+        mixed_fraction=0.5,
+        record_count=1,
+        k=8,
+    )
+
+    gate_a.write_evidence(
+        evidence,
+        candidate_path=candidates,
+        input_digest=hashlib.sha256(candidates.read_bytes()).hexdigest(),
+        metrics=metrics,
+        model="configured-glm",
+        base_url="https://router.test/v1",
+        workers=8,
+    )
+
+    payload = json.loads(evidence.read_text(encoding="utf-8"))
+    assert payload["k"] == 8
+    assert payload["pass_at_k"] == 0.75
+    assert payload["pass_at_8"] == 0.75
+
+
+@pytest.mark.parametrize(
+    ("configured_url", "expected"),
+    [
+        (
+            "https://user:secret@router.test:8443/v1/chat?api_key=nope#fragment",
+            "https://router.test:8443",
+        ),
+        (
+            "https://user:secret@[2001:db8::1]:8443/v1?token=nope",
+            "https://[2001:db8::1]:8443",
+        ),
+        ("https://router.test:bad-port/v1?api_key=nope", "<configured>"),
+    ],
+)
+def test_evidence_base_url_reveals_only_endpoint_identity(
+    configured_url: str, expected: str
+) -> None:
+    value = gate_a._safe_base_url(configured_url)
+
+    assert value == expected
+    assert "secret" not in value
+    assert "api_key" not in value
+    assert "token" not in value
+    assert "/v1" not in value
+
+
+def test_gate_a_rejects_non_finite_json_cells_before_loading_a_client(
+    tmp_path: Path, monkeypatch, capsys
+) -> None:
+    candidates = tmp_path / "candidates.jsonl"
+    candidates.write_text(
+        json.dumps({**_record(1), "expected_results": [[float("nan")]]}) + "\n",
+        encoding="utf-8",
+    )
+
+    def should_not_load_client() -> tuple[object, object]:
+        raise AssertionError("invalid candidate data must fail before LLM setup")
+
+    monkeypatch.setattr(gate_a, "_load_client", should_not_load_client)
+
+    assert gate_a.main([str(candidates)]) == 2
+    assert "finite SQL scalar JSON value" in capsys.readouterr().err
+
+
+def test_gate_a_load_client_uses_repo_dotenv_independent_of_cwd(
+    tmp_path: Path, monkeypatch
+) -> None:
+    from app import gpt
+
+    repository_root = tmp_path / "repository"
+    repository_root.mkdir()
+    monkeypatch.chdir(tmp_path)
+    monkeypatch.setattr(gate_a, "REPOSITORY_ROOT", repository_root)
+    captured: dict[str, Path] = {}
+    settings = SimpleNamespace(model="configured-glm", base_url="https://router.test/v1")
+
+    class FakeSettings:
+        @classmethod
+        def from_env(cls, *, dotenv_path: Path) -> SimpleNamespace:
+            captured["dotenv_path"] = dotenv_path
+            return settings
+
+    class FakeClient:
+        def __init__(self, received_settings: object) -> None:
+            self.settings = received_settings
+
+    monkeypatch.setattr(gpt, "LLMSettings", FakeSettings)
+    monkeypatch.setattr(gpt, "LLMClient", FakeClient)
+
+    client, loaded_settings = gate_a._load_client()
+
+    assert captured["dotenv_path"] == repository_root / ".env"
+    assert client.settings is settings
+    assert loaded_settings is settings
 
 
 def test_gate_a_accepts_exact_human_threshold_boundaries(

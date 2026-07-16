@@ -2,7 +2,12 @@ from __future__ import annotations
 
 import pytest
 
-from core.eval_runner import EvaluationRecordError, evaluate_records, parse_evaluation_record
+from core.eval_runner import (
+    EvaluationMetrics,
+    EvaluationRecordError,
+    evaluate_records,
+    parse_evaluation_record,
+)
 
 
 SCHEMA = """
@@ -69,6 +74,26 @@ def test_runner_requires_an_exact_full_verifier_score() -> None:
     assert run.metrics.mixed_fraction == 0.0
 
 
+def test_metrics_expose_an_additive_pass_at_8_for_gate_a_runs() -> None:
+    metrics = EvaluationMetrics(
+        baseline_pass_at_1=0.25,
+        pass_at_k=0.75,
+        mixed_fraction=0.5,
+        record_count=4,
+        k=8,
+    )
+
+    assert metrics.as_dict()["pass_at_8"] == 0.75
+    assert metrics.as_dict()["pass_at_k"] == 0.75
+    assert "pass_at_8" not in EvaluationMetrics(
+        baseline_pass_at_1=0.25,
+        pass_at_k=0.75,
+        mixed_fraction=0.5,
+        record_count=4,
+        k=2,
+    ).as_dict()
+
+
 @pytest.mark.parametrize(
     "record",
     [
@@ -86,6 +111,34 @@ def test_runner_requires_an_exact_full_verifier_score() -> None:
 def test_record_validation_rejects_malformed_json_shapes(record: dict[str, object]) -> None:
     with pytest.raises(EvaluationRecordError):
         parse_evaluation_record(record)
+
+
+@pytest.mark.parametrize(
+    "cell",
+    [
+        b"bytes are not JSON",
+        ("tuple",),
+        {"object": "is not a scalar"},
+        ["list", "is not a scalar"],
+        complex(1, 2),
+        float("nan"),
+        float("inf"),
+    ],
+)
+def test_record_validation_rejects_non_sql_scalar_or_non_finite_cells(cell: object) -> None:
+    with pytest.raises(EvaluationRecordError, match="finite SQL scalar JSON value"):
+        parse_evaluation_record({**RECORD, "expected_results": [[cell]]})
+
+
+def test_record_validation_accepts_json_sql_scalars() -> None:
+    record = parse_evaluation_record(
+        {
+            **RECORD,
+            "expected_results": [[None, True, False, -3, 1.5, "Ada"]],
+        }
+    )
+
+    assert record.expected_results == ((None, True, False, -3, 1.5, "Ada"),)
 
 
 def test_runner_validates_every_record_before_making_any_completion_request() -> None:

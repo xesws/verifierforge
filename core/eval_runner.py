@@ -71,13 +71,18 @@ class EvaluationMetrics:
 
     def as_dict(self) -> dict[str, float | int]:
         """Return stable JSON-friendly metric names for programmatic callers."""
-        return {
+        metrics: dict[str, float | int] = {
             "baseline_pass_at_1": self.baseline_pass_at_1,
             "pass_at_k": self.pass_at_k,
             "mixed_fraction": self.mixed_fraction,
             "record_count": self.record_count,
             "k": self.k,
         }
+        if self.k == 8:
+            # Keep the generic pass_at_k/k representation and expose the
+            # Gate A fixed-k value as an additive convenience field.
+            metrics["pass_at_8"] = self.pass_at_k
+        return metrics
 
 
 @dataclass(frozen=True)
@@ -94,8 +99,9 @@ def parse_evaluation_record(
     """Validate and normalize a JSON-like NL2SQL evaluation record.
 
     ``expected_results`` intentionally accepts an empty list: a correct SQL
-    query may return no rows.  Every non-empty row must still be sequence-like
-    so ``NL2SQLVerifier`` receives the result-set shape it expects.
+    query may return no rows. Every non-empty row must still be sequence-like
+    and contain only finite JSON SQL scalars, so ``NL2SQLVerifier`` receives a
+    result-set shape whose cells are safe to compare and hash.
     """
     if not isinstance(raw_record, Mapping):
         raise EvaluationRecordError(f"{source} must be a JSON object")
@@ -113,13 +119,12 @@ def parse_evaluation_record(
                 f"{source}.expected_results[{row_index}] must be a row sequence"
             )
         for column_index, value in enumerate(row):
-            try:
-                hash(value)
-            except TypeError as error:
+            if not _is_sql_scalar_json_value(value):
                 raise EvaluationRecordError(
                     f"{source}.expected_results[{row_index}][{column_index}] "
-                    "must be hashable"
-                ) from error
+                    "must be a finite SQL scalar JSON value "
+                    "(string, number, boolean, or null)"
+                )
         normalized_rows.append(tuple(row))
 
     record_id = raw_record.get("id")
@@ -338,3 +343,18 @@ def _is_sequence(value: Any) -> bool:
     return isinstance(value, Sequence) and not isinstance(
         value, (str, bytes, bytearray)
     )
+
+
+def _is_sql_scalar_json_value(value: Any) -> bool:
+    """Return whether ``value`` is a deterministic SQL-comparable JSON scalar.
+
+    ``NL2SQLVerifier`` compares rows with ``Counter``. Exact built-in scalar
+    types keep equality and hashing free from user-defined implementations;
+    non-finite floats are excluded because ``NaN`` is not equal to itself.
+    ``bool`` is retained because it is a JSON scalar and SQLite represents
+    boolean literals as integer-like values.
+    """
+    value_type = type(value)
+    if value_type in (str, int, bool, type(None)):
+        return True
+    return value_type is float and math.isfinite(value)
