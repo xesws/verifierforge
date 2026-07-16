@@ -23,6 +23,91 @@ repo_arg() {
   [[ "$1" =~ ^[A-Za-z0-9._/@+=:-]+$ ]] || usage
 }
 
+restore_remote_key() {
+  ssh runpod "$REMOTE_KEY_RESTORE"
+}
+
+start_remote_job() {
+  local job="$1"
+  local cfg="$2"
+
+  restore_remote_key
+  ssh runpod bash -s -- "$REMOTE_ROOT" "$REMOTE_PYTHON" "$job" "$cfg" <<'REMOTE'
+set -euo pipefail
+
+root="$1"
+python="$2"
+job="$3"
+cfg="$4"
+
+cd "$root"
+git pull --ff-only
+"$python" -c 'import scripts.gate_a'
+mkdir -p "runs/$job"
+rm -f "runs/$job/pgid"
+tmux new-session -d -s "$job" \
+  "cd \"$root\" && exec setsid bash -c 'printf \"%s\\n\" \"\$\$\" > \"runs/$job/pgid\"; exec bash trainer/launch.sh \"$job\" \"$cfg\"' 2>&1 | tee \"runs/$job/train.log\""
+
+for _ in {1..20}; do
+  [[ -s "runs/$job/pgid" ]] && exit 0
+  sleep 0.1
+done
+
+tmux kill-session -t "$job" 2>/dev/null || true
+echo "vf train failed: $job did not publish a PGID marker" >&2
+exit 1
+REMOTE
+}
+
+stop_remote_job() {
+  local job="$1"
+
+  ssh runpod bash -s -- "$REMOTE_ROOT" "$job" <<'REMOTE'
+set -euo pipefail
+
+root="$1"
+job="$2"
+cd "$root"
+
+tmux kill-session -t "$job" 2>/dev/null || true
+pgid_file="runs/$job/pgid"
+if [[ -s "$pgid_file" ]]; then
+  read -r pgid < "$pgid_file"
+  if [[ "$pgid" =~ ^[1-9][0-9]*$ ]]; then
+    if kill -0 -- "-$pgid" 2>/dev/null; then
+      kill -TERM -- "-$pgid" 2>/dev/null || true
+      for _ in {1..5}; do
+        kill -0 -- "-$pgid" 2>/dev/null || break
+        sleep 1
+      done
+      kill -0 -- "-$pgid" 2>/dev/null && kill -KILL -- "-$pgid" 2>/dev/null || true
+    fi
+  else
+    echo "vf kill: invalid PGID marker for $job" >&2
+    exit 1
+  fi
+else
+  echo "vf kill: no PGID marker for $job; using Ray fallback" >&2
+fi
+
+if [[ -x "$root/.venv/bin/ray" ]]; then
+  "$root/.venv/bin/ray" stop --force || true
+else
+  ray stop --force || true
+fi
+
+compute_apps="$(nvidia-smi --query-compute-apps=pid,process_name,used_memory --format=csv,noheader 2>/dev/null || true)"
+gpu_memory="$(nvidia-smi --query-gpu=memory.used --format=csv,noheader,nounits | awk '{sum += $1} END {print sum + 0}')"
+if [[ -n "${compute_apps//[[:space:]]/}" ]] || (( gpu_memory != 0 )); then
+  echo "vf kill failed: GPU still has $gpu_memory MiB allocated" >&2
+  nvidia-smi >&2
+  exit 1
+fi
+
+printf 'vf kill complete: %s (GPU memory: %s MiB)\n' "$job" "$gpu_memory"
+REMOTE
+}
+
 case "${1:-}" in
   bootstrap)
     repo_arg "$REPO_URL"
@@ -33,7 +118,7 @@ case "${1:-}" in
     job="$2"
     cfg="${3:-}"
     cfg_arg "$cfg"
-    ssh runpod "$REMOTE_KEY_RESTORE cd $REMOTE_ROOT && git pull --ff-only && $REMOTE_PYTHON -c 'import scripts.gate_a' && mkdir -p runs/$job && tmux new-session -d -s $job 'bash trainer/launch.sh $job $cfg 2>&1 | tee runs/$job/train.log'"
+    start_remote_job "$job" "$cfg"
     ;;
   watch)
     job_arg "${2:-}"
@@ -53,7 +138,7 @@ case "${1:-}" in
     ;;
   kill)
     job_arg "${2:-}"
-    ssh runpod "tmux kill-session -t $2"
+    stop_remote_job "$2"
     ;;
   model)
     job_arg "${2:-}"
