@@ -1003,8 +1003,10 @@ zero-MiB check are mandatory.
 
 ## v0.12.0 — Fresh H100 rebuild and D4 execution
 
-**Status:** N1–N5 passed on the fresh executor; N6 was attempted and failed
-its no-metrics gate. N7 is blocked and must not start.
+**Status:** N1–N5 passed on the fresh executor. N6's eleven-minute no-metric
+result is revised to a suspected false positive after the healthy C1 0.5B
+control first emitted only after about thirteen minutes. E1 is the new H100
+admission gate; M3–M6 remain blocked until it passes.
 
 - [x] **N1 — connection:** update local `runpod` SSH entry to
   `157.66.254.39:14694`; prove one H100 80 GB and empty `/workspace` (or only
@@ -1054,7 +1056,7 @@ its no-metrics gate. N7 is blocked and must not start.
   (one GPU, TP 1, `0.45` rollout memory, Hugging Face `sdpa`), run 20–30 steps,
   require at least 20 nonempty metric rows, record tokens/s, step time and M3
   estimate, then W1 kill with 0 MiB. **Stop:** any missing metric, error, or
-  cleanup failure. **Failed 2026-07-16 21:39 UTC:** the detached job began at
+  cleanup failure. **Revised 2026-07-16:** the detached job began at
   approximately 21:27:55 UTC with the required command overrides (one GPU,
   TP 1, rollout memory `0.45`, `sdpa`, `k=8`, 30 steps). It reached a
   `WorkerDict` process after dataset preparation, but after 11 minutes
@@ -1066,6 +1068,9 @@ its no-metrics gate. N7 is blocked and must not start.
   `/workspace/verifierforge/runs/n6-h100-smoke/train.log`. W1 passed:
   `vf kill` removed the tmux session and job process group and reported
   `GPU memory: 0 MiB`; an independent `nvidia-smi` check showed 0 MiB/0%.
+  This is no longer a causal hang finding: C1 reached its first healthy metric
+  only after roughly thirteen minutes on the same H100. Blackwell remains the
+  sole confirmed hard hang and is excluded for the week.
 - [ ] **N7 — M3–M6:** only after N6 passes, launch detached 1.5B main training
   (300–500 steps, `k=8`, 50-step checkpoints, held-out-best, entropy brake),
   then serial 0.5B random-reward control at half steps; evaluate the frozen
@@ -1122,6 +1127,26 @@ prove a deterministic 1.5B configuration bug: the 0.5B control's first metric
 arrived about 13 minutes after launch, whereas N6 was killed at about 11
 minutes. A C2 plan must account for that timing fact rather than treating C1
 as a root-cause stack trace.
+
+### v0.12.4 — E1 H100 milestone retest and D4 continuation
+
+**Status:** approved; implementation/launch pending.
+
+- [ ] Add and test the diagnostic launch environment (`HF_HUB_OFFLINE`,
+  `TRANSFORMERS_OFFLINE`, `VLLM_LOGGING_LEVEL=INFO`, `RAY_DEDUP_LOGS=0`, and
+  `PYTHONFAULTHANDLER=1`) with explicit Ray worker propagation. Add atomic
+  `pip freeze` plus driver/GPU evidence to every new run. **Stop:** local test,
+  import-preflight, or evidence-capture failure.
+- [ ] Run `e1-h100-1p5b-smoke-v0124` through `vf train` with unchanged
+  `grpo_v1_1p5b_h100_smoke`, detached tmux, and a 30-minute timebox. Treat
+  engine milestones as health: sleep-mode then spawn, safetensors/GPU growth,
+  then first metric by T+25–30. At T+15 without safetensors only, collect the
+  approved process/socket/py-spy/ABRT bundle. **Pass:** at least 20 metrics.
+- [ ] E1 pass automatically starts M3 (400-step 1.5B, `k=8`, checkpoints every
+  50, entropy brake) under the same environment, then serial M4 (200-step 0.5B
+  deterministic random reward), M5 frozen held-out after-evaluation, and M6
+  artifact/curve/sync SHA checks. **Stop:** any job, evaluation, or artifact
+  failure; do not claim a gain from training-pool or random-control metrics.
 
 **N6 pre-implementation decision:** use a new
 `grpo_v1_1p5b_h100_smoke` target, not the historical Blackwell config. It has
