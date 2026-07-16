@@ -14,7 +14,7 @@ import math
 import re
 from typing import Any, Protocol
 
-from core.rewards.nl2sql import NL2SQLVerifier
+from core.rewards.nl2sql import NL2SQLScoreBreakdown, NL2SQLVerifier
 
 
 class EvaluationRecordError(ValueError):
@@ -146,6 +146,7 @@ class EvaluationRun:
 
     metrics: EvaluationMetrics
     groups: tuple[SampleGroup, ...]
+    samples: tuple["EvaluationSample", ...]
 
 
 @dataclass(frozen=True)
@@ -159,13 +160,20 @@ class _SampleJob:
 
 
 @dataclass(frozen=True)
-class _SampleResult:
-    """One successfully completed and verifier-scored logical sample."""
+class EvaluationSample:
+    """One successful logical sample, including its completion and tier facts."""
 
     request_ordinal: int
     record_index: int
+    record_id: str | None
     sample_index: int
-    score: float
+    completion: str
+    breakdown: NL2SQLScoreBreakdown
+
+    @property
+    def final_score(self) -> float:
+        """Expose the unchanged verifier score used by aggregate Gate A metrics."""
+        return self.breakdown.final_score
 
 
 def parse_evaluation_record(
@@ -257,7 +265,11 @@ def evaluate_records(
         record_count=record_count,
         k=k,
     )
-    return EvaluationRun(metrics=metrics, groups=tuple(groups))
+    return EvaluationRun(
+        metrics=metrics,
+        groups=tuple(groups),
+        samples=tuple(samples),
+    )
 
 
 def _normalize_records(
@@ -283,7 +295,7 @@ def _evaluate_samples(
     model: str | None,
     temperature: float,
     workers: int,
-) -> list[_SampleResult]:
+) -> list[EvaluationSample]:
     """Run samples with bounded concurrency and deterministic failure ordering.
 
     The scheduler submits no more than eight logical samples at once. Results
@@ -308,9 +320,9 @@ def _evaluate_samples(
         )
     ]
     worker_count = min(MAX_IN_FLIGHT, workers, len(jobs))
-    results: list[_SampleResult] = []
+    results: list[EvaluationSample] = []
     failures: list[CompletionError] = []
-    buffered: dict[int, _SampleResult | CompletionError] = {}
+    buffered: dict[int, EvaluationSample | CompletionError] = {}
     next_job_index = 0
     next_commit_ordinal = 1
     consecutive_terminal_failures = 0
@@ -319,7 +331,7 @@ def _evaluate_samples(
     circuit_open = False
 
     with ThreadPoolExecutor(max_workers=worker_count) as executor:
-        in_flight: dict[Future[_SampleResult], _SampleJob] = {}
+        in_flight: dict[Future[EvaluationSample], _SampleJob] = {}
 
         def submit_until_full() -> None:
             nonlocal next_job_index
@@ -397,7 +409,7 @@ def _score_sample(
     *,
     model: str | None,
     temperature: float,
-) -> _SampleResult:
+) -> EvaluationSample:
     """Complete and score one pre-ordered logical sample."""
     verifier = NL2SQLVerifier(job.record.schema_sql, job.record.expected_results)
     completion = _complete(
@@ -409,11 +421,13 @@ def _score_sample(
         record_index=job.record_index,
         sample_index=job.sample_index,
     )
-    return _SampleResult(
+    return EvaluationSample(
         request_ordinal=job.request_ordinal,
         record_index=job.record_index,
+        record_id=job.record.record_id,
         sample_index=job.sample_index,
-        score=verifier.score(job.record.prompt, completion),
+        completion=completion,
+        breakdown=verifier.score_breakdown(job.record.prompt, completion),
     )
 
 
@@ -434,13 +448,15 @@ def _unexpected_completion_error(job: _SampleJob, error: Exception) -> Completio
 
 def _group_samples(
     records: Sequence[EvaluationRecord],
-    samples: Sequence[_SampleResult],
+    samples: Sequence[EvaluationSample],
     *,
     k: int,
 ) -> list[SampleGroup]:
     scores_by_record = [[0.0] * k for _ in records]
     for sample in samples:
-        scores_by_record[sample.record_index - 1][sample.sample_index - 1] = sample.score
+        scores_by_record[sample.record_index - 1][sample.sample_index - 1] = (
+            sample.final_score
+        )
     return [
         SampleGroup(
             record_id=record.record_id,

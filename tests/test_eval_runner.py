@@ -62,6 +62,14 @@ def test_runner_accounts_for_first_pass_any_pass_and_mixed_groups() -> None:
     assert [group.full_passes for group in run.groups] == [(True, False), (False, True)]
     assert all(request[1] == "test-model" for request in client.requests)
     assert all(request[2] == 1.0 for request in client.requests)
+    assert [sample.completion for sample in run.samples] == [
+        "SELECT name FROM people",
+        "SELECT name FROM people WHERE name = 'Nobody'",
+        "SELECT name FROM people WHERE name = 'Nobody'",
+        "SELECT name FROM people",
+    ]
+    assert [sample.record_id for sample in run.samples] == ["ada", "ada", "ada-again", "ada-again"]
+    assert [sample.final_score for sample in run.samples] == [1.0, 0.5, 0.5, 1.0]
 
 
 def test_runner_requires_an_exact_full_verifier_score() -> None:

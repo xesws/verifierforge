@@ -220,7 +220,7 @@ the branch decision: launch remains blocked on O1's unavailable D value.
 ### O0. Documentation and durable-evidence implementation
 
 - [x] Record v0.7.0's evidence contract before code changes.
-- [ ] Implement and test atomic sample evidence, unchanged-score tier facts,
+- [x] Implement and test atomic sample evidence, unchanged-score tier facts,
   default 50-row saving, and taxonomy summary.
 - [ ] Commit/push the implementation and verify the pod checkout.
 
@@ -228,6 +228,11 @@ the branch decision: launch remains blocked on O1's unavailable D value.
 artifact, not only aggregate metrics. No existing verifier score changes.
 **Stop:** any score-parity, atomic-publication, or test failure; do not launch
 the diagnostic.
+
+**Implementation result:** local score-parity, sample/taxonomy, default-save,
+and atomic-publication coverage passed, as did the complete suite: `143 passed,
+1 skipped`. The new evidence schema is `3`; v0.7.0 does not alter a scalar
+NL2SQL verifier result.
 
 ### O1. Authorized local-only subset diagnostic rerun
 

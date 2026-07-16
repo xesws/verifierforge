@@ -64,3 +64,48 @@ def test_nl2sql_does_not_treat_a_sql_keyword_in_a_string_as_a_write() -> None:
     verifier = NL2SQLVerifier(SCHEMA, [("DELETE",)])
 
     assert verifier.score("return the word", "SELECT 'DELETE'") == 1.0
+
+
+@pytest.mark.parametrize(
+    ("completion", "expected_class", "expected_tiers"),
+    [
+        ("", "parse_failure", (0.0, 0.0, 0.0)),
+        ("SELECT missing FROM employees", "execution_error", (0.2, 0.0, 0.0)),
+        (
+            "SELECT name FROM employees WHERE id = 2",
+            "executable_not_full_pass",
+            (0.2, 0.5, 0.0),
+        ),
+        (
+            "SELECT name FROM employees WHERE id = 1",
+            "full_pass",
+            (0.2, 0.5, 1.0),
+        ),
+    ],
+)
+def test_score_breakdown_preserves_existing_score_and_exposes_tiers(
+    completion: str, expected_class: str, expected_tiers: tuple[float, float, float]
+) -> None:
+    verifier = NL2SQLVerifier(SCHEMA, [("Ada",)])
+
+    breakdown = verifier.score_breakdown("find Ada", completion)
+
+    assert breakdown.final_score == verifier.score("find Ada", completion)
+    assert breakdown.failure_class == expected_class
+    assert (
+        breakdown.parse_score,
+        breakdown.execution_score,
+        breakdown.result_match_score,
+    ) == expected_tiers
+
+
+def test_score_breakdown_flags_existing_length_penalty_without_changing_match() -> None:
+    verifier = NL2SQLVerifier(SCHEMA, [("Ada",)])
+    completion = "SELECT name FROM employees WHERE id = 1 -- " + ("x" * 401)
+
+    breakdown = verifier.score_breakdown("find Ada", completion)
+
+    assert breakdown.final_score == 0.95
+    assert breakdown.result_matched is True
+    assert breakdown.failure_class == "executable_not_full_pass"
+    assert breakdown.failure_detail == "length_penalized_exact_result"

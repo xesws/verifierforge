@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from collections import Counter
+from dataclasses import dataclass
 import sqlite3
 from typing import Any, Sequence
 
@@ -10,6 +11,43 @@ import sqlparse
 from sqlparse import tokens as sql_tokens
 
 from core.verifier_base import Verifier
+
+
+@dataclass(frozen=True)
+class NL2SQLScoreBreakdown:
+    """The unchanged NL2SQL score plus stage facts needed for audit evidence."""
+
+    parse_score: float
+    execution_score: float
+    result_match_score: float
+    final_score: float
+    parser_succeeded: bool
+    read_only_statement: bool
+    execution_succeeded: bool
+    result_matched: bool
+    length_penalty: float
+    failure_class: str
+    failure_detail: str | None
+
+    def as_dict(self) -> dict[str, Any]:
+        """Return the JSON-ready, sample-evidence representation."""
+        return {
+            "tier_scores": {
+                "parse": self.parse_score,
+                "execution": self.execution_score,
+                "result_match": self.result_match_score,
+            },
+            "stages": {
+                "parser_succeeded": self.parser_succeeded,
+                "read_only_statement": self.read_only_statement,
+                "execution_succeeded": self.execution_succeeded,
+                "result_matched": self.result_matched,
+                "length_penalty": self.length_penalty,
+            },
+            "final_score": self.final_score,
+            "failure_class": self.failure_class,
+            "failure_detail": self.failure_detail,
+        }
 
 
 class NL2SQLVerifier(Verifier):
@@ -30,19 +68,58 @@ class NL2SQLVerifier(Verifier):
         }
 
     def score(self, prompt: str, completion: str) -> float:
+        """Return the legacy scalar score without changing its semantics."""
+        return self.score_breakdown(prompt, completion).final_score
+
+    def score_breakdown(self, prompt: str, completion: str) -> NL2SQLScoreBreakdown:
+        """Return all existing tier outcomes alongside the exact final score."""
         del prompt  # The schema and expected rows define this verifier's reward.
 
         try:
             parsed = sqlparse.parse(completion)
         except Exception:
-            return 0.0
+            return self._breakdown(
+                parse_score=0.0,
+                execution_score=0.0,
+                result_match_score=0.0,
+                completion=completion,
+                parser_succeeded=False,
+                read_only_statement=False,
+                execution_succeeded=False,
+                result_matched=False,
+                failure_class="parse_failure",
+                failure_detail="sqlparse_exception",
+            )
 
         if not completion.strip() or not parsed:
-            return 0.0
+            return self._breakdown(
+                parse_score=0.0,
+                execution_score=0.0,
+                result_match_score=0.0,
+                completion=completion,
+                parser_succeeded=False,
+                read_only_statement=False,
+                execution_succeeded=False,
+                result_matched=False,
+                failure_class="parse_failure",
+                failure_detail="empty_or_no_statement",
+            )
 
-        score = 0.2
-        if not self._is_single_read_only_statement(parsed):
-            return self._with_length_penalty(score, completion)
+        parse_score = 0.2
+        read_only_statement = self._is_single_read_only_statement(parsed)
+        if not read_only_statement:
+            return self._breakdown(
+                parse_score=parse_score,
+                execution_score=0.0,
+                result_match_score=0.0,
+                completion=completion,
+                parser_succeeded=True,
+                read_only_statement=False,
+                execution_succeeded=False,
+                result_matched=False,
+                failure_class="execution_error",
+                failure_detail="not_single_read_only_statement",
+            )
 
         try:
             with sqlite3.connect(":memory:") as connection:
@@ -50,12 +127,79 @@ class NL2SQLVerifier(Verifier):
                 connection.set_authorizer(self._read_only_authorizer)
                 actual_results = connection.execute(completion).fetchall()
         except (sqlite3.Error, ValueError):
-            return self._with_length_penalty(score, completion)
+            return self._breakdown(
+                parse_score=parse_score,
+                execution_score=0.0,
+                result_match_score=0.0,
+                completion=completion,
+                parser_succeeded=True,
+                read_only_statement=True,
+                execution_succeeded=False,
+                result_matched=False,
+                failure_class="execution_error",
+                failure_detail="sqlite_execution_error",
+            )
 
-        score = 0.5
-        if Counter(actual_results) == Counter(self.expected_results):
-            score = 1.0
-        return self._with_length_penalty(score, completion)
+        result_matched = Counter(actual_results) == Counter(self.expected_results)
+        if not result_matched:
+            return self._breakdown(
+                parse_score=parse_score,
+                execution_score=0.5,
+                result_match_score=0.0,
+                completion=completion,
+                parser_succeeded=True,
+                read_only_statement=True,
+                execution_succeeded=True,
+                result_matched=False,
+                failure_class="executable_not_full_pass",
+                failure_detail="result_mismatch",
+            )
+        return self._breakdown(
+            parse_score=parse_score,
+            execution_score=0.5,
+            result_match_score=1.0,
+            completion=completion,
+            parser_succeeded=True,
+            read_only_statement=True,
+            execution_succeeded=True,
+            result_matched=True,
+            failure_class="full_pass",
+            failure_detail=None,
+        )
+
+    def _breakdown(
+        self,
+        *,
+        parse_score: float,
+        execution_score: float,
+        result_match_score: float,
+        completion: str,
+        parser_succeeded: bool,
+        read_only_statement: bool,
+        execution_succeeded: bool,
+        result_matched: bool,
+        failure_class: str,
+        failure_detail: str | None,
+    ) -> NL2SQLScoreBreakdown:
+        base_score = max(parse_score, execution_score, result_match_score)
+        final_score = self._with_length_penalty(base_score, completion)
+        length_penalty = base_score - final_score
+        if result_matched and final_score < 1.0:
+            failure_class = "executable_not_full_pass"
+            failure_detail = "length_penalized_exact_result"
+        return NL2SQLScoreBreakdown(
+            parse_score=parse_score,
+            execution_score=execution_score,
+            result_match_score=result_match_score,
+            final_score=final_score,
+            parser_succeeded=parser_succeeded,
+            read_only_statement=read_only_statement,
+            execution_succeeded=execution_succeeded,
+            result_matched=result_matched,
+            length_penalty=length_penalty,
+            failure_class=failure_class,
+            failure_detail=failure_detail,
+        )
 
     @staticmethod
     def _is_single_read_only_statement(parsed: Sequence[sqlparse.sql.Statement]) -> bool:

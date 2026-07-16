@@ -93,7 +93,7 @@ def test_gate_a_reports_raw_metrics_and_writes_secret_free_evidence(
     }
     assert client.models == ["configured-glm"] * 4
     payload = json.loads(evidence.read_text(encoding="utf-8"))
-    assert payload["schema_version"] == 2
+    assert payload["schema_version"] == 3
     assert payload["status"] == "completed"
     assert payload["mode"] == "gate"
     assert payload["passed"] is True
@@ -345,7 +345,7 @@ def test_gate_a_persists_retry_and_provider_failure_evidence(
     failure = payload["failure"]
     sample_failure = failure["failures"][0]
     assert client.calls == 2
-    assert payload["schema_version"] == 2
+    assert payload["schema_version"] == 3
     assert payload["status"] == "failed"
     assert payload["resolved_config"] == {
         "base_url": "https://router.test/v1",
@@ -497,3 +497,133 @@ def test_per_prompt_output_keeps_prior_file_when_atomic_publish_fails(
 
     assert output.read_text(encoding="utf-8") == '{"previous":true}\n'
     assert not list(tmp_path.glob(".pass-counts.jsonl.*"))
+
+
+def test_subset_sample_evidence_defaults_on_but_large_runs_require_opt_in() -> None:
+    args = gate_a.build_parser().parse_args(["candidates.jsonl", "--report", "evidence.json"])
+
+    assert gate_a._should_save_samples(args, record_count=50) is True
+    assert gate_a._should_save_samples(args, record_count=51) is False
+
+
+def test_save_samples_persists_full_completion_tiers_and_taxonomy(
+    tmp_path: Path, monkeypatch
+) -> None:
+    candidates = tmp_path / "candidates.jsonl"
+    evidence = tmp_path / "diagnostic-evidence.json"
+    samples = tmp_path / "diagnostic-samples.jsonl"
+    _write_candidates(candidates, [_record(1), _record(2)])
+    _install_fake_client(
+        monkeypatch,
+        SequenceClient(
+            [
+                "",
+                "",
+                "",
+                "SELECT name FROM people",
+            ]
+        ),
+    )
+
+    assert (
+        gate_a.main(
+            [
+                str(candidates),
+                "--k",
+                "2",
+                "--workers",
+                "1",
+                "--reference",
+                "--save-samples",
+                "--samples-output",
+                str(samples),
+                "--report",
+                str(evidence),
+            ]
+        )
+        == 0
+    )
+
+    rows = [json.loads(line) for line in samples.read_text(encoding="utf-8").splitlines()]
+    assert len(rows) == 4
+    assert rows[0] == {
+        "completion": "",
+        "failure_class": "parse_failure",
+        "failure_detail": "empty_or_no_statement",
+        "final_score": 0.0,
+        "record_id": "case-1",
+        "record_index": 1,
+        "request_ordinal": 1,
+        "sample_index": 1,
+        "stages": {
+            "execution_succeeded": False,
+            "length_penalty": 0.0,
+            "parser_succeeded": False,
+            "read_only_statement": False,
+            "result_matched": False,
+        },
+        "tier_scores": {"execution": 0.0, "parse": 0.0, "result_match": 0.0},
+    }
+    assert rows[-1]["completion"] == "SELECT name FROM people"
+    assert rows[-1]["final_score"] == 1.0
+    payload = json.loads(evidence.read_text(encoding="utf-8"))
+    assert payload["sample_evidence"] == {
+        "path": str(samples),
+        "sample_count": 4,
+        "sha256": hashlib.sha256(samples.read_bytes()).hexdigest(),
+    }
+    assert payload["sample_taxonomy"] == {
+        "D_parse_failure_fraction": 1.0,
+        "categories": {
+            "executable_not_full_pass": {"count": 0, "fraction_of_failed": 0.0},
+            "execution_error": {"count": 0, "fraction_of_failed": 0.0},
+            "parse_failure": {"count": 3, "fraction_of_failed": 1.0},
+        },
+        "failed_sample_count": 3,
+        "length_penalized_exact_result_count": 0,
+        "parse_failure_completions": ["", "", ""],
+    }
+
+
+def test_sample_evidence_keeps_prior_file_when_atomic_publish_fails(
+    tmp_path: Path, monkeypatch
+) -> None:
+    output = tmp_path / "samples.jsonl"
+    output.write_text('{"previous":true}\n', encoding="utf-8")
+    breakdown = SimpleNamespace(
+        as_dict=lambda: {
+            "tier_scores": {"parse": 0.2, "execution": 0.5, "result_match": 1.0},
+            "stages": {
+                "parser_succeeded": True,
+                "read_only_statement": True,
+                "execution_succeeded": True,
+                "result_matched": True,
+                "length_penalty": 0.0,
+            },
+            "final_score": 1.0,
+            "failure_class": "full_pass",
+            "failure_detail": None,
+        },
+        failure_class="full_pass",
+        failure_detail=None,
+    )
+    sample = SimpleNamespace(
+        request_ordinal=1,
+        record_index=1,
+        record_id="case-1",
+        sample_index=1,
+        completion="SELECT 1",
+        breakdown=breakdown,
+        final_score=1.0,
+    )
+
+    def fail_replace(source: Path, destination: Path) -> None:
+        del source, destination
+        raise OSError("simulated publish failure")
+
+    monkeypatch.setattr(gate_a.os, "replace", fail_replace)
+    with pytest.raises(OSError, match="simulated publish failure"):
+        gate_a.write_sample_evidence(output, samples=[sample])
+
+    assert output.read_text(encoding="utf-8") == '{"previous":true}\n'
+    assert not list(tmp_path.glob(".samples.jsonl.*"))

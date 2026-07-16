@@ -30,6 +30,7 @@ from core.eval_runner import (  # noqa: E402 - path setup above is intentional.
     EvaluationCompletionError,
     EvaluationMetrics,
     EvaluationRecordError,
+    EvaluationSample,
     evaluate_records,
     parse_evaluation_record,
 )
@@ -88,6 +89,25 @@ def build_parser() -> argparse.ArgumentParser:
         type=Path,
         help="reference-only JSONL output with one full-pass count per prompt",
     )
+    sample_group = parser.add_mutually_exclusive_group()
+    sample_group.add_argument(
+        "--save-samples",
+        dest="save_samples",
+        action="store_true",
+        help="atomically retain full completion and tier evidence for every sample",
+    )
+    sample_group.add_argument(
+        "--no-save-samples",
+        dest="save_samples",
+        action="store_false",
+        help="disable default sample evidence for a non-diagnostic large run",
+    )
+    parser.set_defaults(save_samples=None)
+    parser.add_argument(
+        "--samples-output",
+        type=Path,
+        help="JSONL destination for saved sample evidence (default derives from --report)",
+    )
     return parser
 
 
@@ -102,6 +122,8 @@ def main(argv: Sequence[str] | None = None) -> int:
     args = parser.parse_args(argv)
     if args.per_prompt_output is not None and not args.reference:
         parser.error("--per-prompt-output requires --reference")
+    if args.samples_output is not None and args.save_samples is False:
+        parser.error("--samples-output cannot be used with --no-save-samples")
     candidate_path = _resolve_candidate_path(parser, args)
     mode = "reference" if args.reference else "gate"
     input_digest: str | None = None
@@ -212,28 +234,37 @@ def main(argv: Sequence[str] | None = None) -> int:
         return 2
 
     per_prompt_artifact: dict[str, Any] | None = None
-    if args.per_prompt_output is not None:
-        try:
+    sample_artifact: dict[str, Any] | None = None
+    sample_taxonomy: dict[str, Any] | None = None
+    save_samples = _should_save_samples(args, record_count=len(records))
+    try:
+        if save_samples:
+            samples_output = args.samples_output or _default_samples_output_path(args.report)
+            sample_artifact, sample_taxonomy = write_sample_evidence(
+                samples_output,
+                samples=run.samples,
+            )
+        if args.per_prompt_output is not None:
             per_prompt_artifact = write_per_prompt_pass_counts(
                 args.per_prompt_output,
                 groups=run.groups,
                 k=args.k,
             )
-        except (OSError, ValueError) as error:
-            _write_failure_or_report(
-                args.report,
-                candidate_path=candidate_path,
-                input_digest=input_digest,
-                record_count=len(records),
-                settings=settings,
-                k=args.k,
-                workers=args.workers,
-                mode=mode,
-                category="artifact",
-                error=error,
-            )
-            print("gate_a artifact error: could not write per-prompt output", file=sys.stderr)
-            return 2
+    except (OSError, ValueError) as error:
+        _write_failure_or_report(
+            args.report,
+            candidate_path=candidate_path,
+            input_digest=input_digest,
+            record_count=len(records),
+            settings=settings,
+            k=args.k,
+            workers=args.workers,
+            mode=mode,
+            category="artifact",
+            error=error,
+        )
+        print("gate_a artifact error: could not write evaluation output", file=sys.stderr)
+        return 2
 
     decision = gate_passes(run.metrics)
     if args.report is not None:
@@ -248,6 +279,8 @@ def main(argv: Sequence[str] | None = None) -> int:
                 workers=args.workers,
                 mode=mode,
                 per_prompt_artifact=per_prompt_artifact,
+                sample_artifact=sample_artifact,
+                sample_taxonomy=sample_taxonomy,
             )
         except OSError:
             print("gate_a evidence error: could not write evidence file", file=sys.stderr)
@@ -322,10 +355,12 @@ def write_evidence(
     workers: int,
     mode: str = "gate",
     per_prompt_artifact: Mapping[str, Any] | None = None,
+    sample_artifact: Mapping[str, Any] | None = None,
+    sample_taxonomy: Mapping[str, Any] | None = None,
 ) -> None:
     """Atomically write freeze-ready evidence without prompts, completions, or keys."""
     payload = {
-        "schema_version": 2,
+        "schema_version": 3,
         "status": "completed",
         "mode": mode,
         "timestamp": datetime.now(UTC).isoformat(),
@@ -362,7 +397,83 @@ def write_evidence(
         payload["pass_at_8"] = metrics.pass_at_k
     if per_prompt_artifact is not None:
         payload["per_prompt_pass_counts"] = dict(per_prompt_artifact)
+    if sample_artifact is not None:
+        payload["sample_evidence"] = dict(sample_artifact)
+    if sample_taxonomy is not None:
+        payload["sample_taxonomy"] = dict(sample_taxonomy)
     _write_json_atomic(path, payload)
+
+
+def write_sample_evidence(
+    path: Path,
+    *,
+    samples: Sequence[EvaluationSample],
+) -> tuple[dict[str, Any], dict[str, Any]]:
+    """Atomically write every successful sample's completion and scorer facts."""
+    ordered_samples = sorted(samples, key=lambda sample: sample.request_ordinal)
+    rows = [_sample_evidence_row(sample) for sample in ordered_samples]
+    content = "".join(json.dumps(row, sort_keys=True) + "\n" for row in rows)
+    _write_text_atomic(path, content)
+    raw = path.read_bytes()
+    return (
+        {
+            "path": str(path),
+            "sha256": hashlib.sha256(raw).hexdigest(),
+            "sample_count": len(rows),
+        },
+        _sample_taxonomy(ordered_samples),
+    )
+
+
+def _sample_evidence_row(sample: EvaluationSample) -> dict[str, Any]:
+    """Serialize full local-model completion evidence without retaining prompts."""
+    return {
+        "request_ordinal": sample.request_ordinal,
+        "record_index": sample.record_index,
+        "record_id": sample.record_id,
+        "sample_index": sample.sample_index,
+        "completion": sample.completion,
+        **sample.breakdown.as_dict(),
+    }
+
+
+def _sample_taxonomy(samples: Sequence[EvaluationSample]) -> dict[str, Any]:
+    """Summarize all non-full-passes for the runbook's reproducible D value."""
+    failed_samples = [sample for sample in samples if sample.final_score != 1.0]
+    classes = (
+        "parse_failure",
+        "execution_error",
+        "executable_not_full_pass",
+    )
+    counts = Counter(sample.breakdown.failure_class for sample in failed_samples)
+    unknown = set(counts) - set(classes)
+    if unknown:
+        raise ValueError(f"unexpected sample failure class: {sorted(unknown)!r}")
+    failed_count = len(failed_samples)
+    categories = {
+        name: {
+            "count": counts[name],
+            "fraction_of_failed": counts[name] / failed_count if failed_count else 0.0,
+        }
+        for name in classes
+    }
+    parse_examples = [
+        sample.completion
+        for sample in failed_samples
+        if sample.breakdown.failure_class == "parse_failure"
+    ][:3]
+    return {
+        "failed_sample_count": failed_count,
+        "categories": categories,
+        "D_parse_failure_fraction": (
+            counts["parse_failure"] / failed_count if failed_count else 0.0
+        ),
+        "length_penalized_exact_result_count": sum(
+            sample.breakdown.failure_detail == "length_penalized_exact_result"
+            for sample in failed_samples
+        ),
+        "parse_failure_completions": parse_examples,
+    }
 
 
 def write_per_prompt_pass_counts(
@@ -457,7 +568,7 @@ def write_failure_evidence(
     model = getattr(settings, "model", None)
     resolved_model = model.strip() if isinstance(model, str) and model.strip() else None
     payload: dict[str, Any] = {
-        "schema_version": 2,
+        "schema_version": 3,
         "status": "failed",
         "mode": mode,
         "timestamp": datetime.now(UTC).isoformat(),
@@ -634,6 +745,18 @@ def _resolve_candidate_path(parser: argparse.ArgumentParser, args: argparse.Name
     if candidate_path is None:
         parser.error("a candidate JSONL path is required")
     return candidate_path
+
+
+def _should_save_samples(args: argparse.Namespace, *, record_count: int) -> bool:
+    """Default evidence retention on the canonical 50-row subset only."""
+    if args.save_samples is not None:
+        return bool(args.save_samples)
+    return args.samples_output is not None or record_count == 50
+
+
+def _default_samples_output_path(report_path: Path) -> Path:
+    """Keep a default sample artifact alongside the required evidence report."""
+    return report_path.with_name(f"{report_path.stem}-samples.jsonl")
 
 
 def _load_eval_client() -> tuple[Any, Any]:
