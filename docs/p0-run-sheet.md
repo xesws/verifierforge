@@ -1080,9 +1080,10 @@ repair plan is required before any retry; M3–M6 remain prohibited.
 
 ### v0.12.3 — C1 Gate B control replay diagnosis
 
-**Status:** approved; documentation gate complete, execution pending.
+**Status:** C1 complete; the metric rule selects C2. C2 repair work is not
+defined or authorized by this run sheet, so execution stops here.
 
-- [ ] Verify the original Gate B tag/config/data identity before launch:
+- [x] Verify the original Gate B tag/config/data identity before launch:
   tag `v0.10.2-p0-three-piece-freeze` commit
   `ad3d36b5860c66567a9f60f94c34101c787aaef3`; config SHA-256
   `e2b8e973cf2400040dd83684e9bd7f4b0f191390ebce24ee43281f9ed5b81171`; frozen
@@ -1090,17 +1091,37 @@ repair plan is required before any retry; M3–M6 remain prohibited.
   `c97a5adea789fae3be249bc9ac95a1902ae5a9769de9eefbc08277f056878e8c`.
   Run the tag worktree's literal 0.5B Gate B configuration in detached tmux,
   writing all state to `runs/c1-gateb-replay-v0123/` under the primary
-  workspace. **Stop:** identity or launch failure.
-- [ ] At T+3 minutes, install only `py-spy` into the runtime venv and atomically
+  workspace. **Passed:** a detached worktree at the tag was used; all three
+  identity values were copied to `evidence/identity.txt`. **Stop:** identity or
+  launch failure.
+- [x] At T+3 minutes, install only `py-spy` into the runtime venv and atomically
   preserve the complete native `WorkerDict` dump, PID manifest, and install/
   version output under that run's `evidence/`. This is required regardless of
-  whether a metric already exists. **Stop:** do not claim a branch conclusion
-  without this artifact.
-- [ ] At or before the 15-minute timebox, preserve the metric/no-metric result,
+  whether a metric already exists. **Blocked by executor capability:** `pip
+  install py-spy` reported `py-spy 0.4.2` available, and both driver (`7653`)
+  and WorkerDict (`10342`) dumps were atomically retained, but each raw dump
+  says `Permission Denied` and requests Docker `SYS_PTRACE`. No stack is
+  claimed. The current pod's seccomp/capability profile cannot attach to a
+  peer; a future stack-complete diagnosis needs a pod launched with that
+  capability.
+- [x] At or before the 15-minute timebox, preserve the metric/no-metric result,
   perform W1 teardown, and require tmux/process absence plus 0 MiB GPU. One
   JSONL metric selects C2 (new-config investigation); no metric selects C3
-  (environment-regression investigation). C2/C3 repairs are not authorized by
-  this C1 scope; N7 remains blocked.
+  (environment-regression investigation). **C2 selected:** the literal 0.5B
+  Gate B control produced eight metrics; first metric at `2026-07-16T22:11:29Z`
+  and final captured step 8 at `22:12:12Z`. `vf kill` then removed tmux and
+  all job processes; independent `nvidia-smi` was 0 MiB/0%. The synced local
+  and pod metrics SHA-256 is
+  `f6af42947100e8e938375a3f97c062cedca7a6c5c952851ab39b6932b4b297ea`; train-log
+  SHA-256 is `d965910dc18f4bcd1a1f3c062808463e468215105a3f7821ff1a45d94b573768`.
+  C2/C3 repairs are not authorized by this C1 scope; N7 remains blocked.
+
+**C1 interpretation boundary:** the common H100/runtime can complete the
+frozen 0.5B path, so C1 selects C2 under the predeclared rule. It does **not**
+prove a deterministic 1.5B configuration bug: the 0.5B control's first metric
+arrived about 13 minutes after launch, whereas N6 was killed at about 11
+minutes. A C2 plan must account for that timing fact rather than treating C1
+as a root-cause stack trace.
 
 **N6 pre-implementation decision:** use a new
 `grpo_v1_1p5b_h100_smoke` target, not the historical Blackwell config. It has
