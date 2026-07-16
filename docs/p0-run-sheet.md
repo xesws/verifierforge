@@ -653,17 +653,24 @@ Focused freeze/fixture tests passed `8 passed`; full validation passed
 
 ### F2. Commit and tag the immutable freeze
 
-- [ ] Commit the manifest and runtime alias, create annotated
+- [x] Commit the manifest and runtime alias, create annotated
   `v0.10.2-p0-three-piece-freeze` naming the local eval model, and push `main`
   plus the tag.
-- [ ] Verify the tag resolves to the commit containing the manifest/alias and
+- [x] Verify the tag resolves to the commit containing the manifest/alias and
   all hashes recompute at that commit.
 
 **Stop:** any commit/tag/push/hash failure; preserve artifacts and do not train.
 
+**Result:** annotated tag `v0.10.2-p0-three-piece-freeze` object
+`9cc827e17ca7f306b42d78adace9cf08b201f486` resolves to commit
+`ad3d36b5860c66567a9f60f94c34101c787aaef3`. The tag annotation names
+`Qwen2.5-1.5B-Instruct`, both dataset hashes, and verifier v2. Origin contains
+this exact tag, and at F2 verification `main` was the freeze commit; tag-path
+hash recomputation matched the frozen training/held-out SHA-256 values.
+
 ### F3. Detached 0.5B Gate B
 
-- [ ] On RunPod, check out the freeze tag, stop `vf-eval-vllm`, verify its GPU
+- [x] On RunPod, check out the freeze tag, stop `vf-eval-vllm`, verify its GPU
   memory release, then run `vf train p0-gateb-v102 grpo_v1_0p5b`.
 - [ ] Verify tmux detachment, then poll at least 120 seconds apart until the
   job completes; sync metrics/log/artifact and record a training-monitoring
@@ -671,3 +678,8 @@ Focused freeze/fixture tests passed `8 passed`; full validation passed
 
 **Stop:** evaluator-release, launch, execution, sync, or artifact failure.
 Held-out evaluation is a later D4 step; no Gate B metric is a gain claim.
+
+**Start result:** RunPod verified `HEAD=ad3d36b` equals the freeze tag, then
+stopped `vf-eval-vllm`; tmux, vLLM process list, port 8000 listener, and GPU
+compute list were all empty before launch. `vf train p0-gateb-v102
+grpo_v1_0p5b` returned immediately and tmux session `p0-gateb-v102` exists.
