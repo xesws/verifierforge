@@ -846,8 +846,8 @@ flowing through Storage and `vf watch`.
 
 ## v0.11.1 — W1 kill recovery and W2 Blackwell retest
 
-**Status:** W1 passed; W2 diagnosed as an engine-initialization hang. The first
-authorized `enforce_eager` repair/retest is pending. M3–M6 remain blocked.
+**Status:** W1 passed; W2's eager retest also hung. The single authorized
+`TORCH_SDPA` attention-backend retest is pending. M3–M6 remain blocked.
 
 ### W1. `vf kill` process-group recovery
 
@@ -877,9 +877,10 @@ ignored laptop evidence is `runs/w1-kill-v0111/`.
   `n_gpus` / TP / GPU-memory configuration.
 - [x] Classify exactly one: resource waiting, engine-initialization hang, or
   communication-initialization hang; record raw evidence and classification.
-- [ ] If resource waiting, align single-GPU declarations. If engine init hangs,
+- [x] If resource waiting, align single-GPU declarations. If engine init hangs,
   first enable `enforce_eager`, then try attention fallbacks one at a time.
-- [ ] Retest no more than twice within a 45-minute total W2 timebox.
+- [ ] Retest no more than twice within a 45-minute total W2 timebox. The eager
+  retest is attempt 1; the pending `TORCH_SDPA` retest is attempt 2.
 
 **Acceptance:** a retest must show rollout + post-update evidence, throughput,
 append-only Storage metrics, a curve point, and W1-clean teardown.
@@ -910,3 +911,20 @@ communication initialization. Raw evidence is preserved under the ignored
 `actor_rollout_ref.rollout.enforce_eager=True` for the Blackwell smoke and
 retest once. No attention-backend fallback is permitted unless this retest
 again hangs.
+
+**Repair #1 result (STOP):** `p0-w2-eager-r1-v0111` confirmed
+`actor_rollout_ref.rollout.enforce_eager=true` in the actual launch command.
+It reached Ray, TaskRunner, and a `ray::WorkerDict` (8,286 then 7,192 MiB) but
+after roughly 14 minutes never created `vLLMHttpServer`, a rollout, throughput,
+metrics, or a checkpoint; it also emitted no CUDA/OOM/Traceback. W1 cleanup
+then completed with 0 MiB GPU memory. Eager mode is therefore recorded as
+ineffective, not as a passing Blackwell fix.
+
+**Authorized repair #2 / final W2 retest:** set only
+`VLLM_ATTENTION_BACKEND=TORCH_SDPA` for the Blackwell smoke, both in the driver
+environment and Ray worker runtime environment. The installed vLLM source
+contains `_Backend.TORCH_SDPA`, so this is a real supported backend rather than
+an invented flag. Keep eager mode, model, data, TP 1, one GPU, and memory
+utilization 0.5 unchanged. This is the second and final W2 retest: another
+hang, any unrelated failure, or expiry of the 45-minute W2 budget stops work
+and returns the evidence to the human.
