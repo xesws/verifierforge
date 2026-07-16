@@ -1020,16 +1020,19 @@ completion credit. Start again on the new H100 SXM executor.
   You've successfully authenticated`. The new volume exposes stored key files
   as `666`, so bootstrap's existing root-only `0600` copy is required and has
   not been bypassed. **Stop:** `gh auth` or GitHub authentication fails.
-- [ ] **N3 — bootstrap (FAILED):** run `vf bootstrap`; prove imports and exact runtime
+- [x] **N3 — bootstrap:** run `vf bootstrap`; prove imports and exact runtime
   versions: torch `2.8.0+cu128`, vLLM `0.10.2`, verl `0.8.0`, ray `2.56.0`.
-  **Failed 2026-07-16 20:54 UTC:** cloning reached remote `82c2712`; the
+  **Initial failure 2026-07-16 20:54 UTC:** cloning reached remote `82c2712`; the
   workspace key was copied to `/root/.ssh/id_ed25519` at `0600`, but
   `.venv/bin/python -c 'import torch, vllm, verl, ray'` stopped at
   `ModuleNotFoundError: No module named 'torch'`. Read-only evidence: Python
   `3.12.3`, pip `26.1.2`, and `pip show torch vllm verl ray` reported all four
   packages absent; the remote requirements file digest is
   `fd71886bad76ddaf9384269a726187696679ed1b667c001b9bcf4a4f51db0f50`.
-  N4–N7 are not authorized. **Stop:** clone/install/import/version mismatch.
+  **Passed retry 2026-07-16 21:21 UTC:** repaired tmux-backed validation logged
+  `torch=2.8.0+cu128`, `vllm=0.10.2`, `verl=0.8.0`, and `ray=2.56.0`, all with
+  status `0`; `runtime-install.status` is `state=success`. **Stop:**
+  clone/install/import/version mismatch.
 - [ ] **N4 — models:** snapshot only Qwen 2.5 0.5B and 1.5B into
   `/workspace/hf-cache`; prove both snapshot directories are complete. **Stop:**
   either download/snapshot check fails; do not download gpt-oss-20b.
@@ -1075,7 +1078,12 @@ auditable, and N3 must not be treated as complete.
   `bash -n scripts/vf trainer/bootstrap.sh`, and `pytest -q` passed
   (`184 passed, 1 skipped`). No failure masking or version relaxation is
   permitted.
-- [ ] **N3 retry:** run the explicit tmux-backed installation, preserve its raw
+- [x] **N3 retry:** run the explicit tmux-backed installation, preserve its raw
   log/status, then import/print torch `2.8.0+cu128`, vLLM `0.10.2`, verl
-  `0.8.0`, and ray `2.56.0`. **Stop:** any installation/status/import/version
-  failure; N4–N7 remain blocked.
+  `0.8.0`, and ray `2.56.0`. **Passed:** the durable probe's raw log contains
+  `END torch status=0`, `END vllm status=0`, `END verl status=0`, and
+  `END ray status=0` at their required versions. The pre-v0.12.1 direct
+  installer was discovered still alive after D1; its duplicate tmux install was
+  terminated immediately to avoid concurrent venv writes, while the original
+  was allowed to complete. **Stop:** any future installation/status/import/version
+  failure; N4 is now authorized.
