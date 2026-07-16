@@ -367,7 +367,7 @@ B3 passes.
 
 ### B1. Git-bound population and full difficulty probe
 
-- [ ] Build/test a deterministic 326-record population: 276 full candidates
+- [x] Build/test a deterministic 326-record population: 276 full candidates
   plus the original 50 reviewed seeds from Git ref `78912f1`; record source
   hashes and provenance.
 - [ ] On the pod, run every population record at `k=8` in detached tmux using
@@ -379,6 +379,15 @@ B3 passes.
 v2 and the fixed population.
 **Stop ①:** two consecutive B1 infrastructure exit-2 runs; do not retry a
 completed probe for its numbers.
+
+**Population result:** `data/nl2sql/v0.9.0-b1-population.jsonl` contains 326
+records (276 candidates + 50 original seeds) with SHA-256
+`23c269a9de89bb4fdfec21bde56488290f424368e5c2b08c7ce402bc74f31a91`.
+Its manifest SHA-256 is
+`515a0961f9f1d2e566a0d4fd691bb5457e6428cccc95e5d44fc443a764e65071` and binds
+the full candidate input SHA-256
+`0ad88c264bb4488189fc0788b740bdfabf99fc5fb2be0e232f0420953c79c96a` plus the
+original seed object at `78912f1`.
 
 ### B2. Fixed 50-row reprojection
 
