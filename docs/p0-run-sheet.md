@@ -1006,9 +1006,11 @@ zero-MiB check are mandatory.
 **Status:** planned; the former RTX PRO 6000/old volume have no remaining
 completion credit. Start again on the new H100 SXM executor.
 
-- [ ] **N1 — connection:** update local `runpod` SSH entry to
+- [x] **N1 — connection:** update local `runpod` SSH entry to
   `157.66.254.39:14694`; prove one H100 80 GB and empty `/workspace` (or only
-  `lost+found`). **Stop:** SSH/GPU/volume acceptance fails.
+  `lost+found`). **Passed 2026-07-16 20:53 UTC:** `nvidia-smi` reported one
+  `NVIDIA H100 80GB HBM3`, 81,559 MiB, 0 MiB used; `/workspace` contained only
+  `.` and `..`. **Stop:** SSH/GPU/volume acceptance fails.
 - [ ] **N2 — repository access:** create the new pod key, add a read-only
   deploy key with authenticated `gh`, preserve it only on the new workspace
   volume for the existing 0600 copy logic, and prove `ssh -T git@github.com`.
