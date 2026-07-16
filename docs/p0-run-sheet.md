@@ -527,7 +527,7 @@ remain fixed.
 
 ### E0. Documentation gate
 
-- [ ] Commit the v0.10.1 version document plus evaluation-serving,
+- [x] Commit the v0.10.1 version document plus evaluation-serving,
   infrastructure, and model-trainer area documents before code.
 
 **Acceptance:** the chosen canonical invocation, dry-run preflight, baseline
@@ -536,9 +536,9 @@ scope, Gate B dependency, and stop conditions are committed before any code.
 
 ### E1. Canonical package entrypoint and vf preflight
 
-- [ ] Add the minimal `scripts/__init__.py` package marker; use repository-root
+- [x] Add the minimal `scripts/__init__.py` package marker; use repository-root
   `python -m scripts.gate_a` locally and on RunPod.
-- [ ] Before `vf` detaches any remote job, run
+- [x] Before `vf` detaches any remote job, run
   `/workspace/verifierforge/.venv/bin/python -c "import scripts.gate_a"` from
   the repository root and fail synchronously on import error.
 - [ ] Validate the same import on RunPod before the U2 tmux session exists.
@@ -548,6 +548,13 @@ entrypoint. It gives one importable canonical command in laptop and pod
 environments and makes the preflight directly test the command that tmux runs.
 **Stop:** package/import/shell-validation failure; do not create a Gate A tmux
 session.
+
+**Implementation result:** `scripts/__init__.py` makes the canonical module
+entrypoint explicit, and `vf train` runs the remote import immediately after
+`git pull --ff-only` and before `tmux new-session`. Local import, module-help,
+and shell syntax checks passed; focused tests passed `26 passed` and the full
+suite passed `174 passed, 1 skipped`. Pod preflight remains required before a
+new U2 session.
 
 ### E2. Authorized U2 rerun and held-out baseline
 
