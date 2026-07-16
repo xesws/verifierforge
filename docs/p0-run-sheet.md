@@ -474,16 +474,24 @@ or external-provider request was made.
 
 ### U1. Deterministic training/held-out construction
 
-- [ ] Reuse the immutable 326-row B1 population/count artifact. Per seed select
+- [x] Reuse the immutable 326-row B1 population/count artifact. Per seed select
   nearest-to-2 in `[1,4]`; otherwise lowest in `[1,6]`; only then use existing
   discard/backfill handling.
-- [ ] Atomically write a 50-row training pool and zero-overlap 60-row held-out
+- [x] Atomically write a 50-row training pool and zero-overlap 60-row held-out
   set, with exact bucket-allocation and verifier-v2 provenance report.
 
 **Acceptance:** 50/60 rows, all reference SQL at `1.0`, no common source
 population ID, and every nonempty B1 difficulty bucket represented in held-out.
 **Stop:** any invalid count, duplicate/overlap, unsupported fallback, or split
 shortfall; do not run a Gate A or freeze.
+
+**Result:** `data/nl2sql/v0.10.0-training-pool.jsonl` has 50 rows and SHA-256
+`c97a5adea789fae3be249bc9ac95a1902ae5a9769de9eefbc08277f056878e8c`.
+`data/nl2sql/v0.10.0-heldout.jsonl` has 60 rows and SHA-256
+`482f0e7678e7603311f72aeead381364cd92f0596c20745cc58c96916a9177e8`.
+The deterministic repeat produced byte-identical outputs. The split report
+records zero source-ID overlap, verifier-v2 `110/110` reference passes, and
+held-out representation for every B1 pass-count bucket `0..8`.
 
 ### U2. Three-predicate training-pool Gate A
 
