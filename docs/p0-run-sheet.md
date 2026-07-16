@@ -1132,11 +1132,16 @@ as a root-cause stack trace.
 
 **Status:** approved; implementation/launch pending.
 
-- [ ] Add and test the diagnostic launch environment (`HF_HUB_OFFLINE`,
+- [x] Add and test the diagnostic launch environment (`HF_HUB_OFFLINE`,
   `TRANSFORMERS_OFFLINE`, `VLLM_LOGGING_LEVEL=INFO`, `RAY_DEDUP_LOGS=0`, and
   `PYTHONFAULTHANDLER=1`) with explicit Ray worker propagation. Add atomic
   `pip freeze` plus driver/GPU evidence to every new run. **Stop:** local test,
-  import-preflight, or evidence-capture failure.
+  import-preflight, or evidence-capture failure. **Passed locally:** launch
+  exports the five values, command construction adds corresponding
+  `ray_kwargs.ray_init.runtime_env.env_vars.*` overrides, and
+  `runtime-environment.txt` atomically captures effective values, `pip freeze`,
+  and driver/GPU output before every GRPO child. `pytest -q` passed
+  (`187 passed, 1 skipped`); `bash -n trainer/launch.sh` passed.
 - [ ] Run `e1-h100-1p5b-smoke-v0124` through `vf train` with unchanged
   `grpo_v1_1p5b_h100_smoke`, detached tmux, and a 30-minute timebox. Treat
   engine milestones as health: sleep-mode then spawn, safetensors/GPU growth,

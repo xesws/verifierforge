@@ -3,10 +3,29 @@
 from __future__ import annotations
 
 from dataclasses import dataclass, replace
+import os
 from pathlib import Path
 
 
 CONFIG_DIRECTORY = Path(__file__).with_name("verl_configs")
+
+RAY_DIAGNOSTIC_ENVIRONMENT = (
+    "HF_HUB_OFFLINE",
+    "TRANSFORMERS_OFFLINE",
+    "VLLM_LOGGING_LEVEL",
+    "RAY_DEDUP_LOGS",
+    "PYTHONFAULTHANDLER",
+)
+
+
+def _ray_diagnostic_environment_overrides() -> list[str]:
+    """Propagate explicitly set H100 diagnostics through Ray worker startup."""
+    overrides: list[str] = []
+    for name in RAY_DIAGNOSTIC_ENVIRONMENT:
+        value = os.environ.get(name)
+        if value is not None:
+            overrides.append(f"+ray_kwargs.ray_init.runtime_env.env_vars.{name}={value}")
+    return overrides
 
 
 @dataclass(frozen=True)
@@ -187,6 +206,7 @@ class GrpoSmokeConfig:
             f"trainer.default_local_dir={staging_dir}",
             "trainer.default_hdfs_dir=null",
         ]
+        overrides.extend(_ray_diagnostic_environment_overrides())
         if self.vllm_attention_backend is not None:
             overrides.append(
                 "+ray_kwargs.ray_init.runtime_env.env_vars."

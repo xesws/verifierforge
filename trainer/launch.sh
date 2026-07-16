@@ -11,6 +11,14 @@ if [[ -x .venv/bin/python ]]; then
   python=.venv/bin/python
 fi
 
+h100_diagnostic_environment() {
+  export HF_HUB_OFFLINE=1
+  export TRANSFORMERS_OFFLINE=1
+  export VLLM_LOGGING_LEVEL=INFO
+  export RAY_DEDUP_LOGS=0
+  export PYTHONFAULTHANDLER=1
+}
+
 case "$cfg" in
   fake_smoke)
     exec "$python" -m trainer.fake_train --job "$job" --steps 150 --interval 2
@@ -25,6 +33,7 @@ case "$cfg" in
     exec "$python" -m trainer.grpo_train --job "$job" --config "$cfg"
     ;;
   grpo_v1_1p5b_h100_smoke)
+    h100_diagnostic_environment
     exec "$python" -m trainer.grpo_train --job "$job" --config "$cfg"
     ;;
   *)

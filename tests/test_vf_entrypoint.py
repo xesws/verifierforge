@@ -68,3 +68,9 @@ def test_blackwell_smoke_is_an_explicit_launch_target() -> None:
     assert "grpo_v1_1p5b_blackwell_smoke)" in launch
     assert "grpo_v1_1p5b_h100_smoke)" in launch
     assert 'trainer.grpo_train --job "$job" --config "$cfg"' in launch
+    assert "h100_diagnostic_environment()" in launch
+    assert "export HF_HUB_OFFLINE=1" in launch
+    assert "export TRANSFORMERS_OFFLINE=1" in launch
+    assert "export VLLM_LOGGING_LEVEL=INFO" in launch
+    assert "export RAY_DEDUP_LOGS=0" in launch
+    assert "export PYTHONFAULTHANDLER=1" in launch

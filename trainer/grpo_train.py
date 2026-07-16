@@ -8,6 +8,7 @@ import signal
 import subprocess
 import sys
 import time
+from collections.abc import Callable
 from dataclasses import asdict
 from datetime import datetime, timezone
 from pathlib import Path
@@ -21,6 +22,78 @@ from trainer.plot_metrics import render_curve
 
 
 REPOSITORY_ROOT = Path(__file__).resolve().parents[1]
+RUNTIME_EVIDENCE_ENVIRONMENT = (
+    "HF_HUB_OFFLINE",
+    "TRANSFORMERS_OFFLINE",
+    "VLLM_LOGGING_LEVEL",
+    "RAY_DEDUP_LOGS",
+    "PYTHONFAULTHANDLER",
+)
+
+
+def capture_runtime_evidence(
+    run_dir: Path,
+    *,
+    runner: Callable[..., subprocess.CompletedProcess[str]] = subprocess.run,
+) -> Path:
+    """Atomically preserve runtime identity before a GPU child starts.
+
+    The output is intentionally command-oriented rather than a dependency lock:
+    it records the effective environment, installed Python packages, and driver
+    facts for post-run diagnosis without ever reading a secret-bearing `.env`.
+    """
+    run_dir = Path(run_dir)
+    evidence_dir = run_dir / "evidence"
+    evidence_dir.mkdir(parents=True, exist_ok=True)
+    destination = evidence_dir / "runtime-environment.txt"
+    lines = [f"captured_at={datetime.now(timezone.utc).isoformat()}", "[environment]"]
+    lines.extend(f"{name}={os.environ.get(name, '<unset>')}" for name in RUNTIME_EVIDENCE_ENVIRONMENT)
+    lines.extend(
+        (
+            "",
+            "[pip_freeze]",
+            _capture_command((sys.executable, "-m", "pip", "freeze"), runner),
+            "",
+            "[nvidia_smi]",
+            _capture_command(
+                (
+                    "nvidia-smi",
+                    "--query-gpu=name,driver_version,memory.total",
+                    "--format=csv,noheader",
+                ),
+                runner,
+            ),
+            "",
+        )
+    )
+    temporary = destination.with_suffix(".tmp")
+    temporary.write_text("\n".join(lines), encoding="utf-8")
+    os.replace(temporary, destination)
+    return destination
+
+
+def _capture_command(
+    command: tuple[str, ...], runner: Callable[..., subprocess.CompletedProcess[str]]
+) -> str:
+    """Return a bounded, printable command transcript even when unavailable."""
+    rendered = " ".join(command)
+    try:
+        completed = runner(command, capture_output=True, text=True, check=False)
+    except OSError as error:
+        return f"command={rendered}\nerror={type(error).__name__}: {error}"
+
+    output = completed.stdout or ""
+    error_output = completed.stderr or ""
+    return "\n".join(
+        (
+            f"command={rendered}",
+            f"returncode={completed.returncode}",
+            "stdout:",
+            output.rstrip(),
+            "stderr:",
+            error_output.rstrip(),
+        )
+    )
 
 
 def build_verl_command(
@@ -68,6 +141,7 @@ def run(
     staging_dir = run_dir / ".verl-staging"
     logger_path = staging_dir / "verl-metrics.jsonl"
     staging_dir.mkdir(parents=True, exist_ok=True)
+    capture_runtime_evidence(run_dir)
 
     resume_path = latest_storage_resume_path(storage, job_id)
     if resume_path is None and any(staging_dir.glob("global_step_*")):

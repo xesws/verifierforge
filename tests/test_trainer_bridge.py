@@ -1,11 +1,12 @@
 import json
 from pathlib import Path
+import subprocess
 
 from core.storage.local import LocalStorage
 from trainer.checkpoint_bridge import CheckpointBridge, latest_storage_resume_path
 from trainer.grpo_config import GrpoSmokeConfig
 from trainer.grpo_dataset import build_verl_rows
-from trainer.grpo_train import _publish_final_artifacts, build_verl_command
+from trainer.grpo_train import _publish_final_artifacts, build_verl_command, capture_runtime_evidence
 from trainer.metric_bridge import VerlMetricBridge
 from trainer.plot_metrics import render_curve
 
@@ -176,6 +177,50 @@ def test_h100_smoke_config_is_bounded_single_gpu_probe(tmp_path: Path) -> None:
     assert "actor_rollout_ref.rollout.tensor_model_parallel_size=1" in command
     assert "actor_rollout_ref.rollout.enforce_eager=false" in command
     assert not any("VLLM_ATTENTION_BACKEND=" in argument for argument in command)
+
+
+def test_h100_diagnostic_environment_reaches_ray_workers(monkeypatch, tmp_path: Path) -> None:
+    expected = {
+        "HF_HUB_OFFLINE": "1",
+        "TRANSFORMERS_OFFLINE": "1",
+        "VLLM_LOGGING_LEVEL": "INFO",
+        "RAY_DEDUP_LOGS": "0",
+        "PYTHONFAULTHANDLER": "1",
+    }
+    for name, value in expected.items():
+        monkeypatch.setenv(name, value)
+
+    command = build_verl_command(
+        config=GrpoSmokeConfig.load("grpo_v1_1p5b_h100_smoke"),
+        job_id="h100-smoke",
+        train_file=tmp_path / "train.parquet",
+        validation_file=tmp_path / "validation.parquet",
+        staging_dir=tmp_path / "staging",
+        resume_path=None,
+        python="python",
+    )
+
+    for name, value in expected.items():
+        assert f"+ray_kwargs.ray_init.runtime_env.env_vars.{name}={value}" in command
+
+
+def test_runtime_evidence_captures_pip_driver_and_diagnostic_environment(
+    monkeypatch, tmp_path: Path
+) -> None:
+    monkeypatch.setenv("HF_HUB_OFFLINE", "1")
+
+    def runner(command, **_kwargs):
+        if command[0] == "nvidia-smi":
+            return subprocess.CompletedProcess(command, 0, "H100, 570.195.03, 81559 MiB\n", "")
+        return subprocess.CompletedProcess(command, 0, "verl==0.8.0\n", "")
+
+    evidence = capture_runtime_evidence(tmp_path / "job", runner=runner)
+    content = evidence.read_text(encoding="utf-8")
+
+    assert "HF_HUB_OFFLINE=1" in content
+    assert "command=" in content
+    assert "verl==0.8.0" in content
+    assert "H100, 570.195.03, 81559 MiB" in content
 
 
 def test_dataset_rows_and_curve_artifact_are_portable(tmp_path: Path) -> None:
