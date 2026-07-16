@@ -846,8 +846,8 @@ flowing through Storage and `vf watch`.
 
 ## v0.11.1 — W1 kill recovery and W2 Blackwell retest
 
-**Status:** W1 passed; W2's eager retest also hung. The single authorized
-`TORCH_SDPA` attention-backend retest is pending. M3–M6 remain blocked.
+**Status:** W1 passed; W2 exhausted its two retests and 45-minute timebox
+without admission evidence. M3–M6 are blocked pending human direction.
 
 ### W1. `vf kill` process-group recovery
 
@@ -879,8 +879,8 @@ ignored laptop evidence is `runs/w1-kill-v0111/`.
   communication-initialization hang; record raw evidence and classification.
 - [x] If resource waiting, align single-GPU declarations. If engine init hangs,
   first enable `enforce_eager`, then try attention fallbacks one at a time.
-- [ ] Retest no more than twice within a 45-minute total W2 timebox. The eager
-  retest is attempt 1; the pending `TORCH_SDPA` retest is attempt 2.
+- [x] Retest no more than twice within a 45-minute total W2 timebox. The eager
+  retest was attempt 1; the `TORCH_SDPA` retest was attempt 2.
 
 **Acceptance:** a retest must show rollout + post-update evidence, throughput,
 append-only Storage metrics, a curve point, and W1-clean teardown.
@@ -928,3 +928,19 @@ an invented flag. Keep eager mode, model, data, TP 1, one GPU, and memory
 utilization 0.5 unchanged. This is the second and final W2 retest: another
 hang, any unrelated failure, or expiry of the 45-minute W2 budget stops work
 and returns the evidence to the human.
+
+**Repair #2 / final W2 result (STOP):** `p0-w2-sdpa-r2-v0111` confirmed both
+`enforce_eager=true` and the Ray runtime override
+`VLLM_ATTENTION_BACKEND=TORCH_SDPA` in its launch command. Ray started at
+`19:57:10 UTC`, but through the 45-minute W2 boundary the GPU remained 3 MiB
+with 0% utilization and no compute process. It never reached WorkerDict, vLLM
+server, rollout, throughput, `metrics.jsonl`, curve point, or checkpoint; no
+CUDA/OOM/Traceback was emitted. W1 cleanup completed at `20:03:58 UTC` with
+GPU memory `0 MiB`.
+
+The two permitted retests are therefore exhausted: eager mode failed after
+WorkerDict initialization, and the `TORCH_SDPA` fallback failed to progress
+beyond Ray startup before the timebox expired. No third backend, retry, data
+change, or M3–M6 launch is authorized. The final evidence remains under the
+ignored `runs/p0-w2-diag-v0111/`, `runs/p0-w2-eager-r1-v0111/`, and
+`runs/p0-w2-sdpa-r2-v0111/` directories.
