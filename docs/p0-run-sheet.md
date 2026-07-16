@@ -944,3 +944,35 @@ beyond Ray startup before the timebox expired. No third backend, retry, data
 change, or M3–M6 launch is authorized. The final evidence remains under the
 ignored `runs/p0-w2-diag-v0111/`, `runs/p0-w2-eager-r1-v0111/`, and
 `runs/p0-w2-sdpa-r2-v0111/` directories.
+
+## v0.11.2 — Py-spy Blackwell hang diagnosis
+
+**Status:** planned; documentation gate complete before execution.
+**Starting point:** `a8a7a91`; v0.11.1 exhausted two functional retests without
+a rollout, Storage metric, or actionable Python frame.
+
+- [ ] Start unchanged `grpo_v1_1p5b_blackwell_smoke` and treat an unchanged
+  `ray::WorkerDict` state for a full three minutes as the reproduction point.
+- [ ] Only after that point, install `py-spy` into the pod virtual environment;
+  it is the sole authorized new dependency for this track.
+- [ ] Capture a raw `py-spy dump` for every job-associated Python PID (launch
+  PGID plus verl/Ray session), save it under `runs/<job>/evidence/`, and embed
+  the complete unabridged text below.
+- [ ] If and only if a stack identifies a clear one-step JIT-extension or
+  import bypass, document one repair before changing it and make one retest.
+- [ ] At 20 minutes from launch, or after one hanging retest, invoke `vf kill`,
+  verify `nvidia-smi` is `0 MiB`, record the final conclusion, and stop. No
+  further retry, backend/config experiment, or M3–M6 action is allowed.
+
+**Deterministic process selection:** read `runs/<job>/pgid`, select Python
+processes in that launch session, find the matching `verl.trainer.main_ppo`
+driver, then select every Python process sharing its session ID. This includes
+the launcher, driver, Ray workers, and vLLM Python process while excluding
+unrelated pod services. The raw PID manifest and every dump will be copied
+verbatim into this section before any diagnosis conclusion.
+
+### Runtime result and raw py-spy evidence
+
+_Pending the authorized run. This placeholder will be replaced with timestamps,
+the process manifest, complete raw dumps, any single authorized repair/retest,
+and W1 teardown proof._
