@@ -5,7 +5,7 @@ from __future__ import annotations
 from datetime import datetime
 from enum import Enum
 
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
 
 class JobStatus(str, Enum):
@@ -26,6 +26,14 @@ class ReportVerdict(str, Enum):
     COLLAPSED = "collapsed"
 
 
+class ClusterStatus(str, Enum):
+    """Lifecycle of a discovered task cluster in the product UI."""
+
+    DISCOVERED = "discovered"
+    FORGING = "forging"
+    LIVE = "live"
+
+
 class Metrics(BaseModel):
     steps: list[int]
     reward_mean: list[float]
@@ -37,17 +45,67 @@ class Control(BaseModel):
     pass_at_1: list[float]
 
 
+class ArenaSample(BaseModel):
+    prompt: str
+    baseline_output: str
+    tuned_output: str
+    baseline_score: float
+    tuned_score: float
+
+
+class Arena(BaseModel):
+    win_rate: float
+    samples: list[ArenaSample]
+
+
 class Report(BaseModel):
     baseline_pass_at_1: float
     final_pass_at_1: float
     control_final_pass_at_1: float
     verdict: ReportVerdict
     narrative: str
+    projected_monthly_savings_usd: float | None = None
+    arena: Arena | None = None
 
 
 class Endpoint(BaseModel):
     base_url: str
     model_name: str
+
+
+class RoutingState(BaseModel):
+    cluster_id: str
+    enabled: bool
+    canary_percent: int = Field(ge=0, le=100)
+    target_model: str
+
+
+class LivePassRatePoint(BaseModel):
+    """One online guardian sample.
+
+    Uses ``pass_rate`` deliberately — live rolling score is not the same as
+    offline ``pass_at_1`` k-sample evaluation.
+    """
+
+    timestamp: datetime
+    pass_rate: float
+
+
+class LivePassRate(BaseModel):
+    cluster_id: str
+    points: list[LivePassRatePoint]
+
+
+class Cluster(BaseModel):
+    cluster_id: str
+    name: str
+    monthly_calls: int
+    monthly_cost_usd: float
+    trainable: bool
+    status: ClusterStatus
+    job_id: str | None = None
+    routing: RoutingState | None = None
+    live_pass_rate: LivePassRate | None = None
 
 
 class Job(BaseModel):

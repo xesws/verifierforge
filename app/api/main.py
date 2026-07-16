@@ -4,13 +4,14 @@ from __future__ import annotations
 
 import json
 import os
+from datetime import datetime, timezone
 from pathlib import Path
 
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 
 from app.api.copilot import router as copilot_router
-from core.contracts import MetricRecord, Metrics
+from core.contracts import Control, Job, JobStatus, MetricRecord, Metrics
 
 
 app = FastAPI(title="VerifierForge API")
@@ -50,23 +51,9 @@ def _status_for(job_dir: Path) -> str:
     return "queued"
 
 
-@app.get("/jobs")
-def list_jobs() -> list[dict[str, str]]:
-    """List local run IDs and their file-inferred status."""
-    root = _runs_dir()
-    if not root.is_dir():
-        return []
-    return [
-        {"job_id": path.name, "status": _status_for(path)}
-        for path in sorted(root.iterdir())
-        if path.is_dir() and not path.name.startswith(".")
-    ]
-
-
-@app.get("/jobs/{job_id}/metrics", response_model=Metrics)
-def job_metrics(job_id: str) -> Metrics:
+def _metrics_for(job_dir: Path) -> Metrics:
     """Aggregate the append-only metric log into the shared Metrics shape."""
-    metrics_path = _job_dir(job_id) / "metrics.jsonl"
+    metrics_path = job_dir / "metrics.jsonl"
     if not metrics_path.exists():
         return Metrics(steps=[], reward_mean=[], pass_at_1=[], entropy=[])
 
@@ -82,3 +69,40 @@ def job_metrics(job_id: str) -> Metrics:
         pass_at_1=[record.pass_at_1 for record in records],
         entropy=[record.entropy for record in records],
     )
+
+
+@app.get("/jobs")
+def list_jobs() -> list[dict[str, str]]:
+    """List local run IDs and their file-inferred status."""
+    root = _runs_dir()
+    if not root.is_dir():
+        return []
+    return [
+        {"job_id": path.name, "status": _status_for(path)}
+        for path in sorted(root.iterdir())
+        if path.is_dir() and not path.name.startswith(".")
+    ]
+
+
+@app.get("/jobs/{job_id}", response_model=Job)
+def get_job(job_id: str) -> Job:
+    """Return a minimal Job built from files already present under runs/."""
+    job_dir = _job_dir(job_id)
+    created = datetime.fromtimestamp(job_dir.stat().st_mtime, tz=timezone.utc)
+    return Job(
+        job_id=job_id,
+        template="unknown",
+        status=JobStatus(_status_for(job_dir)),
+        model="unknown",
+        created_at=created,
+        metrics=_metrics_for(job_dir),
+        control=Control(pass_at_1=[]),
+        report=None,
+        endpoint=None,
+    )
+
+
+@app.get("/jobs/{job_id}/metrics", response_model=Metrics)
+def job_metrics(job_id: str) -> Metrics:
+    """Aggregate the append-only metric log into the shared Metrics shape."""
+    return _metrics_for(_job_dir(job_id))
