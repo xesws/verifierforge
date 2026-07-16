@@ -714,9 +714,9 @@ the final validation/checkpoint/`Finished` lines; it did not prevent final
 artifact publication and is retained verbatim in the synced log.
 
 
-## v0.11.0 — D4 multi-GPU main training
+## v0.11.0 — D4 Blackwell main training
 
-**Status:** M0 documentation gate complete; M1 not started.
+**Status:** M0/M0′ documentation gates complete; M1′ bootstrap pending.
 
 This D4 section supersedes P0's former prohibition on trainer changes only for
 the documented main/control configuration, entropy brake, checkpoint-selection
@@ -735,30 +735,40 @@ held-out-only measurement rule remain unchanged.
 run-sheet is the recovery context.
 **Stop:** do not alter the trainer or RunPod before this commit.
 
-### M1. Replace L4 with same-volume multi-A100 worker
+### M0′. Single-Blackwell scope revision
 
-- [ ] Record current L4/volume state; stop the L4 only through an authorized
-  lifecycle control path, retaining `/workspace`.
-- [ ] Provision in the same region with the same network volume and at least
-  three A100 GPUs; update the `runpod` SSH endpoint as needed and run
-  `vf bootstrap`.
+- [x] The human selected one RTX PRO 6000 Blackwell Server Edition (96 GB)
+  rather than the earlier multi-A100 target.
+- [x] Step 0 verified the corrected SSH endpoint and the mounted network volume:
+  `nvidia-smi` reports the Blackwell card, and `/workspace` contains
+  `verifierforge`, `hf-cache`, and `pip-cache`.
+- [x] Record the required control as serial-after-main, not omitted or unsafe
+  concurrent GPU sharing; the M2′ result cannot claim multi-card NCCL proof.
 
-**Acceptance:** `nvidia-smi` identifies at least three A100s, `/workspace`
-persists, the repository can pull, and bootstrap is idempotent.
-**Stop:** missing lifecycle credential/tool, wrong region/volume, insufficient
-GPU allocation, SSH, or bootstrap failure. Do not launch M2.
+**Acceptance:** matching version/area documents define this changed hardware
+scope before bootstrap or trainer code changes.
+**Stop:** no bootstrap if the volume entries disappear; no multi-card claim on
+one GPU.
 
-### M2. 30-step multi-GPU smoke
+### M1′. Bootstrap the same-volume Blackwell worker
 
-- [ ] Implement/test the explicit 1.5B multi-GPU smoke configuration and
-  isolated GPU allocation through `vf`.
+- [ ] Run `vf bootstrap` twice on the verified mounted volume and record the
+  Blackwell runtime/venv result.
+
+**Acceptance:** `nvidia-smi` identifies the one 96 GB Blackwell card,
+`/workspace` persists, the repository can pull, and bootstrap is idempotent.
+**Stop:** missing volume, SSH, or bootstrap failure. Do not launch M2′.
+
+### M2′. 30-step single-Blackwell compatibility smoke
+
+- [ ] Implement/test the explicit 1.5B single-GPU Blackwell configuration.
 - [ ] Run 30 steps on the frozen training pool; require FSDP ranks, vLLM
   rollout/weight-update evidence, Storage metric lines, and curve points.
 - [ ] Kill the job after curve evidence is present and preserve its log.
 
-**Acceptance:** no NCCL/OOM/synchronization error; storage and laptop sync
-work; at least one post-update rollout is proven.
-**Stop:** any setup, NCCL, OOM, vLLM, throughput, bridge, checkpoint, or sync
+**Acceptance:** no CUDA capability/OOM/synchronization error; storage and
+laptop sync work; throughput and at least one post-update rollout are proven.
+**Stop:** any setup, CUDA, OOM, vLLM, throughput, bridge, checkpoint, or sync
 failure. Do not start M3/M4.
 
 ### M3. 1.5B main run
@@ -773,14 +783,15 @@ checkpoints, no secret propagation, and explicit stop artifact if braked.
 **Stop:** execution/Storage/sync failure or entropy brake; preserve artifacts,
 do not silently retry or claim success.
 
-### M4. Parallel spurious control
+### M4. Required serial spurious control
 
-- [ ] Start a detached 200-step 0.5B control on a GPU disjoint from M3, with
-  deterministic Bernoulli(0.5) reward and independent Storage namespace.
+- [ ] After M3 completes/releases the one GPU, start a detached 200-step 0.5B
+  control with deterministic Bernoulli(0.5) reward and independent Storage
+  namespace.
 
-**Acceptance:** control is concurrent with M3, visibly identifies its reward
-mode, and produces a separate curve.
-**Stop:** allocation overlap, control configuration failure, or run failure;
+**Acceptance:** control is not omitted, visibly identifies its reward mode,
+and produces a separate curve.
+**Stop:** unsafe overlap, control configuration failure, or run failure;
 preserve its evidence and do not substitute verifier reward.
 
 ### M5. Held-out after evaluation and report artifact
