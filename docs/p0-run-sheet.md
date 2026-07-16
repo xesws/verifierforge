@@ -321,11 +321,18 @@ full test validation completed with `154 passed, 1 skipped`.
 
 ### A2. Full candidate v2 re-verification
 
-- [ ] Atomically re-verify all 276 stored candidate `reference_sql` values
+- [x] Atomically re-verify all 276 stored candidate `reference_sql` values
   offline under verifier v2 and record source hash/version/full-pass count.
 
 **Acceptance:** exactly 276/276 are `1.0`.
 **Stop ③:** any record drops below `1.0`; do not start Gate A, freeze, or train.
+
+**Result:** passed. `runs/p0-gate-a/v0.8.0-a2-full-reverify.json` records
+`276/276` full passes, zero failures, verifier v2, input SHA-256
+`0ad88c264bb4488189fc0788b740bdfabf99fc5fb2be0e232f0420953c79c96a`, and
+evidence SHA-256
+`89d97f7ec03ba4319f530614469fdfdee0ae60b8b76541289f36d296585087bd`.
+Stop condition ③ is not triggered.
 
 ### A3. Branch A subset Gate A rerun
 
