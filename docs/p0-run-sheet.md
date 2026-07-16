@@ -129,12 +129,20 @@
 
 ### F3. Pod-local vLLM exam server
 
-- [ ] Pull the verified implementation to RunPod and start detached tmux session `vf-eval-vllm` using `/workspace/verifierforge/.venv/bin/vllm`.
-- [ ] Serve the local snapshot at `127.0.0.1:8000` as `Qwen2.5-1.5B-Instruct`, with offline cache flags, BF16, 0.70 GPU memory utilization, and 4096 max model length.
-- [ ] Record tmux session, port, log path, and raw `/v1/models` response.
+- [x] Pull the verified implementation to RunPod and start detached tmux session `vf-eval-vllm` using `/workspace/verifierforge/.venv/bin/vllm`.
+- [x] Serve the local snapshot at `127.0.0.1:8000` as `Qwen2.5-1.5B-Instruct`, with offline cache flags, BF16, 0.70 GPU memory utilization, and 4096 max model length.
+- [x] Record tmux session, port, log path, and raw `/v1/models` response.
 
 **Acceptance:** port 8000 was free before launch; tmux remains alive; `/v1/models` contains `Qwen2.5-1.5B-Instruct`.
 **Stop:** cache, vLLM startup, GPU, tmux, or health check fails. No Gate A.
+
+**Result:** complete on RunPod at pod checkout `70c109b`. Initial port check was empty. The service is detached in tmux session `vf-eval-vllm`, listens only on `127.0.0.1:8000`, and logs to `/workspace/verifierforge/runs/p0-eval-vllm/vllm.log`. It uses the cached snapshot, BF16, `--gpu-memory-utilization 0.70`, and `--max-model-len 4096`; `nvidia-smi` reported its worker at 16,692 MiB.
+
+Raw pod-local `curl http://127.0.0.1:8000/v1/models` response:
+
+```json
+{"object":"list","data":[{"id":"Qwen2.5-1.5B-Instruct","object":"model","created":1784186815,"owned_by":"vllm","root":"/workspace/hf-cache/models--Qwen--Qwen2.5-1.5B-Instruct/snapshots/989aa7980e4cf806f80c7fef2b1adb7bc71aa306","parent":null,"max_model_len":4096,"permission":[{"id":"modelperm-a10c416ac38a44fa9998891853ba1501","object":"model_permission","created":1784186815,"allow_create_engine":false,"allow_sampling":true,"allow_logprobs":true,"allow_search_indices":false,"allow_view":true,"allow_fine_tuning":false,"organization":"*","group":null,"is_blocking":false}]}]}
+```
 
 ### F4a. Pod subset Gate A
 
