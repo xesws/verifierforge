@@ -712,3 +712,94 @@ the fixed D4 held-out comparison remains pending. The preserved pod log also
 contains a Ray/DataLoader-worker `Killed` traceback during teardown, before
 the final validation/checkpoint/`Finished` lines; it did not prevent final
 artifact publication and is retained verbatim in the synced log.
+
+
+## v0.11.0 — D4 multi-GPU main training
+
+**Status:** M0 documentation gate complete; M1 not started.
+
+This D4 section supersedes P0's former prohibition on trainer changes only for
+the documented main/control configuration, entropy brake, checkpoint-selection
+evidence, and GPU-allocation work. The frozen data/verifier identity and
+held-out-only measurement rule remain unchanged.
+
+### M0. Documentation gate
+
+- [x] Reserve `v0.11.0` and commit version, model-trainer, infrastructure,
+  evaluation-serving, and verifier documents before code or pod mutation.
+- [x] Define the fixed 400-step main / 200-step control split, minimum
+  three-A100 allocation, 50-step checkpoint cadence, entropy-brake rule, and
+  held-out-only checkpoint-selection rule.
+
+**Acceptance:** all listed documents exist in the same commit and this
+run-sheet is the recovery context.
+**Stop:** do not alter the trainer or RunPod before this commit.
+
+### M1. Replace L4 with same-volume multi-A100 worker
+
+- [ ] Record current L4/volume state; stop the L4 only through an authorized
+  lifecycle control path, retaining `/workspace`.
+- [ ] Provision in the same region with the same network volume and at least
+  three A100 GPUs; update the `runpod` SSH endpoint as needed and run
+  `vf bootstrap`.
+
+**Acceptance:** `nvidia-smi` identifies at least three A100s, `/workspace`
+persists, the repository can pull, and bootstrap is idempotent.
+**Stop:** missing lifecycle credential/tool, wrong region/volume, insufficient
+GPU allocation, SSH, or bootstrap failure. Do not launch M2.
+
+### M2. 30-step multi-GPU smoke
+
+- [ ] Implement/test the explicit 1.5B multi-GPU smoke configuration and
+  isolated GPU allocation through `vf`.
+- [ ] Run 30 steps on the frozen training pool; require FSDP ranks, vLLM
+  rollout/weight-update evidence, Storage metric lines, and curve points.
+- [ ] Kill the job after curve evidence is present and preserve its log.
+
+**Acceptance:** no NCCL/OOM/synchronization error; storage and laptop sync
+work; at least one post-update rollout is proven.
+**Stop:** any setup, NCCL, OOM, vLLM, throughput, bridge, checkpoint, or sync
+failure. Do not start M3/M4.
+
+### M3. 1.5B main run
+
+- [ ] Start a detached 400-step `k=8` main job after M2 only; checkpoint every
+  50 steps and enable the documented entropy brake.
+- [ ] Keep all metrics/checkpoints/artifacts in Storage and keep `vf watch`
+  running to the laptop.
+
+**Acceptance:** independent job namespace, append-only metrics, 50-step
+checkpoints, no secret propagation, and explicit stop artifact if braked.
+**Stop:** execution/Storage/sync failure or entropy brake; preserve artifacts,
+do not silently retry or claim success.
+
+### M4. Parallel spurious control
+
+- [ ] Start a detached 200-step 0.5B control on a GPU disjoint from M3, with
+  deterministic Bernoulli(0.5) reward and independent Storage namespace.
+
+**Acceptance:** control is concurrent with M3, visibly identifies its reward
+mode, and produces a separate curve.
+**Stop:** allocation overlap, control configuration failure, or run failure;
+preserve its evidence and do not substitute verifier reward.
+
+### M5. Held-out after evaluation and report artifact
+
+- [ ] Evaluate each eligible main checkpoint on the frozen 60-row held-out
+  set; select max held-out pass@1 (lower checkpoint step wins ties).
+- [ ] Write a hash-bound report artifact containing fixed before and measured
+  after triplets plus the control curve reference.
+
+**Acceptance:** all gain text is held-out-only and evidence contains samples,
+tiers, identities, and hashes.
+**Stop:** any evaluation/evidence/hash failure; no gain/DoD claim.
+
+### M6. Storage/S3 decision
+
+- [ ] Check AWS readiness without printing values for 30 minutes from M1.
+- [ ] Use tested S3 only if ready without delaying M3; otherwise record
+  LocalStorage and schedule a Gate-B-scale S3 proof after the main result.
+
+**Acceptance:** selected backend and artifact paths are recorded; metrics keep
+flowing through Storage and `vf watch`.
+**Stop:** an untested S3 backend never blocks or replaces LocalStorage mid-run.
