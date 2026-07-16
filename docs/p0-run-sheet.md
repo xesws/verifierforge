@@ -146,11 +146,15 @@ Raw pod-local `curl http://127.0.0.1:8000/v1/models` response:
 
 ### F4a. Pod subset Gate A
 
-- [ ] Run the 50-row subset inside detached tmux on the pod with `VF_EVAL_BASE_URL=http://127.0.0.1:8000/v1` and `VF_EVAL_MODEL=Qwen2.5-1.5B-Instruct`; do not set `VF_LLM_*`.
-- [ ] Sync the evidence/log, validate the local input SHA-256, and record the raw `pass_at_1`, `pass_at_8`, and `mixed_fraction`.
+- [x] Run the 50-row subset inside detached tmux on the pod with `VF_EVAL_BASE_URL=http://127.0.0.1:8000/v1` and `VF_EVAL_MODEL=Qwen2.5-1.5B-Instruct`; do not set `VF_LLM_*`.
+- [x] Sync the evidence/log, validate the local input SHA-256, and record the raw `pass_at_1`, `pass_at_8`, and `mixed_fraction`.
 
 **Acceptance:** completed subset evidence has matching input/verifier hashes and passes `0.20 <= pass_at_1 <= 0.60`, `mixed_fraction >= 0.30`.
 **Stop:** exit 2/circuit/terminal failure, evidence mismatch, or threshold failure. Do not run full reference or train.
+
+**Result (stopped at gate):** the pod job `vf-gate-a-subset` completed with exit `1` (measured threshold rejection, not an execution error). Raw metrics: `pass_at_1=0.08`, `pass_at_8=0.36`, `mixed_fraction=0.36`. The completed v2 evidence records `candidate_count=50`, `sample_count=400`, `input_sha256=cfa93154cd87013b7460666925200be14f67c5112229f03c66df2978d747255c`, and verifier source SHA-256 `34764efba707d6bf44142a75624b26342686e817e9ea0dcda1603222930f2fd2`.
+
+The local and pod subset input hashes matched exactly: `cfa93154cd87013b7460666925200be14f67c5112229f03c66df2978d747255c`; the synced evidence hashes also matched exactly: `5981a9f92254cc2631603077292f2e4a2751102f607f9b5c8ff929e82dd59b21`. Pass@1 is below the fixed `0.20` lower bound, so F4b, F5, tagging, and Gate B are prohibited pending human direction. No threshold or training configuration was changed.
 
 ### F4b. Pod full Gate A reference
 
