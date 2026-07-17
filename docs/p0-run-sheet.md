@@ -1262,8 +1262,8 @@ were not launched.
 
 ### v0.12.6 — checkpoint space governance and M3 resume
 
-**Status:** S1--S4 complete; the serial M4 random-reward control is authorized
-and queued after a clean M3 completion.
+**Status:** S1--S4 and serial M4 complete; M5 held-out evaluation is authorized
+and queued.
 
 - [x] **S1 — state freeze:** tmux is absent; `d4-m3-1p5b-r1-v0125` ends at
   bridged metric step 150 (`2026-07-17T02:12:56.416371Z`) and Storage steps
@@ -1327,16 +1327,38 @@ and queued after a clean M3 completion.
   208. `global_step_200` is the only wrapper retaining model/optimizer files;
   steps 50, 100, and 150 are HF-only exports. Storage is 34 GiB and active
   staging is 1.4 MiB, with an empty CUDA/OOM/bridge-failure scan.
-- [ ] **S5 — serial continuation:** M4 will use the distinct job namespace
+- [x] **S5a — serial M4 control:** M4 used the distinct job namespace
   `d4-m4-0p5b-random-v0126` and the pre-existing
   `grpo_v1_0p5b_random_control` config: 0.5B, 200 steps, frozen 50-row
   training pool, deterministic Bernoulli(0.5) random reward, 50-step
   checkpoints, derived epoch guard, and the same five diagnostic environment
   variables. It is serial after M3, does not use held-out data, and is not a
-  gain claim. On its complete artifact/evidence result, launch M5 against only
-  the frozen 60-row held-out set and then M6 SHA/sync archive. **Stop:** any M4
-  job or Storage failure; M5 after pass@1 below `0.5833333333333334`; or any
-  artifact/sync mismatch.
+  gain claim. **Passed 2026-07-17 03:57:22 UTC:** exactly 200 append-only
+  metrics and Storage steps 50/100/150/200 were published; the final runner
+  logged `Finished d4-m4-0p5b-random-v0126` and published `curve.png` and
+  `final/model.txt`. Remote SHA-256: metrics
+  `b9acd2c38c702dc6b32b481425010f8c0afc780b52937ce62a09e6c11f76c14f`,
+  curve `3b913ef64bb42e78ef6ef046f848cc46689cbfdf97a2b9638f18d30b1935c0d6`,
+  manifest `ec3f945121d0603490168ed29c50f11a52faaf85ae98bb3060916d8d0ed0bad1`.
+  The main runner's CUDA/OOM/bridge/entropy scans were empty and GPU returned
+  to the accepted 2,134 MiB host residual. A Ray worker emitted
+  `RuntimeError: DataLoader worker (pid 73197) is killed by signal: Killed`
+  during teardown after the final publish/`Finished` lines. It is retained as a
+  nonfatal teardown observation (matching prior Gate B/E1 behavior), not
+  silently discarded or treated as a training/Storage failure.
+- [ ] **S5b — M5 held-out evaluation:** launch detached tmux session
+  `d4-m5-heldout-v0126` on the pod. It runs
+  `python -m trainer.heldout_eval --job d4-m3-1p5b-r1-v0125 --control-job
+  d4-m4-0p5b-random-v0126` against all eight M3 HF exports (50--400), one
+  loopback-only vLLM instance at a time on ports 8011--8018. Each checkpoint
+  must produce 60 × `k=8` full completion/tier sample evidence; the report
+  selects maximum held-out pass@1 with lower step as tie-break. No M4 or
+  training-pool value is a gain claim. **Acceptance:** a complete hash-bound
+  report containing before `0.5833333333333334 / 0.7666666666666667 /
+  0.4666666666666667`, all eight checkpoint evidence pairs, selected checkpoint,
+  and M4 control-curve hash. **Stop:** unavailable/incomplete evidence, any
+  evaluation/hash failure, or selected after pass@1 below `0.5833333333333334`.
+  Only then proceed to M6 SHA/sync archive.
 
 **N6 pre-implementation decision:** use a new
 `grpo_v1_1p5b_h100_smoke` target, not the historical Blackwell config. It has
