@@ -41,9 +41,19 @@ un-decomposable lock and cannot diagnose an identity dispute.
 **Status:** in progress. This section replaces all earlier unfinished serving
 instructions. It does not authorize a trainer or frozen-data change.
 
-- [ ] **S1 — three-machine runtime evidence:** archive full `pip freeze` from
-  laptop, training pod, and `vfserve`; record exact `transformers` /
+- [x] **S1 — three-machine runtime evidence:** archived full `pip freeze` from
+  laptop, training pod, and `vfserve`; recorded exact `transformers` /
   `tokenizers` versions and sanitized evidence paths.
+  **Result:** training pod is `transformers==4.57.6` /
+  `tokenizers==0.22.2`; `vfserve` is `transformers==5.14.1` /
+  `tokenizers==0.22.2`; laptop is `transformers==4.57.0` /
+  `tokenizers==0.22.1`. Full inventories live under
+  `runs/d4-m3-1p5b-r1-v0125/evidence/v0.15.2-serving-runtime/` with SHA-256
+  `7c2947717785a9d71b8261fc5639eb8d089d4b14de7740296a68d3f2b533a7dc`
+  (laptop), `f277d1174f38f50e04912123a7493af62ff578bce148a94f9ea0cad7c2a3c0ae`
+  (training pod), and
+  `94931e73d828549394959144e1843fc69085b66cef610c17a55ca0742e225f00`
+  (`vfserve`).
 - [ ] **S2 — constrained alignment:** install precisely the training-pod
   `transformers` and `tokenizers` versions on `vfserve`, without changing
   vLLM or torch.
