@@ -1381,11 +1381,32 @@ v0.12.6's M5 stop only for the explicitly approved conversion, serving proof,
 M5 rerun, and future-publication serving gate. Frozen data, verifier, original
 exports, training logic, and external API access remain untouched.
 
-- [ ] **X1 — read-only classification (10 minutes):** preserve a verbatim
-  step-50 source export file list, first ten safetensors keys, and active
-  LoRA/PEFT settings. Classify strictly as pure adapter, `base_model`-prefixed
-  full weights, or other. **Stop:** `other` stops and is reported; no heuristic
-  converter is allowed.
+- [x] **X1 — read-only classification (10 minutes):** step 50 source export
+  contains exactly `added_tokens.json`, `chat_template.jinja`, `config.json`,
+  `generation_config.json`, `merges.txt`,
+  `model-00001-of-00002.safetensors`,
+  `model-00002-of-00002.safetensors`, `model.safetensors.index.json`,
+  `special_tokens_map.json`, `tokenizer.json`, `tokenizer_config.json`, and
+  `vocab.json`; notably it has no `adapter_config.json` or `adapter_model.*`.
+  The first ten sorted keys in shard 1 are verbatim:
+  `base_model.model.model.embed_tokens.weight`,
+  `base_model.model.model.layers.0.input_layernorm.weight`,
+  `base_model.model.model.layers.0.mlp.down_proj.base_layer.weight`,
+  `base_model.model.model.layers.0.mlp.down_proj.lora_A.default.weight`,
+  `base_model.model.model.layers.0.mlp.down_proj.lora_B.default.weight`,
+  `base_model.model.model.layers.0.mlp.gate_proj.base_layer.weight`,
+  `base_model.model.model.layers.0.mlp.gate_proj.lora_A.default.weight`,
+  `base_model.model.model.layers.0.mlp.gate_proj.lora_B.default.weight`,
+  `base_model.model.model.layers.0.mlp.up_proj.base_layer.weight`, and
+  `base_model.model.model.layers.0.mlp.up_proj.lora_A.default.weight`.
+  The M3 config has `lora_rank: 16`, `lora_alpha: 32`,
+  `target_modules=all-linear`, and `save_hf_model: true`. Key inventory is 280
+  `base_layer`, 196 `lora_A`, 196 `lora_B`, and 59 non-wrapper keys.
+  **Classification:** `base_model`-prefixed full export, with PEFT wrapper
+  state (not pure adapter, not other). Codex's recorded implementation choice
+  is to reconstruct the matching rank-16/alpha-32 PEFT wrapper, load the full
+  state, merge LoRA, then save standard bf16 HF weights. Merely stripping the
+  prefix would leave `base_layer`/LoRA keys and discard trained deltas.
 - [ ] **X2 — non-destructive batch converter:** convert all eight M3 candidate
   exports to sibling serveable standard-HF directories, keeping the original
   sources byte-for-byte intact. Pure adapter means local frozen base + adapter
