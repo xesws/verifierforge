@@ -99,10 +99,18 @@ frozen-data changes.
   Tests cover an interrupted second upload (no manifest visible), 50 records,
   artifact file/directory round trips, fresh-cache recovery, and explicit
   `VF_STORAGE_BACKEND=s3` selection. Validation: `230 passed, 1 skipped`.
-- [ ] **S7b — true cloud round trip:** upload/download a checkpoint with SHA,
-  append 50 metrics, and prove interrupted data remains unpublished. A single
-  `AccessDenied`/403/scope failure becomes `OWNER-ACTION` with the exact
-  follow-up command and skips S7c.
+- [x] **S7b — true cloud round trip:** uploaded/downloaded a checkpoint with
+  SHA, appended 50 metrics, and proved interrupted data remains unpublished.
+  **Result:** one real-bucket attempt passed with checkpoint SHA-256
+  `a60b4cf7a2129129e6cf8a181b435ebf04f1be49037a1e1c76d936bf958a64e9`,
+  `metric_count=50`, `object_count=53`, and
+  `interrupted_manifest_visible=false`. Evidence is
+  `runs/d4-m3-1p5b-r1-v0125/evidence/v0.16.0-s3/real-roundtrip.json`, SHA-256
+  `060be6c5df1d3cfe30dcca70bd0f32f10eb64db3a1bdc8bbf8e1849ce66e73f0`.
+  No credential or bucket identifier was written to evidence. The reusable
+  one-shot command is `python -m scripts.s3_roundtrip --load-dotenv --job
+  <job> --metrics 50 --evidence <path>`; it writes `OWNER-ACTION` with the
+  original access error and rerun command if a future credential lacks access.
 - [ ] **S7c — GPU node-loss proof:** only after S7b, run a 0.5B 100-step job
   with S3 durable storage, kill near 60, resume to 100, retain S3 inventory /
   SHA / curve evidence, and then print `S3 实证完成,训练 pod 可停`.
