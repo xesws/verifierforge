@@ -1219,6 +1219,10 @@ were not launched.
   50-row pool, 400 steps, `k=8`, 50-step checkpoints, entropy brake, H100
   diagnostic environment, and explicit 40 epochs. Preserve the original
   `d4-m3-1p5b-v0124` metrics/checkpoints unchanged and do not resume it.
+  **Started 2026-07-17T01:39:43Z:** `vf train` detached a tmux session with
+  PGID `33936` after the pod fast-forwarded to `70fe4d2`; old evidence remained
+  at 120 metrics and Storage steps 50/100 before launch. The job starts from
+  scratch.
   **Acceptance:** 400 metrics/final artifact, released GPU, and evidence files.
   At 50 metrics report rate if outside 1.75--5.25 steps/minute; do not stop for
   that alert. **Stop:** entropy brake or any job/Storage gate failure.
