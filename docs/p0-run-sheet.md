@@ -1262,7 +1262,7 @@ were not launched.
 
 ### v0.12.6 — checkpoint space governance and M3 resume
 
-**Status:** S1 frozen; documentation gate complete before S2 deletion or code.
+**Status:** S1--S3 complete; M3 remains stopped pending the H100 cleanup gate.
 
 - [x] **S1 — state freeze:** tmux is absent; `d4-m3-1p5b-r1-v0125` ends at
   bridged metric step 150 (`2026-07-17T02:12:56.416371Z`) and Storage steps
@@ -1270,16 +1270,25 @@ were not launched.
   Current/new D4 storage is 28 GiB checkpoint + 41 GiB staging; old D4 is 28
   GiB checkpoint + 28 GiB staging; successful E1 smoke is 21 GiB checkpoint +
   21 GiB staging. **Stop:** unexpected running M3 or missing Storage step 100.
-- [ ] **S2 — safe recovery:** delete successful staging trees; delete only old
-  `d4-m3-1p5b-v0124` checkpoint/staging trees while retaining its metrics and
-  logs; preserve current failed step-150 staging as evidence. Record `df -h`
-  after deletion. **Stop:** any target path does not match the frozen state.
-- [ ] **S3 — retention/preflight:** latest native resume payload only; all HF
-  exports retained; successful staging deleted; failed staging preserved with
-  an error. Before launch reject projected peak demand above 80% free space and
-  record `ceil(steps / interval)`, native/HF bytes, projected bytes, and free
-  bytes. **Acceptance:** focused tests plus `pytest -q`. **Stop:** any test or
-  preflight failure.
+- [x] **S2 — safe recovery:** deleted the successful current staging trees for
+  steps 50/100, all successful E1 staging, and only old
+  `d4-m3-1p5b-v0124` checkpoint/staging trees. Its `metrics.jsonl` and
+  `train.log` remain (old job now 3.8 MiB); current unpublished
+  `global_step_150` remains for evidence. Post-recovery `df -h /workspace`
+  remained `364T / 229T / 135T / 63%` on the shared MFS mount; relevant current
+  trees were 28 GiB `ckpt` and 14 GiB staging. **Stop observed:** none; target
+  paths matched S1 guards.
+- [x] **S3 — retention/preflight:** `LocalStorage` now retains only the newest
+  complete native payload (model + optimizer + data) while preserving every
+  older `actor/huggingface` export. Resume discovery explicitly rejects
+  HF-only wrappers. Successful staging is deleted after atomic Storage publish;
+  a bridge failure signals the trainer child, atomically moves its completed
+  staging tree to `evidence/failed-staging/`, and records its cause. Before
+  launch, `ceil(total_steps / checkpoint_every) * hf_export_bytes + 3 *
+  full_checkpoint_bytes` must not exceed 80% of reported free bytes; the
+  accepted/rejected arithmetic is written as an artifact. Focused tests: 24
+  passed; full suite: **200 passed, 1 skipped**; shell syntax checks passed.
+  **Stop:** any test or preflight failure.
 - [ ] **S4 — resume:** after S2/S3, atomically move failed step-150 staging
   into evidence, then resume M3 from Storage step 100 with the same job ID.
   **Acceptance:** next metric/checkpoint is bridged through the new policy;

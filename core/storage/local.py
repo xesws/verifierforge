@@ -62,16 +62,51 @@ class LocalStorage(Storage):
 
     def load_latest_checkpoint(self, job_id: str) -> Path | None:
         """Return the highest numbered complete checkpoint directory."""
+        checkpoints = self.checkpoint_paths(job_id)
+        return checkpoints[-1][1] if checkpoints else None
+
+    def checkpoint_paths(self, job_id: str) -> list[tuple[int, Path]]:
+        """Return published checkpoint wrappers in ascending numeric order."""
         checkpoint_root = self.root / job_id / "ckpt"
         if not checkpoint_root.is_dir():
-            return None
+            return []
 
         checkpoints: list[tuple[int, Path]] = []
         for candidate in checkpoint_root.iterdir():
             match = _STEP_DIR.fullmatch(candidate.name)
             if candidate.is_dir() and match:
                 checkpoints.append((int(match.group(1)), candidate))
-        return max(checkpoints, default=(None, None), key=lambda item: item[0])[1]
+        return sorted(checkpoints)
+
+    def prune_native_checkpoints(self, job_id: str, *, retain_step: int) -> list[int]:
+        """Keep every HF export while retaining one complete native checkpoint.
+
+        A completed GRPO checkpoint contains a resumable native payload and an
+        optional ``actor/huggingface`` export. Older native payloads are costly
+        and only the latest one is needed to resume; each export remains for
+        held-out checkpoint selection.
+        """
+        pruned: list[int] = []
+        for step, wrapper in self.checkpoint_paths(job_id):
+            if step == retain_step:
+                continue
+            native = wrapper / f"global_step_{step}"
+            if not native.is_dir():
+                continue
+
+            hf_export = native / "actor" / "huggingface"
+            if hf_export.is_dir():
+                for child in native.iterdir():
+                    if child.name != "actor":
+                        _remove_path(child)
+                        continue
+                    for actor_child in child.iterdir():
+                        if actor_child.name != "huggingface":
+                            _remove_path(actor_child)
+            else:
+                shutil.rmtree(native)
+            pruned.append(step)
+        return pruned
 
     def append_metrics(self, job_id: str, record: dict) -> None:
         """Append exactly one JSON record without rewriting prior metrics."""
@@ -128,3 +163,11 @@ class LocalStorage(Storage):
         if relative_name.is_absolute() or ".." in relative_name.parts:
             raise ValueError("artifact name must be a relative path")
         return self._job_dir(job_id) / "artifacts" / relative_name
+
+
+def _remove_path(path: Path) -> None:
+    """Remove a file, directory, or symlink without following a symlink."""
+    if path.is_symlink() or path.is_file():
+        path.unlink()
+    elif path.is_dir():
+        shutil.rmtree(path)

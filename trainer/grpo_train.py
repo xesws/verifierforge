@@ -16,7 +16,13 @@ from pathlib import Path
 from statistics import median
 
 from core.storage.local import LocalStorage
-from trainer.checkpoint_bridge import CheckpointBridge, latest_storage_resume_path
+from trainer.checkpoint_bridge import (
+    CheckpointBudget,
+    CheckpointCapacityError,
+    CheckpointBridge,
+    CheckpointPublicationError,
+    latest_storage_resume_path,
+)
 from trainer.grpo_config import GrpoSmokeConfig
 from trainer.grpo_dataset import prepare_v1_inputs
 from trainer.metric_bridge import NormalizedMetric, VerlMetricBridge
@@ -221,6 +227,28 @@ def run(
     logger_path.unlink(missing_ok=True)
     metric_bridge = VerlMetricBridge(storage, job_id, logger_path)
     checkpoint_bridge = CheckpointBridge(storage, job_id, staging_dir)
+    if resume_path is not None:
+        quarantined = checkpoint_bridge.prepare_resume()
+        if quarantined:
+            _publish_staging_quarantine(storage, job_id, resume_path, quarantined)
+    try:
+        checkpoint_budget = checkpoint_bridge.checkpoint_budget(
+            total_steps=config.total_steps,
+            checkpoint_every=config.checkpoint_every,
+            model_path=config.model_path,
+        )
+    except CheckpointCapacityError as error:
+        _publish_checkpoint_budget_rejection(storage, job_id, error)
+        raise
+    _publish_checkpoint_budget(storage, job_id, checkpoint_budget)
+    print(
+        "Checkpoint capacity: "
+        f"count={checkpoint_budget.checkpoint_count} "
+        f"projected_peak_bytes={checkpoint_budget.projected_peak_bytes} "
+        f"free_bytes={checkpoint_budget.free_bytes} "
+        f"allowed_bytes={checkpoint_budget.allowed_bytes}",
+        flush=True,
+    )
 
     command = build_verl_command(
         config=config,
@@ -256,6 +284,7 @@ def run(
     )
     interrupted = False
     brake_decision: EntropyBrakeDecision | None = None
+    bridge_failure: CheckpointPublicationError | None = None
     entropy_brake = EntropyBrake() if config.entropy_brake else None
     termination_deadline: float | None = None
 
@@ -279,8 +308,25 @@ def run(
     }
     try:
         while process.poll() is None:
-            metrics = _drain_bridges(metric_bridge, checkpoint_bridge)
-            if entropy_brake is not None and brake_decision is None:
+            metrics: list[NormalizedMetric] = []
+            if bridge_failure is None:
+                try:
+                    metrics = _drain_bridges(metric_bridge, checkpoint_bridge)
+                except CheckpointPublicationError as error:
+                    bridge_failure = error
+                    if termination_deadline is None:
+                        termination_deadline = time.monotonic() + 20
+                    try:
+                        os.killpg(process.pid, signal.SIGTERM)
+                    except ProcessLookupError:
+                        pass
+                    _preserve_checkpoint_failure(storage, job_id, checkpoint_bridge, error)
+                    print(
+                        f"checkpoint publication failed at step={error.step:04d}; "
+                        "terminating the unbridged trainer child",
+                        flush=True,
+                    )
+            if bridge_failure is None and entropy_brake is not None and brake_decision is None:
                 for metric in metrics:
                     decision = entropy_brake.observe(step=metric.step, entropy=metric.entropy)
                     if decision is None:
@@ -310,8 +356,16 @@ def run(
     finally:
         for signum, handler in previous_handlers.items():
             signal.signal(signum, handler)
-        _drain_bridges(metric_bridge, checkpoint_bridge)
+        if bridge_failure is None:
+            try:
+                _drain_bridges(metric_bridge, checkpoint_bridge)
+            except CheckpointPublicationError as error:
+                bridge_failure = error
+                _preserve_checkpoint_failure(storage, job_id, checkpoint_bridge, error)
 
+    if bridge_failure is not None:
+        print(f"{job_id} stopped after checkpoint publication failure", flush=True)
+        return 74
     if brake_decision is not None:
         print(f"{job_id} early-stopped by entropy brake", flush=True)
         return 75
@@ -381,6 +435,116 @@ def _publish_entropy_brake(
     _write_text_atomic(run_dir / "early_stopped", "entropy brake\n")
     storage.put_artifact(job_id, "entropy-brake.json", evidence)
     return evidence
+
+
+def _publish_checkpoint_budget(storage: LocalStorage, job_id: str, budget: CheckpointBudget) -> Path:
+    """Persist the arithmetic that admitted a run before its GPU child starts."""
+    evidence = storage.root / job_id / "evidence" / "checkpoint-budget.json"
+    payload = {
+        "job_id": job_id,
+        "status": "accepted",
+        "policy": "checkpoint_count * hf_export_bytes + 3 * full_checkpoint_bytes",
+        **budget.as_dict(),
+        "generated_at": datetime.now(timezone.utc).isoformat(),
+    }
+    _write_json_atomic(evidence, payload)
+    storage.put_artifact(job_id, "checkpoint-budget.json", evidence)
+    return evidence
+
+
+def _publish_checkpoint_budget_rejection(
+    storage: LocalStorage, job_id: str, error: CheckpointCapacityError
+) -> Path:
+    """Preserve a rejected capacity calculation without starting a child."""
+    evidence = storage.root / job_id / "evidence" / "checkpoint-budget-rejected.json"
+    _write_json_atomic(
+        evidence,
+        {
+            "job_id": job_id,
+            "status": "rejected",
+            "detail": str(error),
+            "generated_at": datetime.now(timezone.utc).isoformat(),
+        },
+    )
+    storage.put_artifact(job_id, "checkpoint-budget-rejected.json", evidence)
+    return evidence
+
+
+def _publish_staging_quarantine(
+    storage: LocalStorage,
+    job_id: str,
+    resume_path: Path,
+    quarantined: list[Path],
+) -> Path:
+    """Record failed staging moved aside before a Storage-only resume."""
+    evidence = storage.root / job_id / "evidence" / "staging-quarantine.json"
+    _write_json_atomic(
+        evidence,
+        {
+            "job_id": job_id,
+            "resume_path": str(resume_path),
+            "quarantined_paths": [str(path) for path in quarantined],
+            "generated_at": datetime.now(timezone.utc).isoformat(),
+        },
+    )
+    storage.put_artifact(job_id, "staging-quarantine.json", evidence)
+    return evidence
+
+
+def _publish_checkpoint_failure(
+    storage: LocalStorage, job_id: str, error: CheckpointPublicationError
+) -> Path:
+    """Record the failed staging location before stopping an unbridged child."""
+    checkpoint = latest_storage_resume_path(storage, job_id)
+    evidence = storage.root / job_id / "evidence" / "checkpoint-publication-failure.json"
+    _write_json_atomic(
+        evidence,
+        {
+            "job_id": job_id,
+            "status": "checkpoint_publication_failed",
+            "step": error.step,
+            "native_checkpoint": str(error.native_checkpoint),
+            "detail": str(error),
+            "cause_type": type(error.cause).__name__,
+            "quarantined_staging_path": (
+                str(error.quarantined_path) if error.quarantined_path is not None else None
+            ),
+            "latest_storage_checkpoint": str(checkpoint) if checkpoint else None,
+            "generated_at": datetime.now(timezone.utc).isoformat(),
+        },
+    )
+    storage.put_artifact(job_id, "checkpoint-publication-failure.json", evidence)
+    return evidence
+
+
+def _preserve_checkpoint_failure(
+    storage: LocalStorage,
+    job_id: str,
+    checkpoint_bridge: CheckpointBridge,
+    error: CheckpointPublicationError,
+) -> None:
+    """Quarantine failed staging, then retain a concise failure report.
+
+    Both actions are best-effort because this path commonly follows a quota
+    failure.  The original bridge exception still determines the nonzero exit;
+    an evidence-write failure must not hide its cause.
+    """
+    try:
+        error.quarantined_path = checkpoint_bridge.quarantine_failed_native(error.native_checkpoint)
+    except Exception as quarantine_error:  # pragma: no cover - disk failure boundary.
+        print(
+            f"checkpoint staging quarantine failed: "
+            f"{type(quarantine_error).__name__}: {quarantine_error}",
+            flush=True,
+        )
+    try:
+        _publish_checkpoint_failure(storage, job_id, error)
+    except Exception as evidence_error:  # pragma: no cover - disk failure boundary.
+        print(
+            f"checkpoint publication evidence failed: "
+            f"{type(evidence_error).__name__}: {evidence_error}",
+            flush=True,
+        )
 
 
 def _write_json_atomic(path: Path, payload: object) -> None:

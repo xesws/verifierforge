@@ -2,25 +2,51 @@ import json
 from dataclasses import replace
 from pathlib import Path
 import subprocess
+from types import SimpleNamespace
 
 import pytest
 
 from core.storage.local import LocalStorage
-from trainer.checkpoint_bridge import CheckpointBridge, latest_storage_resume_path
+from trainer import checkpoint_bridge as checkpoint_bridge_module
+from trainer.checkpoint_bridge import (
+    CheckpointBridge,
+    CheckpointCapacityError,
+    CheckpointPublicationError,
+    latest_storage_resume_path,
+)
 from trainer.grpo_config import GrpoSmokeConfig
 from trainer.grpo_dataset import build_verl_rows
-from trainer.grpo_train import _publish_final_artifacts, build_verl_command, capture_runtime_evidence
+from trainer.grpo_train import (
+    _preserve_checkpoint_failure,
+    _publish_final_artifacts,
+    build_verl_command,
+    capture_runtime_evidence,
+)
 from trainer.metric_bridge import VerlMetricBridge
 from trainer.plot_metrics import render_curve
+
+
+def _write_native_checkpoint(root: Path, step: int, *, hf_export: bool = True) -> Path:
+    """Create the minimal pinned-verl checkpoint shape used by bridge tests."""
+    native = root / f"global_step_{step}"
+    actor = native / "actor"
+    actor.mkdir(parents=True)
+    (actor / "model_world_size_1_rank_0.pt").write_bytes(b"model-state")
+    (actor / "optim_world_size_1_rank_0.pt").write_bytes(b"optimizer-state")
+    (actor / "extra_state_world_size_1_rank_0.pt").write_bytes(b"extra-state")
+    (native / "data.pt").write_bytes(b"dataloader-state")
+    if hf_export:
+        hf = actor / "huggingface"
+        hf.mkdir()
+        (hf / "model.safetensors").write_bytes(b"hf-weights")
+        (hf / "config.json").write_text("{}", encoding="utf-8")
+    return native
 
 
 def test_checkpoint_bridge_publishes_only_completed_native_checkpoint(tmp_path: Path) -> None:
     storage = LocalStorage(tmp_path / "runs")
     staging = tmp_path / "staging"
-    native = staging / "global_step_50"
-    (native / "actor").mkdir(parents=True)
-    (native / "actor" / "state.txt").write_text("model + optimizer", encoding="utf-8")
-    (native / "data.pt").write_text("dataloader state", encoding="utf-8")
+    native = _write_native_checkpoint(staging, 50)
 
     bridge = CheckpointBridge(storage, "grpo-job", staging)
     assert bridge.publish_available() == []
@@ -31,11 +57,139 @@ def test_checkpoint_bridge_publishes_only_completed_native_checkpoint(tmp_path: 
 
     resume = latest_storage_resume_path(storage, "grpo-job")
     assert resume == tmp_path / "runs" / "grpo-job" / "ckpt" / "step_50" / "global_step_50"
-    assert (resume / "actor" / "state.txt").read_text(encoding="utf-8") == "model + optimizer"
+    assert (resume / "actor" / "optim_world_size_1_rank_0.pt").read_bytes() == b"optimizer-state"
+    assert not native.exists()
 
     # The persisted bridge state also prevents an expensive duplicate copy after
     # the sidecar itself is restarted.
     assert CheckpointBridge(storage, "grpo-job", staging).publish_available() == []
+
+
+def test_checkpoint_retention_keeps_all_hf_exports_but_only_latest_native(tmp_path: Path) -> None:
+    storage = LocalStorage(tmp_path / "runs")
+    staging = tmp_path / "staging"
+    bridge = CheckpointBridge(storage, "grpo-job", staging)
+
+    _write_native_checkpoint(staging, 50)
+    (staging / "latest_checkpointed_iteration.txt").write_text("50", encoding="utf-8")
+    assert bridge.publish_available() == [50]
+
+    _write_native_checkpoint(staging, 100)
+    (staging / "latest_checkpointed_iteration.txt").write_text("100", encoding="utf-8")
+    assert bridge.publish_available() == [100]
+
+    older = storage.root / "grpo-job" / "ckpt" / "step_50" / "global_step_50"
+    latest = storage.root / "grpo-job" / "ckpt" / "step_100" / "global_step_100"
+    assert (older / "actor" / "huggingface" / "model.safetensors").read_bytes() == b"hf-weights"
+    assert not (older / "actor" / "model_world_size_1_rank_0.pt").exists()
+    assert not (older / "actor" / "optim_world_size_1_rank_0.pt").exists()
+    assert not (older / "data.pt").exists()
+    assert latest_storage_resume_path(storage, "grpo-job") == latest
+    assert not (staging / "global_step_100").exists()
+
+
+def test_latest_resume_skips_a_higher_hf_only_export(tmp_path: Path) -> None:
+    storage = LocalStorage(tmp_path / "runs")
+    complete_wrapper = tmp_path / "complete"
+    complete = _write_native_checkpoint(complete_wrapper, 50)
+    storage.save_checkpoint("grpo-job", 50, complete_wrapper)
+
+    hf_only_wrapper = tmp_path / "hf-only"
+    hf = hf_only_wrapper / "global_step_100" / "actor" / "huggingface"
+    hf.mkdir(parents=True)
+    (hf / "model.safetensors").write_bytes(b"heldout-only")
+    storage.save_checkpoint("grpo-job", 100, hf_only_wrapper)
+
+    assert latest_storage_resume_path(storage, "grpo-job") == (
+        storage.root / "grpo-job" / "ckpt" / "step_50" / "global_step_50"
+    )
+
+
+def test_resume_quarantines_unpublished_staging_and_deletes_successful_staging(tmp_path: Path) -> None:
+    storage = LocalStorage(tmp_path / "runs")
+    staging = tmp_path / "staging"
+    bridge = CheckpointBridge(storage, "grpo-job", staging)
+    for step in (50, 100):
+        _write_native_checkpoint(staging, step)
+        (staging / "latest_checkpointed_iteration.txt").write_text(str(step), encoding="utf-8")
+        assert bridge.publish_available() == [step]
+
+    _write_native_checkpoint(staging, 100)
+    _write_native_checkpoint(staging, 150)
+    (staging / "latest_checkpointed_iteration.txt").write_text("150", encoding="utf-8")
+
+    quarantined = bridge.prepare_resume()
+
+    assert quarantined == [
+        storage.root / "grpo-job" / "evidence" / "failed-staging" / "global_step_150"
+    ]
+    assert not (staging / "global_step_100").exists()
+    assert not (staging / "global_step_150").exists()
+    assert not (staging / "latest_checkpointed_iteration.txt").exists()
+    assert latest_storage_resume_path(storage, "grpo-job").name == "global_step_100"
+
+
+def test_checkpoint_capacity_budget_accepts_and_rejects_with_explicit_arithmetic(
+    monkeypatch, tmp_path: Path
+) -> None:
+    storage = LocalStorage(tmp_path / "runs")
+    staging = tmp_path / "staging"
+    bridge = CheckpointBridge(storage, "grpo-job", staging)
+    _write_native_checkpoint(staging, 50)
+    (staging / "latest_checkpointed_iteration.txt").write_text("50", encoding="utf-8")
+    assert bridge.publish_available() == [50]
+
+    monkeypatch.setattr(
+        checkpoint_bridge_module.shutil,
+        "disk_usage",
+        lambda _path: SimpleNamespace(free=100_000),
+    )
+    budget = bridge.checkpoint_budget(total_steps=100, checkpoint_every=50, model_path="unused")
+    assert budget.checkpoint_count == 2
+    assert budget.projected_peak_bytes == 2 * budget.hf_export_bytes + 3 * budget.full_checkpoint_bytes
+    assert budget.projected_peak_bytes <= budget.allowed_bytes
+
+    monkeypatch.setattr(
+        checkpoint_bridge_module.shutil,
+        "disk_usage",
+        lambda _path: SimpleNamespace(free=1),
+    )
+    with pytest.raises(CheckpointCapacityError, match="checkpoint_count=2"):
+        bridge.checkpoint_budget(total_steps=100, checkpoint_every=50, model_path="unused")
+
+
+def test_failed_checkpoint_publication_quarantines_staging_and_writes_evidence(
+    monkeypatch, tmp_path: Path
+) -> None:
+    storage = LocalStorage(tmp_path / "runs")
+    staging = tmp_path / "staging"
+    native = _write_native_checkpoint(staging, 50)
+    (staging / "latest_checkpointed_iteration.txt").write_text("50", encoding="utf-8")
+    bridge = CheckpointBridge(storage, "grpo-job", staging)
+
+    def fail_save(*_args, **_kwargs) -> None:
+        raise OSError(122, "Disk quota exceeded")
+
+    monkeypatch.setattr(storage, "save_checkpoint", fail_save)
+    with pytest.raises(CheckpointPublicationError) as raised:
+        bridge.publish_available()
+
+    error = raised.value
+    assert error.native_checkpoint == native
+    assert native.exists()
+    _preserve_checkpoint_failure(storage, "grpo-job", bridge, error)
+
+    assert error.quarantined_path == (
+        storage.root / "grpo-job" / "evidence" / "failed-staging" / "global_step_50"
+    )
+    assert not native.exists()
+    payload = json.loads(
+        (storage.root / "grpo-job" / "evidence" / "checkpoint-publication-failure.json").read_text(
+            encoding="utf-8"
+        )
+    )
+    assert payload["cause_type"] == "OSError"
+    assert payload["quarantined_staging_path"] == str(error.quarantined_path)
 
 
 def test_metric_bridge_normalizes_validation_and_deduplicates_resume(tmp_path: Path) -> None:
