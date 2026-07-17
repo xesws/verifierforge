@@ -1300,9 +1300,14 @@ were not launched.
   checkpoint: expected throughput is about 3.5 steps/minute, with zero CUDA
   errors and zero OOMs. Any anomaly in that guard window requires immediate
   `vf kill` and a stop report; a pod restart then requires a new operator-supplied
-  SSH endpoint. **Acceptance:** step 150 publishes under the new policy, then
-  reach 400 with a final artifact and GPU clear. **Stop:** quota, bridge,
-  entropy, CUDA/OOM, or guard-window anomaly.
+  SSH endpoint. **Launched:** `2026-07-17 02:34:13` pod time via detached
+  `vf train`; the remote fast-forwarded to `f33379a`, resumed exactly from
+  `ckpt/step_100/global_step_100`, moved failed staging into evidence, and
+  accepted the capacity budget: count 8, projected peak `101173860823` bytes,
+  free `148562451234816` bytes, allowed `118849960987852` bytes.
+  **Acceptance:** step 150 publishes under the new policy, then reach 400 with
+  a final artifact and GPU clear. **Stop:** quota, bridge, entropy, CUDA/OOM,
+  or guard-window anomaly.
 - [ ] **S5 — serial continuation:** only after S4 passes, continue approved
   M4, M5, and M6 without waiting. Existing held-out and artifact gates remain
   unchanged.
