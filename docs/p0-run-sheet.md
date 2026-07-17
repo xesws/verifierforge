@@ -1376,7 +1376,7 @@ serving evidence, so M6 is blocked pending human direction.
 
 ### v0.12.7 — export/serving compatibility repair and M5 rerun
 
-**Status:** documentation gate complete; X1 is next. This version supersedes
+**Status:** X3 serving gate passed; X4 formal held-out rerun is next. This version supersedes
 v0.12.6's M5 stop only for the explicitly approved conversion, serving proof,
 M5 rerun, and future-publication serving gate. Frozen data, verifier, original
 exports, training logic, and external API access remain untouched.
@@ -1425,9 +1425,17 @@ exports, training logic, and external API access remain untouched.
   and its bf16 serving representation is 3.4 GiB. M3 checkpoint storage rose
   from 61 GiB to 88 GiB, within the mounted-volume budget. **Stop:** source
   mutation, converter/test failure, or insufficient pod space.
-- [ ] **X3 — serving gate:** serve converted step 50 locally; record
-  `/v1/models` and one real completion in evidence. **Stop:** any serve/load or
-  completion failure; do not launch M5.
+- [x] **X3 — serving gate:** converted step 50 served pod-locally as
+  `vf-x3-step50` on `127.0.0.1:8021`. `GET /v1/models` returned HTTP 200 and
+  listed that model; a real `POST /v1/completions` with prompt
+  `Return exactly: SELECT 1;` returned HTTP 200 and 16 generated tokens. The
+  complete request, models response, and completion are atomically preserved at
+  `evidence/export-compat-v0127/x3-serving-smoke.json` (SHA-256
+  `e83e20ae11eeb7ce863851aeaf3afda207581183fc63c4cb7072fda029986039`).
+  The temporary `d4-x3-serve-v0127` tmux service was terminated; after its
+  shutdown settled, `nvidia-smi` returned to the pre-existing 2,134 MiB
+  `[Not Found]` ghost allocation at 0% utilization. **Admission passed:** X4
+  may use only `actor/serveable_huggingface` paths.
 - [ ] **X4 — formal M5 rerun:** serially evaluate eight converted checkpoints ×
   frozen 60 held-out rows × `k=8`; retain all 3,840 completions/tier records.
   Publish every checkpoint triplet and select highest held-out pass@1 (lower
