@@ -226,7 +226,13 @@ def run(
     # LocalStorage and de-duplicated by the metric bridge.
     logger_path.unlink(missing_ok=True)
     metric_bridge = VerlMetricBridge(storage, job_id, logger_path)
-    checkpoint_bridge = CheckpointBridge(storage, job_id, staging_dir)
+    checkpoint_bridge = CheckpointBridge(
+        storage,
+        job_id,
+        staging_dir,
+        lora_rank=config.lora_rank,
+        lora_alpha=config.lora_alpha,
+    )
     if resume_path is not None:
         quarantined = checkpoint_bridge.prepare_resume()
         if quarantined:
@@ -443,7 +449,7 @@ def _publish_checkpoint_budget(storage: LocalStorage, job_id: str, budget: Check
     payload = {
         "job_id": job_id,
         "status": "accepted",
-        "policy": "checkpoint_count * hf_export_bytes + 3 * full_checkpoint_bytes",
+        "policy": "checkpoint_count * (raw_hf_export_bytes + serveable_hf_export_bytes) + 3 * full_checkpoint_bytes",
         **budget.as_dict(),
         "generated_at": datetime.now(timezone.utc).isoformat(),
     }

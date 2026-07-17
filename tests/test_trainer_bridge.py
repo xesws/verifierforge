@@ -43,12 +43,23 @@ def _write_native_checkpoint(root: Path, step: int, *, hf_export: bool = True) -
     return native
 
 
+def _passing_serving_gate(_native_checkpoint: Path, **kwargs: object) -> None:
+    """Keep bridge unit tests GPU-free while recording the required evidence path."""
+    evidence = Path(str(kwargs["evidence_path"]))
+    evidence.parent.mkdir(parents=True, exist_ok=True)
+    evidence.write_text('{"status":"completed"}\n', encoding="utf-8")
+
+
+def _bridge(storage: LocalStorage, job_id: str, staging: Path) -> CheckpointBridge:
+    return CheckpointBridge(storage, job_id, staging, serving_gate=_passing_serving_gate)
+
+
 def test_checkpoint_bridge_publishes_only_completed_native_checkpoint(tmp_path: Path) -> None:
     storage = LocalStorage(tmp_path / "runs")
     staging = tmp_path / "staging"
     native = _write_native_checkpoint(staging, 50)
 
-    bridge = CheckpointBridge(storage, "grpo-job", staging)
+    bridge = _bridge(storage, "grpo-job", staging)
     assert bridge.publish_available() == []
 
     (staging / "latest_checkpointed_iteration.txt").write_text("50", encoding="utf-8")
@@ -62,13 +73,68 @@ def test_checkpoint_bridge_publishes_only_completed_native_checkpoint(tmp_path: 
 
     # The persisted bridge state also prevents an expensive duplicate copy after
     # the sidecar itself is restarted.
-    assert CheckpointBridge(storage, "grpo-job", staging).publish_available() == []
+    assert _bridge(storage, "grpo-job", staging).publish_available() == []
+
+
+def test_checkpoint_bridge_runs_serving_gate_before_storage_publish(monkeypatch, tmp_path: Path) -> None:
+    storage = LocalStorage(tmp_path / "runs")
+    staging = tmp_path / "staging"
+    native = _write_native_checkpoint(staging, 50)
+    (staging / "latest_checkpointed_iteration.txt").write_text("50", encoding="utf-8")
+    calls: list[str] = []
+
+    def passing_gate(path: Path, *, lora_rank: int, lora_alpha: int, evidence_path: Path) -> None:
+        assert path == native
+        assert (lora_rank, lora_alpha) == (4, 8)
+        assert storage.checkpoint_paths("grpo-job") == []
+        calls.append("gate")
+        evidence_path.parent.mkdir(parents=True, exist_ok=True)
+        evidence_path.write_text('{"status":"completed"}\n', encoding="utf-8")
+
+    original_save = storage.save_checkpoint
+
+    def observed_save(*args: object) -> None:
+        calls.append("storage")
+        original_save(*args)  # type: ignore[arg-type]
+
+    monkeypatch.setattr(storage, "save_checkpoint", observed_save)
+    bridge = CheckpointBridge(
+        storage,
+        "grpo-job",
+        staging,
+        lora_rank=4,
+        lora_alpha=8,
+        serving_gate=passing_gate,
+    )
+
+    assert bridge.publish_available() == [50]
+    assert calls == ["gate", "storage"]
+    assert (
+        storage.root / "grpo-job" / "evidence" / "serveability" / "step_50.json"
+    ).is_file()
+
+
+def test_checkpoint_bridge_refuses_publication_when_serving_gate_fails(tmp_path: Path) -> None:
+    storage = LocalStorage(tmp_path / "runs")
+    staging = tmp_path / "staging"
+    native = _write_native_checkpoint(staging, 50)
+    (staging / "latest_checkpointed_iteration.txt").write_text("50", encoding="utf-8")
+
+    def failing_gate(*_args: object, **_kwargs: object) -> None:
+        raise RuntimeError("vLLM completion failed")
+
+    bridge = CheckpointBridge(storage, "grpo-job", staging, serving_gate=failing_gate)
+    with pytest.raises(CheckpointPublicationError, match="vLLM completion failed"):
+        bridge.publish_available()
+
+    assert storage.checkpoint_paths("grpo-job") == []
+    assert native.is_dir()
 
 
 def test_checkpoint_retention_keeps_all_hf_exports_but_only_latest_native(tmp_path: Path) -> None:
     storage = LocalStorage(tmp_path / "runs")
     staging = tmp_path / "staging"
-    bridge = CheckpointBridge(storage, "grpo-job", staging)
+    bridge = _bridge(storage, "grpo-job", staging)
 
     _write_native_checkpoint(staging, 50)
     (staging / "latest_checkpointed_iteration.txt").write_text("50", encoding="utf-8")
@@ -108,7 +174,7 @@ def test_latest_resume_skips_a_higher_hf_only_export(tmp_path: Path) -> None:
 def test_resume_quarantines_unpublished_staging_and_deletes_successful_staging(tmp_path: Path) -> None:
     storage = LocalStorage(tmp_path / "runs")
     staging = tmp_path / "staging"
-    bridge = CheckpointBridge(storage, "grpo-job", staging)
+    bridge = _bridge(storage, "grpo-job", staging)
     for step in (50, 100):
         _write_native_checkpoint(staging, step)
         (staging / "latest_checkpointed_iteration.txt").write_text(str(step), encoding="utf-8")
@@ -134,7 +200,7 @@ def test_checkpoint_capacity_budget_accepts_and_rejects_with_explicit_arithmetic
 ) -> None:
     storage = LocalStorage(tmp_path / "runs")
     staging = tmp_path / "staging"
-    bridge = CheckpointBridge(storage, "grpo-job", staging)
+    bridge = _bridge(storage, "grpo-job", staging)
     _write_native_checkpoint(staging, 50)
     (staging / "latest_checkpointed_iteration.txt").write_text("50", encoding="utf-8")
     assert bridge.publish_available() == [50]
@@ -146,7 +212,7 @@ def test_checkpoint_capacity_budget_accepts_and_rejects_with_explicit_arithmetic
     )
     budget = bridge.checkpoint_budget(total_steps=100, checkpoint_every=50, model_path="unused")
     assert budget.checkpoint_count == 2
-    assert budget.projected_peak_bytes == 2 * budget.hf_export_bytes + 3 * budget.full_checkpoint_bytes
+    assert budget.projected_peak_bytes == 4 * budget.hf_export_bytes + 3 * budget.full_checkpoint_bytes
     assert budget.projected_peak_bytes <= budget.allowed_bytes
 
     monkeypatch.setattr(
@@ -165,7 +231,7 @@ def test_failed_checkpoint_publication_quarantines_staging_and_writes_evidence(
     staging = tmp_path / "staging"
     native = _write_native_checkpoint(staging, 50)
     (staging / "latest_checkpointed_iteration.txt").write_text("50", encoding="utf-8")
-    bridge = CheckpointBridge(storage, "grpo-job", staging)
+    bridge = _bridge(storage, "grpo-job", staging)
 
     def fail_save(*_args, **_kwargs) -> None:
         raise OSError(122, "Disk quota exceeded")

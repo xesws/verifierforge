@@ -1451,21 +1451,24 @@ exports, training logic, and external API access remain untouched.
   **Before:** `0.5833333333 / 0.7666666667 / 0.4666666667`; **after:**
   `0.7833333333 / 0.9 / 0.4333333333`. The after pass@1 clears the sole human
   stop threshold, so X5 proceeds automatically.
-- [ ] **X5 — M6 archive and permanent publication gate:** create an atomic
-  archive manifest that identifies both the selected step-350 serving export
-  and the final step-400 resumable checkpoint, M3/M4 curve PNGs, every M3/M4
-  evidence-file SHA-256, and runtime pip-freeze/driver evidence. Sync that
-  manifest and its referenced small artifacts through `vf watch` and compare
-  remote/local SHA-256 values. Before a future bridge stores any checkpoint,
-  it must convert the staged PEFT export to a standard bf16 sibling, bind vLLM
-  only to loopback on a free port, obtain `/v1/models` plus one real completion,
-  atomically retain the exchange, then call Storage. Failure leaves the staged
-  checkpoint unpublished for the existing quarantine path. Pass LoRA rank and
-  alpha from `GrpoSmokeConfig`; use a small smoke memory cap so it can coexist
-  with the rollout engine. The existing capacity preflight must count both the
-  raw and standard-HF export retained for each checkpoint. Focused unit tests inject the gateway and prove both
-  success ordering and no-publication-on-failure. **Stop:** any archive/hash or
-  publication-smoke failure; no after claim from incomplete data.
+- [x] **X5a — permanent publication gate:** `CheckpointBridge` now runs the
+  strict `trainer.serving_smoke` gateway before `LocalStorage.save_checkpoint`.
+  It atomically converts a staged PEFT export to standard bf16, starts
+  loopback-only vLLM on a free port with a small (`0.10`) memory cap, requires
+  `/v1/models` and one real completion, preserves command/log/response evidence,
+  then permits Storage publication. Conversion or serving failure raises the
+  existing publication error and leaves the checkpoint unpublished for the
+  quarantine path. LoRA rank/alpha come from `GrpoSmokeConfig`; capacity
+  preflight now reserves raw plus standard-HF export bytes per checkpoint.
+  Focused tests prove success ordering, failure refusal, endpoint evidence, and
+  conversion-failure evidence; full pytest is **212 passed, 1 skipped**.
+- [ ] **X5b — M6 archive:** run `python -m trainer.m6_archive` against the
+  completed M3/M4 pair. It must atomically identify the selected step-350
+  serving export and final step-400 resumable checkpoint, both curve PNGs,
+  every M3/M4 evidence SHA-256, and runtime pip-freeze/driver evidence; publish
+  the manifest as a Storage artifact. Sync the manifest and its referenced
+  small artifacts through `vf watch` and compare remote/local SHA-256 values.
+  **Stop:** any archive/hash failure; no after claim from incomplete data.
 
 **N6 pre-implementation decision:** use a new
 `grpo_v1_1p5b_h100_smoke` target, not the historical Blackwell config. It has

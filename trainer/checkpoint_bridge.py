@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from collections.abc import Callable
 import json
 import os
 import re
@@ -11,9 +12,11 @@ from dataclasses import asdict, dataclass
 from pathlib import Path
 
 from core.storage.local import LocalStorage
+from trainer.serving_smoke import validate_checkpoint_for_serving
 
 
 _NATIVE_DIRECTORY = re.compile(r"global_step_(\d+)")
+ServingGate = Callable[..., object]
 
 
 class CheckpointPublicationError(RuntimeError):
@@ -74,10 +77,24 @@ class CheckpointBridge:
     directories are never copied.
     """
 
-    def __init__(self, storage: LocalStorage, job_id: str, staging_dir: Path) -> None:
+    def __init__(
+        self,
+        storage: LocalStorage,
+        job_id: str,
+        staging_dir: Path,
+        *,
+        lora_rank: int = 16,
+        lora_alpha: int = 32,
+        serving_gate: ServingGate = validate_checkpoint_for_serving,
+    ) -> None:
+        if lora_rank < 1 or lora_alpha < 1:
+            raise ValueError("lora_rank and lora_alpha must be positive")
         self.storage = storage
         self.job_id = job_id
         self.staging_dir = Path(staging_dir)
+        self.lora_rank = lora_rank
+        self.lora_alpha = lora_alpha
+        self._serving_gate = serving_gate
         self._state_path = storage.root / job_id / ".checkpoint-bridge.json"
         self._published_steps = self._load_published_steps()
 
@@ -176,7 +193,7 @@ class CheckpointBridge:
             source = f"model-cache:{model_path}"
 
         checkpoint_count = (total_steps + checkpoint_every - 1) // checkpoint_every
-        projected_peak_bytes = checkpoint_count * hf_export_bytes + 3 * full_checkpoint_bytes
+        projected_peak_bytes = checkpoint_count * (2 * hf_export_bytes) + 3 * full_checkpoint_bytes
         free_bytes = shutil.disk_usage(self.storage.root).free
         allowed_bytes = free_bytes * 80 // 100
         budget = CheckpointBudget(
@@ -209,8 +226,15 @@ class CheckpointBridge:
         return step if step >= 0 else None
 
     def _publish(self, step: int, native_checkpoint: Path) -> None:
-        """Wrap a native checkpoint so Storage retains its global-step name."""
+        """Serve-smoke a native checkpoint, then atomically publish its wrapper."""
         self.staging_dir.mkdir(parents=True, exist_ok=True)
+        evidence = self.storage.root / self.job_id / "evidence" / "serveability" / f"step_{step}.json"
+        self._serving_gate(
+            native_checkpoint,
+            lora_rank=self.lora_rank,
+            lora_alpha=self.lora_alpha,
+            evidence_path=evidence,
+        )
         with tempfile.TemporaryDirectory(prefix=".vf-publish-", dir=self.staging_dir) as temporary:
             wrapper = Path(temporary)
             # ``LocalStorage.save_checkpoint`` copies a directory's contents.
