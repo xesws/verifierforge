@@ -1462,7 +1462,8 @@ exports, training logic, and external API access remain untouched.
   atomically retain the exchange, then call Storage. Failure leaves the staged
   checkpoint unpublished for the existing quarantine path. Pass LoRA rank and
   alpha from `GrpoSmokeConfig`; use a small smoke memory cap so it can coexist
-  with the rollout engine. Focused unit tests inject the gateway and prove both
+  with the rollout engine. The existing capacity preflight must count both the
+  raw and standard-HF export retained for each checkpoint. Focused unit tests inject the gateway and prove both
   success ordering and no-publication-on-failure. **Stop:** any archive/hash or
   publication-smoke failure; no after claim from incomplete data.
 
