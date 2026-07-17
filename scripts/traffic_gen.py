@@ -13,15 +13,18 @@ from typing import Any
 from urllib.error import HTTPError, URLError
 from urllib.request import Request, urlopen
 
+from app.proxy.clusters import SYSTEM_PROMPTS_BY_CLUSTER
+
 
 REPOSITORY_ROOT = Path(__file__).resolve().parents[1]
 FROZEN_TRAINING_POOL = REPOSITORY_ROOT / "data" / "nl2sql" / "v0.10.0-training-pool.jsonl"
 FAMILIES = ("support-ticket", "invoice", "data-pull-sql")
-SYSTEM_PROMPTS = {
-    "support-ticket": "Extract issue, account, order identifier, urgency, and requested action as JSON.",
-    "invoice": "Extract invoice number, vendor, due date, currency, and total as JSON.",
-    "data-pull-sql": "Return exactly one read-only SQL SELECT or WITH statement. Do not include an explanation.",
+FAMILY_CLUSTER_IDS = {
+    "support-ticket": "support-ticket-extraction",
+    "invoice": "invoice-field-extraction",
+    "data-pull-sql": "data-pull-sql",
 }
+SYSTEM_PROMPTS = {family: SYSTEM_PROMPTS_BY_CLUSTER[cluster_id] for family, cluster_id in FAMILY_CLUSTER_IDS.items()}
 SUPPORT_EMAILS = (
     "Order SO-1001 arrived with a cracked screen. Please replace it before Friday.",
     "I was charged twice for invoice INV-2002; refund the duplicate card charge.",

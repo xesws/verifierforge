@@ -6,12 +6,24 @@ import json
 import os
 from datetime import datetime, timezone
 from pathlib import Path
+import sqlite3
 
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 
 from app.api.copilot import router as copilot_router
-from core.contracts import Control, Job, JobStatus, MetricRecord, Metrics
+from app.proxy.routing import LivePassRateRecord, RouteRecord, get_route, list_live_pass_rate, put_route
+from app.proxy.traffic import DEFAULT_DB_PATH
+from core.contracts import (
+    Control,
+    Job,
+    JobStatus,
+    LivePassRate,
+    LivePassRatePoint,
+    MetricRecord,
+    Metrics,
+    RoutingState,
+)
 
 
 app = FastAPI(title="VerifierForge API")
@@ -27,6 +39,11 @@ app.include_router(copilot_router)
 
 def _runs_dir() -> Path:
     return Path(os.environ.get("VF_RUNS_DIR", "./runs")).expanduser()
+
+
+def _proxy_db_path() -> Path:
+    """Use the same local SQLite file as the independently runnable proxy."""
+    return Path(os.environ.get("VF_PROXY_DB_PATH", str(DEFAULT_DB_PATH))).expanduser()
 
 
 def _job_dir(job_id: str) -> Path:
@@ -106,3 +123,55 @@ def get_job(job_id: str) -> Job:
 def job_metrics(job_id: str) -> Metrics:
     """Aggregate the append-only metric log into the shared Metrics shape."""
     return _metrics_for(_job_dir(job_id))
+
+
+@app.get("/clusters/{cluster_id}/routing", response_model=RoutingState)
+def get_cluster_routing(cluster_id: str) -> RoutingState:
+    """Read the frontend routing switch in the existing contract shape."""
+    try:
+        return _routing_state(get_route(cluster_id, db_path=_proxy_db_path()))
+    except (OSError, sqlite3.Error, ValueError) as error:
+        raise HTTPException(status_code=503, detail="Routing state is unavailable") from error
+
+
+@app.put("/clusters/{cluster_id}/routing", response_model=RoutingState)
+def put_cluster_routing(cluster_id: str, state: RoutingState) -> RoutingState:
+    """Persist the frontend routing switch without adding a new public contract."""
+    if state.cluster_id != cluster_id:
+        raise HTTPException(status_code=422, detail="routing cluster_id must match the path")
+    try:
+        route = put_route(
+            RouteRecord(
+                cluster_id=state.cluster_id,
+                enabled=state.enabled,
+                canary_percent=state.canary_percent,
+                target_upstream=state.target_model,
+            ),
+            db_path=_proxy_db_path(),
+        )
+    except (OSError, sqlite3.Error, ValueError) as error:
+        raise HTTPException(status_code=503, detail="Routing state is unavailable") from error
+    return _routing_state(route)
+
+
+@app.get("/clusters/{cluster_id}/live-pass-rate", response_model=LivePassRate)
+def get_live_pass_rate(cluster_id: str) -> LivePassRate:
+    """Serve guardian rolling exact-pass points in the shared contract shape."""
+    try:
+        points = list_live_pass_rate(cluster_id, db_path=_proxy_db_path())
+    except (OSError, sqlite3.Error, ValueError) as error:
+        raise HTTPException(status_code=503, detail="Live pass rate is unavailable") from error
+    return LivePassRate(cluster_id=cluster_id, points=[_live_point(point) for point in points])
+
+
+def _routing_state(route: RouteRecord) -> RoutingState:
+    return RoutingState(
+        cluster_id=route.cluster_id,
+        enabled=route.enabled,
+        canary_percent=route.canary_percent,
+        target_model=route.target_upstream,
+    )
+
+
+def _live_point(point: LivePassRateRecord) -> LivePassRatePoint:
+    return LivePassRatePoint(timestamp=point.timestamp, pass_rate=point.pass_rate)

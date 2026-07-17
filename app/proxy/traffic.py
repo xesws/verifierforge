@@ -24,6 +24,7 @@ class TrafficRecord:
     output_tokens: int
     latency_ms: float
     estimated_cost_usd: float
+    route_path: str = "default"
 
 
 def estimate_tokens(text: str) -> int:
@@ -69,26 +70,13 @@ def record_traffic(record: TrafficRecord, *, db_path: Path) -> bool:
         db_path = Path(db_path)
         db_path.parent.mkdir(parents=True, exist_ok=True)
         with sqlite3.connect(db_path) as connection:
-            connection.execute(
-                """
-                CREATE TABLE IF NOT EXISTS traffic (
-                    id INTEGER PRIMARY KEY,
-                    timestamp TEXT NOT NULL,
-                    system_prompt_hash TEXT NOT NULL,
-                    model TEXT NOT NULL,
-                    input_tokens INTEGER NOT NULL,
-                    output_tokens INTEGER NOT NULL,
-                    latency_ms REAL NOT NULL,
-                    estimated_cost_usd REAL NOT NULL
-                )
-                """
-            )
+            _ensure_traffic_schema(connection)
             connection.execute(
                 """
                 INSERT INTO traffic (
                     timestamp, system_prompt_hash, model, input_tokens,
-                    output_tokens, latency_ms, estimated_cost_usd
-                ) VALUES (?, ?, ?, ?, ?, ?, ?)
+                    output_tokens, latency_ms, estimated_cost_usd, route_path
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)
                 """,
                 (
                     record.timestamp,
@@ -98,6 +86,7 @@ def record_traffic(record: TrafficRecord, *, db_path: Path) -> bool:
                     record.output_tokens,
                     record.latency_ms,
                     record.estimated_cost_usd,
+                    record.route_path,
                 ),
             )
         return True
@@ -110,3 +99,24 @@ def _rate(rates: dict[object, object], name: str) -> float:
     if not isinstance(value, (int, float)) or isinstance(value, bool) or value < 0:
         raise ValueError(f"proxy price table has invalid {name}")
     return float(value)
+
+
+def _ensure_traffic_schema(connection: sqlite3.Connection) -> None:
+    connection.execute(
+        """
+        CREATE TABLE IF NOT EXISTS traffic (
+            id INTEGER PRIMARY KEY,
+            timestamp TEXT NOT NULL,
+            system_prompt_hash TEXT NOT NULL,
+            model TEXT NOT NULL,
+            input_tokens INTEGER NOT NULL,
+            output_tokens INTEGER NOT NULL,
+            latency_ms REAL NOT NULL,
+            estimated_cost_usd REAL NOT NULL,
+            route_path TEXT NOT NULL DEFAULT 'default'
+        )
+        """
+    )
+    columns = {row[1] for row in connection.execute("PRAGMA table_info(traffic)")}
+    if "route_path" not in columns:
+        connection.execute("ALTER TABLE traffic ADD COLUMN route_path TEXT NOT NULL DEFAULT 'default'")

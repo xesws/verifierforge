@@ -5,10 +5,12 @@ from __future__ import annotations
 from dataclasses import dataclass
 import hashlib
 import json
+from pathlib import Path
 from typing import Any, Mapping
 from urllib.error import HTTPError, URLError
 from urllib.request import Request, urlopen
 
+from app.proxy.frozen_nl2sql import FROZEN_TRAINING_POOL, case_for_prompt
 from app.proxy.traffic import estimate_tokens
 
 
@@ -25,18 +27,38 @@ class ForwardedResponse:
 def fake_chat_completion(request: Mapping[str, Any]) -> ForwardedResponse:
     """Return a deterministic, OpenAI-shaped completion without any network call."""
     identity = hashlib.sha256(_canonical_json(request).encode("utf-8")).hexdigest()
+    content = f"vf-fake-completion-{identity[:16]}"
+    return _fake_response(request, identity=identity, content=content, kind="fake")
+
+
+def fake_tuned_chat_completion(
+    request: Mapping[str, Any], *, pool_path: Path = FROZEN_TRAINING_POOL
+) -> ForwardedResponse:
+    """Return a deterministic, visibly fake tuned result for known frozen SQL prompts."""
+    identity = hashlib.sha256(f"fake-tuned:{_canonical_json(request)}".encode("utf-8")).hexdigest()
+    case = _case_for_request(request, pool_path)
+    if case is None:
+        content = f"SELECT 'vf-fake-tuned-{identity[:16]}' AS route_marker"
+    else:
+        content = f"-- vf-fake-tuned\n{case.reference_sql}"
+    return _fake_response(request, identity=identity, content=content, kind="fake-tuned")
+
+
+def _fake_response(
+    request: Mapping[str, Any], *, identity: str, content: str, kind: str
+) -> ForwardedResponse:
     model = request.get("model") if isinstance(request.get("model"), str) else "vf-fake"
     prompt_text = "\n".join(_message_text(message) for message in _messages(request))
-    content = f"vf-fake-completion-{identity[:16]}"
     input_tokens = estimate_tokens(prompt_text)
     output_tokens = estimate_tokens(content)
     return ForwardedResponse(
         status_code=200,
         payload={
-            "id": f"chatcmpl-vf-{identity[:20]}",
+            "id": f"chatcmpl-vf-{kind}-{identity[:20]}",
             "object": "chat.completion",
             "created": int(identity[:8], 16),
             "model": model,
+            "system_fingerprint": f"vf-{kind}",
             "choices": [
                 {
                     "index": 0,
@@ -51,6 +73,16 @@ def fake_chat_completion(request: Mapping[str, Any]) -> ForwardedResponse:
             },
         },
     )
+
+
+def _case_for_request(request: Mapping[str, Any], pool_path: Path):
+    users = [message for message in _messages(request) if message.get("role") == "user"]
+    if not users:
+        return None
+    try:
+        return case_for_prompt(_message_text(users[-1]), pool_path=pool_path)
+    except (OSError, json.JSONDecodeError):
+        return None
 
 
 def forward_real(

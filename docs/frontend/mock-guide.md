@@ -23,6 +23,9 @@ Listens on `http://0.0.0.0:8001`. Interactive OpenAPI UI is at
 | `POST` | `/jobs` | Fake-create a queued job in memory (no `runs/` write). |
 | `GET` | `/clusters` | Three task clusters for the product home. |
 | `GET` | `/clusters/{id}` | One cluster; live cluster embeds routing + guardian curve. |
+| `GET` | `/clusters/{id}/routing` | Read the routing switch in `RoutingState` shape. |
+| `PUT` | `/clusters/{id}/routing` | Update `enabled`, `canary_percent`, and `target_model`. |
+| `GET` | `/clusters/{id}/live-pass-rate` | Read guardian points in `LivePassRate` shape. |
 
 ## Job fields (one-liners)
 

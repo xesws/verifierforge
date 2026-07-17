@@ -259,6 +259,18 @@ CLUSTERS: list[Cluster] = [
 ]
 
 
+_ROUTING_STATES: dict[str, RoutingState] = {
+    cluster.cluster_id: cluster.routing
+    or RoutingState(
+        cluster_id=cluster.cluster_id,
+        enabled=False,
+        canary_percent=0,
+        target_model="tuned",
+    )
+    for cluster in CLUSTERS
+}
+
+
 @app.get("/jobs", response_model=list[Job])
 def list_jobs() -> list[Job]:
     return JOBS
@@ -307,6 +319,32 @@ def get_cluster(cluster_id: str) -> Cluster:
         if cluster.cluster_id == cluster_id:
             return cluster
     raise HTTPException(status_code=404, detail="Cluster not found")
+
+
+@app.get("/clusters/{cluster_id}/routing", response_model=RoutingState)
+def get_cluster_routing(cluster_id: str) -> RoutingState:
+    _require_cluster(cluster_id)
+    return _ROUTING_STATES[cluster_id]
+
+
+@app.put("/clusters/{cluster_id}/routing", response_model=RoutingState)
+def put_cluster_routing(cluster_id: str, state: RoutingState) -> RoutingState:
+    _require_cluster(cluster_id)
+    if state.cluster_id != cluster_id:
+        raise HTTPException(status_code=422, detail="routing cluster_id must match the path")
+    _ROUTING_STATES[cluster_id] = state
+    return state
+
+
+@app.get("/clusters/{cluster_id}/live-pass-rate", response_model=LivePassRate)
+def get_live_pass_rate(cluster_id: str) -> LivePassRate:
+    _require_cluster(cluster_id)
+    return _live_pass_rate(cluster_id)
+
+
+def _require_cluster(cluster_id: str) -> None:
+    if cluster_id not in _ROUTING_STATES:
+        raise HTTPException(status_code=404, detail="Cluster not found")
 
 
 if __name__ == "__main__":
