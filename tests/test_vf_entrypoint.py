@@ -40,6 +40,12 @@ def test_vf_kill_owns_recorded_job_process_groups_and_gpu_cleanup() -> None:
     assert "vf kill failed: GPU still has" in script
 
 
+def test_vf_watch_excludes_pod_only_failed_staging_weights() -> None:
+    script = (REPOSITORY_ROOT / "scripts" / "vf").read_text(encoding="utf-8")
+
+    assert "--exclude='evidence/failed-staging/'" in script
+
+
 def test_vf_bootstrap_waits_for_a_durable_runtime_install_status() -> None:
     script = (REPOSITORY_ROOT / "scripts" / "vf").read_text(encoding="utf-8")
 

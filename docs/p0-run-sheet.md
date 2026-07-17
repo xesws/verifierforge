@@ -1468,6 +1468,8 @@ exports, training logic, and external API access remain untouched.
   every M3/M4 evidence SHA-256, and runtime pip-freeze/driver evidence; publish
   the manifest as a Storage artifact. Sync the manifest and its referenced
   small artifacts through `vf watch` and compare remote/local SHA-256 values.
+  `vf watch` must exclude `evidence/failed-staging/`: it is preserved pod-side
+  failure evidence containing native weights, not laptop metadata.
   **Stop:** any archive/hash failure; no after claim from incomplete data.
 
 **N6 pre-implementation decision:** use a new
