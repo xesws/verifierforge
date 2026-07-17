@@ -3,7 +3,7 @@ from pathlib import Path
 
 import pytest
 
-from scripts.s3_job_env import _job_shell_command, _validate_payload, local_payload
+from scripts.s3_job_env import _job_shell_command, _recovery_shell_command, _validate_payload, local_payload
 
 
 def _payload() -> dict[str, str]:
@@ -46,3 +46,23 @@ def test_tmux_shell_command_records_lifecycle_without_embedding_secret_values(tm
     assert '"storage_credentials":"cleared"' in command
     assert "unset AWS_ACCESS_KEY_ID AWS_SECRET_ACCESS_KEY" in command
     assert "setsid bash -c" in command
+
+
+def test_recovery_tmux_command_is_credential_free_and_clears_environment(tmp_path):
+    command = _recovery_shell_command(
+        root=tmp_path,
+        python="/venv/bin/python",
+        job="s3-proof",
+        step=50,
+        native=tmp_path / "cache" / "global_step_50",
+        lifecycle_path=tmp_path / "runs" / "s3-proof" / "evidence" / "recovery.json",
+        log_path=tmp_path / "runs" / "s3-proof" / "evidence" / "recovery.log",
+        prior_log=tmp_path / "runs" / "s3-proof" / "train.log",
+    )
+
+    assert "secret-value" not in command
+    assert "scripts.s3_native_recovery" in command
+    assert "--prior-log" in command
+    assert '"storage_credentials":"injected"' in command
+    assert '"storage_credentials":"cleared"' in command
+    assert "unset AWS_ACCESS_KEY_ID AWS_SECRET_ACCESS_KEY" in command

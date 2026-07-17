@@ -157,6 +157,12 @@ contracts.
   `docs/submission/devpost-draft.md`, exact three-minute
   `docs/submission/video-script.md`, and GPU-free `JUDGES.md`. All claims
   trace to committed artifacts and retain the public-endpoint limitation.
+- [ ] **S7c recovery (v0.16.1):** first H100 attempt reached step 50 with 49
+  S3 metric records, then stopped before a manifest because its strict serving
+  gate reported `no safetensors files in .../actor/huggingface`. This is not an
+  S3/IAM failure. Per the no-`trainer/` rule, add and test an external native
+  checkpoint wrapper publisher, publish the preserved complete step-50 native
+  payload through S3, then resume/kill/resume unchanged `vf train`.
 
 ## Fixed boundaries
 

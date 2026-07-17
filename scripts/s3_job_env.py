@@ -71,6 +71,52 @@ def launch_from_stdin(*, root: Path, python: str, job: str, config: str) -> None
     raise RuntimeError("S3-backed tmux job did not publish a PGID marker")
 
 
+def launch_recovery_from_stdin(
+    *,
+    root: Path,
+    python: str,
+    job: str,
+    step: int,
+    native: Path,
+    prior_log: Path | None = None,
+) -> None:
+    """Run one credential-scoped native-checkpoint recovery in detached tmux."""
+    _validate_job_and_config(job, "recovery")
+    if step < 1:
+        raise ValueError("recovery step must be positive")
+    try:
+        raw = json.load(sys.stdin)
+    except json.JSONDecodeError as error:
+        raise ValueError("S3 credential payload is not valid JSON") from error
+    environment = _validate_payload(raw)
+    environment["VF_S3_CACHE_DIR"] = f"/tmp/verifierforge-s3-cache/{job}"
+
+    session = f"s3-recover-{job}-{step}"
+    if _session_exists(session):
+        raise RuntimeError(f"tmux session already exists for recovery {session!r}")
+    evidence_dir = root / "runs" / job / "evidence"
+    lifecycle = evidence_dir / f"s3-recovery-credentials-step-{step}.json"
+    log = evidence_dir / f"s3-native-recovery-step-{step}.log"
+    command = _recovery_shell_command(
+        root=root,
+        python=python,
+        job=job,
+        step=step,
+        native=native,
+        lifecycle_path=lifecycle,
+        log_path=log,
+        prior_log=prior_log,
+    )
+    arguments = ["tmux", "new-session", "-d", "-s", session]
+    for name in sorted(environment):
+        arguments.extend(("-e", f"{name}={environment[name]}"))
+    arguments.append(command)
+    completed = subprocess.run(arguments, check=False, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+    if completed.returncode:
+        raise RuntimeError("tmux could not start S3 native-checkpoint recovery")
+    print(json.dumps({"status": "started", "job_id": job, "step": step, "storage": "s3"}))
+
+
 def _validate_payload(raw: object) -> dict[str, str]:
     if not isinstance(raw, dict):
         raise ValueError("S3 credential payload must be a JSON object")
@@ -129,6 +175,52 @@ def _job_shell_command(
     )
 
 
+def _recovery_shell_command(
+    *,
+    root: Path,
+    python: str,
+    job: str,
+    step: int,
+    native: Path,
+    lifecycle_path: Path,
+    log_path: Path,
+    prior_log: Path | None,
+) -> str:
+    """Build recovery shell text without embedding credential values."""
+    cleanup = " ".join((*_REQUIRED, *_OPTIONAL, "VF_STORAGE_BACKEND", "VF_S3_CACHE_DIR"))
+    command = [
+        shlex.quote(str(python)),
+        "-m",
+        "scripts.s3_native_recovery",
+        "--job",
+        shlex.quote(job),
+        "--step",
+        str(step),
+        "--native",
+        shlex.quote(str(native)),
+    ]
+    if prior_log is not None:
+        command.extend(("--prior-log", shlex.quote(str(prior_log))))
+    inner = "\n".join(
+        (
+            "set -euo pipefail",
+            f"mkdir -p {shlex.quote(str(lifecycle_path.parent))}",
+            f"printf '%s\\n' '{{\"storage_credentials\":\"injected\"}}' > {shlex.quote(str(lifecycle_path))}",
+            "cleanup() {",
+            f"  unset {cleanup}",
+            f"  printf '%s\\n' '{{\"storage_credentials\":\"cleared\"}}' > {shlex.quote(str(lifecycle_path))}",
+            "}",
+            "trap cleanup EXIT",
+            "trap 'exit 143' HUP INT TERM",
+            " ".join(command),
+        )
+    )
+    return (
+        f"cd {shlex.quote(str(root))} && "
+        f"exec setsid bash -c {shlex.quote(inner)} 2>&1 | tee {shlex.quote(str(log_path))}"
+    )
+
+
 def _session_exists(job: str) -> bool:
     return subprocess.run(["tmux", "has-session", "-t", job], check=False).returncode == 0
 
@@ -163,10 +255,14 @@ def parse_args() -> argparse.Namespace:
     mode = parser.add_mutually_exclusive_group(required=True)
     mode.add_argument("--emit-payload", action="store_true")
     mode.add_argument("--launch", action="store_true")
+    mode.add_argument("--recover", action="store_true")
     parser.add_argument("--root", type=Path)
     parser.add_argument("--python")
     parser.add_argument("--job")
     parser.add_argument("--config")
+    parser.add_argument("--step", type=int)
+    parser.add_argument("--native", type=Path)
+    parser.add_argument("--prior-log", type=Path)
     return parser.parse_args()
 
 
@@ -174,6 +270,18 @@ def main() -> None:
     args = parse_args()
     if args.emit_payload:
         _emit_payload()
+        return
+    if args.recover:
+        if not all((args.root, args.python, args.job, args.step, args.native)):
+            raise SystemExit("--recover requires --root, --python, --job, --step, and --native")
+        launch_recovery_from_stdin(
+            root=args.root,
+            python=args.python,
+            job=args.job,
+            step=args.step,
+            native=args.native,
+            prior_log=args.prior_log,
+        )
         return
     if not all((args.root, args.python, args.job, args.config)):
         raise SystemExit("--launch requires --root, --python, --job, and --config")
