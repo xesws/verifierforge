@@ -36,6 +36,32 @@
 algorithm declaration and a per-file inventory. A tree-only digest is an
 un-decomposable lock and cannot diagnose an identity dispute.
 
+## v0.15.2 — overnight S1–S6 serving recovery
+
+**Status:** in progress. This section replaces all earlier unfinished serving
+instructions. It does not authorize a trainer or frozen-data change.
+
+- [ ] **S1 — three-machine runtime evidence:** archive full `pip freeze` from
+  laptop, training pod, and `vfserve`; record exact `transformers` /
+  `tokenizers` versions and sanitized evidence paths.
+- [ ] **S2 — constrained alignment:** install precisely the training-pod
+  `transformers` and `tokenizers` versions on `vfserve`, without changing
+  vLLM or torch.
+- [ ] **S3/S4 — service gate:** restart warning-level vLLM with the rotated
+  key and test `/v1/models` plus one local completion. If compatibility still
+  fails, align only the minimally implicated packages from the training freeze,
+  with at most three total rounds; then record and skip S5/S6.
+- [ ] **S5 — public SDK proof:** only after S3 succeeds, use the official
+  OpenAI SDK against the RunPod proxy URL and archive a redacted source/output
+  proof under ignored `assets/`.
+- [ ] **S6 — production handoff proof:** only after S5 succeeds, point the
+  local proxy at the real tuned endpoint, canary synthetic data-pull traffic
+  at 50%, preserve route/guardian evidence, and reset canary to zero.
+
+**Global stops:** a single permission error is recorded as `OWNER-ACTION` and
+is not retried. A blocker exceeding 30 minutes is recorded and skipped. No
+secret, raw endpoint key, or paid external LLM request is allowed.
+
 ## Fixed boundaries
 
 - Work only on `main`; do not create a parallel worktree.
