@@ -109,6 +109,10 @@ start_remote_job() {
   local cfg="$2"
 
   restore_remote_key
+  if [[ "${VF_STORAGE_BACKEND:-local}" == "s3" ]]; then
+    start_remote_s3_job "$job" "$cfg"
+    return
+  fi
   ssh runpod bash -s -- "$REMOTE_ROOT" "$REMOTE_PYTHON" "$job" "$cfg" <<'REMOTE'
 set -euo pipefail
 
@@ -134,6 +138,15 @@ tmux kill-session -t "$job" 2>/dev/null || true
 echo "vf train failed: $job did not publish a PGID marker" >&2
 exit 1
 REMOTE
+}
+
+start_remote_s3_job() {
+  local job="$1"
+  local cfg="$2"
+
+  ssh runpod "cd '$REMOTE_ROOT' && git pull --ff-only && '$REMOTE_PYTHON' -c 'import scripts.gate_a, scripts.s3_job_env'"
+  python3 -m scripts.s3_job_env --emit-payload | \
+    ssh runpod "cd '$REMOTE_ROOT' && '$REMOTE_PYTHON' -m scripts.s3_job_env --launch --root '$REMOTE_ROOT' --python '$REMOTE_PYTHON' --job '$job' --config '$cfg'"
 }
 
 stop_remote_job() {

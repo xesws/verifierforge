@@ -28,6 +28,15 @@ def test_vf_train_preflights_gate_a_import_before_tmux_detach() -> None:
     assert script.index(import_command) < script.index('tmux new-session -d -s "$job"')
 
 
+def test_vf_s3_train_uses_stdin_payload_helper_without_secret_shell_expansion() -> None:
+    script = (REPOSITORY_ROOT / "scripts" / "vf").read_text(encoding="utf-8")
+
+    assert '[[ "${VF_STORAGE_BACKEND:-local}" == "s3" ]]' in script
+    assert "start_remote_s3_job" in script
+    assert "python3 -m scripts.s3_job_env --emit-payload |" in script
+    assert "scripts.s3_job_env --launch" in script
+
+
 def test_vf_kill_owns_recorded_job_process_groups_and_gpu_cleanup() -> None:
     script = (REPOSITORY_ROOT / "scripts" / "vf").read_text(encoding="utf-8")
 
