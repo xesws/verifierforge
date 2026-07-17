@@ -1376,7 +1376,7 @@ serving evidence, so M6 is blocked pending human direction.
 
 ### v0.12.7 — export/serving compatibility repair and M5 rerun
 
-**Status:** X4 passed; X5 archive and future-publication serving gate are in progress. This version supersedes
+**Status:** completed. This version supersedes
 v0.12.6's M5 stop only for the explicitly approved conversion, serving proof,
 M5 rerun, and future-publication serving gate. Frozen data, verifier, original
 exports, training logic, and external API access remain untouched.
@@ -1461,16 +1461,17 @@ exports, training logic, and external API access remain untouched.
   quarantine path. LoRA rank/alpha come from `GrpoSmokeConfig`; capacity
   preflight now reserves raw plus standard-HF export bytes per checkpoint.
   Focused tests prove success ordering, failure refusal, endpoint evidence, and
-  conversion-failure evidence; full pytest is **212 passed, 1 skipped**.
-- [ ] **X5b — M6 archive:** run `python -m trainer.m6_archive` against the
-  completed M3/M4 pair. It must atomically identify the selected step-350
-  serving export and final step-400 resumable checkpoint, both curve PNGs,
-  every M3/M4 evidence SHA-256, and runtime pip-freeze/driver evidence; publish
-  the manifest as a Storage artifact. Sync the manifest and its referenced
-  small artifacts through `vf watch` and compare remote/local SHA-256 values.
-  `vf watch` must exclude `evidence/failed-staging/`: it is preserved pod-side
-  failure evidence containing native weights, not laptop metadata.
-  **Stop:** any archive/hash failure; no after claim from incomplete data.
+  conversion-failure evidence; final v0.12.7 validation is **213 passed, 1 skipped**.
+- [x] **X5b — M6 archive:** `trainer.m6_archive` atomically published
+  `evidence/m6-v0127/archive-manifest.json` and the Storage artifact
+  `artifacts/m6/v0.12.7-archive-manifest.json`. Both pod and laptop copies have
+  SHA-256 `d27aa5e7d7c07439539f42e91003b9e63432572364b8dc042b7d61a4ba2f5973`.
+  The manifest identifies selected step-350 serving export, final step-400
+  resumable checkpoint, M3/M4 PNG curves, every M3/M4 evidence-file hash, and
+  both runtime pip-freeze/driver records. A corrected `vf watch`-rule sync
+  excluded pod-only `evidence/failed-staging/`; 73 portable evidence/artifact
+  hashes were verified against the remote-generated manifest on the laptop.
+  No checkpoint weights were copied to the laptop. **M6 passed.**
 
 **N6 pre-implementation decision:** use a new
 `grpo_v1_1p5b_h100_smoke` target, not the historical Blackwell config. It has
