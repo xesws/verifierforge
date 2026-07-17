@@ -1725,21 +1725,26 @@ auditable, and N3 must not be treated as complete.
 
 ### 【OWNER 晨间清单】
 
-1. **约 2 分钟 — 处置四个未跟踪文件。** 确认
+1. **约 2 分钟 — 轮换 `vfserve` endpoint key，并在短维护窗口重启
+   vLLM。** 一次只读远端进程状态诊断将 key 作为进程参数回显到 agent
+   tooling；值未复制、未写入仓库或证据，但必须按已暴露处理。因重启会
+   短暂中断服务，此处不擅自执行；无安全的一键命令，轮换时不得把新值
+   放入 shell history、日志或 commit。
+2. **约 2 分钟 — 处置四个未跟踪文件。** 确认
    `docs/vllm-debug/`、`scripts/freeze_nl2sql.py`、
    `tests/test_freeze_nl2sql.py`、`tq/transferqueue-0.1.7-py3-none-any.whl`
    应分别保留提交、归档或删除；这是让全局 `git status` 变干净的唯一
    人工决策。无安全的一键命令，因为这些可能是 owner 证据。
-2. **约 3 分钟 — 本地演示评委路径。** 运行
+3. **约 3 分钟 — 本地演示评委路径。** 运行
    `bash scripts/start_reviewer_sandbox.sh`，在浏览器打开其输出的
    `http://127.0.0.1:8012/docs`；Ctrl-C 会同时关闭 API 和 proxy。
-3. **约 5 分钟 — 若需要公网推理演示，先修 RunPod 的 8000 公网入口。**
+4. **约 5 分钟 — 若需要公网推理演示，先修 RunPod 的 8000 公网入口。**
    修复后再提供确认可达的 endpoint；当前不应重试旧 URL，因为一次
    30 秒超时已按规则记录。
-4. **约 10 分钟 — 裁决 S7c 的证明边界。** 二选一授权：允许为 0.5B
+5. **约 10 分钟 — 裁决 S7c 的证明边界。** 二选一授权：允许为 0.5B
    native checkpoint 增加可服务导出路径，或接受不经过 serving gate 的
    S3-only native node-loss 证明；未获授权前不要重跑。
-5. **约 30 分钟 — 如确实需要公网评委沙箱，提供可审计的邀请码/鉴权
+6. **约 30 分钟 — 如确实需要公网评委沙箱，提供可审计的邀请码/鉴权
    方案和 Cloudflare 账户边界。** 现仓库没有该机制；不能用无鉴权 quick
    tunnel 替代。获批后须先开新的文档版本再执行。
 
@@ -1807,3 +1812,9 @@ or 403 occurred in the successful real-bucket S7b probe.
 invite/authentication implementation. Therefore no unauthenticated public
 quick tunnel was created. The four S8d paths listed in the morning checklist
 remain `OWNER-ACTION`; they were not staged, deleted, or hidden.
+
+One read-only remote service-status diagnostic exposed the endpoint key as a
+process argument in agent tooling output. No secret value was copied into this
+repository, evidence, or documentation. It is nevertheless an exposure event;
+the first owner action is deliberate rotation in a short service-maintenance
+window, rather than an unannounced restart of the live vLLM process.
