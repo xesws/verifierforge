@@ -1374,6 +1374,39 @@ serving evidence, so M6 is blocked pending human direction.
   honored:** no repair, retry, after metric, gain claim, or M6 archive was
   attempted. A human decision is required before changing export/serving logic.
 
+### v0.12.7 — export/serving compatibility repair and M5 rerun
+
+**Status:** documentation gate complete; X1 is next. This version supersedes
+v0.12.6's M5 stop only for the explicitly approved conversion, serving proof,
+M5 rerun, and future-publication serving gate. Frozen data, verifier, original
+exports, training logic, and external API access remain untouched.
+
+- [ ] **X1 — read-only classification (10 minutes):** preserve a verbatim
+  step-50 source export file list, first ten safetensors keys, and active
+  LoRA/PEFT settings. Classify strictly as pure adapter, `base_model`-prefixed
+  full weights, or other. **Stop:** `other` stops and is reported; no heuristic
+  converter is allowed.
+- [ ] **X2 — non-destructive batch converter:** convert all eight M3 candidate
+  exports to sibling serveable standard-HF directories, keeping the original
+  sources byte-for-byte intact. Pure adapter means local frozen base + adapter
+  + `merge_and_unload` in bf16; confirmed prefix layout means only the evidenced
+  key/index rewrite. Add focused tests and commit before pod conversion.
+  **Stop:** source mutation, converter/test failure, or insufficient pod space.
+- [ ] **X3 — serving gate:** serve converted step 50 locally; record
+  `/v1/models` and one real completion in evidence. **Stop:** any serve/load or
+  completion failure; do not launch M5.
+- [ ] **X4 — formal M5 rerun:** serially evaluate eight converted checkpoints ×
+  frozen 60 held-out rows × `k=8`; retain all 3,840 completions/tier records.
+  Publish every checkpoint triplet and select highest held-out pass@1 (lower
+  step tie-break), next to before `0.5833 / 0.7667 / 0.4667`. **Only automatic
+  human call:** selected after pass@1 below `0.5833333333333334`; otherwise
+  proceed immediately to X5.
+- [ ] **X5 — M6 archive and permanent publication gate:** archive the selected
+  checkpoint, M3/M4 curves, all evidence SHA-256 values, pip freeze, and driver
+  evidence; sync/hash-check laptop copies. Make bridge publication require a
+  local vLLM models-plus-completion smoke and add focused tests. **Stop:** any
+  archive/hash/publication-smoke failure; no after claim from incomplete data.
+
 **N6 pre-implementation decision:** use a new
 `grpo_v1_1p5b_h100_smoke` target, not the historical Blackwell config. It has
 30 steps, 1.5B, `k=8`, one GPU/TP 1, `rollout_gpu_memory_utilization=0.45`,
