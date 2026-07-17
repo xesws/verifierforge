@@ -8,6 +8,7 @@ from trainer import grpo_dataset
 from trainer.grpo_config import GrpoSmokeConfig
 from trainer.grpo_reward import compute_random_score
 from trainer.grpo_train import EntropyBrake, EntropyBrakeDecision, _publish_entropy_brake, build_verl_command
+from trainer.export_compat import SERVEABLE_MANIFEST
 from trainer.heldout_eval import (
     CheckpointResult,
     HeldoutEvaluationError,
@@ -168,6 +169,30 @@ def test_heldout_evaluator_requires_exported_hf_checkpoint_and_tie_breaks_lowest
         assert "lacks an exported" in str(error)
     else:  # pragma: no cover - documents the required failure boundary.
         raise AssertionError("missing HF export must not be evaluated")
+
+
+def test_heldout_evaluator_can_require_a_completed_serveable_sibling(tmp_path: Path) -> None:
+    native = tmp_path / "m3" / "ckpt" / "step_50" / "global_step_50"
+    raw = native / "actor" / "huggingface"
+    raw.mkdir(parents=True)
+    (raw / "model.safetensors").write_bytes(b"raw")
+
+    try:
+        eligible_checkpoints(tmp_path, "m3", require_serveable=True)
+    except HeldoutEvaluationError as error:
+        assert "completed serveable" in str(error)
+    else:  # pragma: no cover - documents the required failure boundary.
+        raise AssertionError("raw PEFT export must not bypass the serving gate")
+
+    serveable = native / "actor" / "serveable_huggingface"
+    serveable.mkdir()
+    (serveable / "config.json").write_text("{}", encoding="utf-8")
+    (serveable / "model.safetensors.index.json").write_text("{}", encoding="utf-8")
+    (serveable / "model.safetensors").write_bytes(b"merged")
+    (serveable / SERVEABLE_MANIFEST).write_text("{}", encoding="utf-8")
+
+    checkpoints = eligible_checkpoints(tmp_path, "m3", require_serveable=True)
+    assert [(checkpoint.step, checkpoint.hf_path) for checkpoint in checkpoints] == [(50, serveable)]
 
 
 def test_heldout_evaluator_rejects_mismatched_or_incomplete_sample_evidence(

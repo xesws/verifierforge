@@ -20,6 +20,7 @@ from urllib.request import urlopen
 
 from core.rewards.nl2sql import NL2SQLVerifier
 from core.storage.local import LocalStorage
+from trainer.export_compat import is_serveable_export, serveable_export_path
 
 
 REPOSITORY_ROOT = Path(__file__).resolve().parents[1]
@@ -60,22 +61,57 @@ def main() -> None:
     parser.add_argument("--job", required=True, help="completed M3 job whose checkpoints are evaluated")
     parser.add_argument("--control-job", required=True, help="completed M4 control job for report linkage")
     parser.add_argument("--port", type=int, default=8011, help="first pod-loopback vLLM port to try")
+    parser.add_argument(
+        "--evidence-name",
+        default="heldout-after",
+        help="job-local evidence directory name; use a new value to preserve a prior attempt",
+    )
+    parser.add_argument(
+        "--artifact-name",
+        default="heldout/report.json",
+        help="Storage artifact name for this evaluation report",
+    )
+    parser.add_argument(
+        "--require-serveable",
+        action="store_true",
+        help="evaluate only converted actor/serveable_huggingface exports",
+    )
     args = parser.parse_args()
-    raise SystemExit(run(args.job, args.control_job, port=args.port))
+    raise SystemExit(
+        run(
+            args.job,
+            args.control_job,
+            port=args.port,
+            evidence_name=args.evidence_name,
+            artifact_name=args.artifact_name,
+            require_serveable=args.require_serveable,
+        )
+    )
 
 
-def run(main_job: str, control_job: str, *, port: int = 8011) -> int:
+def run(
+    main_job: str,
+    control_job: str,
+    *,
+    port: int = 8011,
+    evidence_name: str = "heldout-after",
+    artifact_name: str = "heldout/report.json",
+    require_serveable: bool = False,
+) -> int:
     """Evaluate every exported checkpoint, then atomically publish one report."""
+    _validate_output_names(evidence_name, artifact_name)
     storage = LocalStorage()
     run_dir = storage.root / main_job
-    evidence_dir = run_dir / "evidence" / "heldout-after"
+    evidence_dir = run_dir / "evidence" / evidence_name
     evidence_dir.mkdir(parents=True, exist_ok=True)
     try:
         frozen_identity = verify_frozen_identity()
-        checkpoints = eligible_checkpoints(storage.root, main_job)
+        checkpoints = eligible_checkpoints(storage.root, main_job, require_serveable=require_serveable)
         control_curve = control_curve_identity(storage.root, control_job)
     except HeldoutEvaluationError as error:
-        _publish_unavailable_report(storage, main_job, control_job, evidence_dir, str(error))
+        _publish_unavailable_report(
+            storage, main_job, control_job, evidence_dir, str(error), artifact_name=artifact_name
+        )
         return 2
 
     results: list[CheckpointResult] = []
@@ -96,6 +132,7 @@ def run(main_job: str, control_job: str, *, port: int = 8011) -> int:
                 checkpoint_results=results,
                 frozen_identity=frozen_identity,
                 control_curve=control_curve,
+                artifact_name=artifact_name,
             )
             return 2
 
@@ -116,12 +153,14 @@ def run(main_job: str, control_job: str, *, port: int = 8011) -> int:
     }
     report_path = evidence_dir / "report.json"
     _write_json_atomic(report_path, report)
-    storage.put_artifact(main_job, "heldout/report.json", report_path)
+    storage.put_artifact(main_job, artifact_name, report_path)
     print(json.dumps({"selected_checkpoint_step": best.step, **(best.metrics or {})}, sort_keys=True))
     return 0
 
 
-def eligible_checkpoints(runs_root: Path, job_id: str) -> list[Checkpoint]:
+def eligible_checkpoints(
+    runs_root: Path, job_id: str, *, require_serveable: bool = False
+) -> list[Checkpoint]:
     """Return all exported Storage checkpoints in numeric step order."""
     checkpoint_root = Path(runs_root) / job_id / "ckpt"
     candidates: list[Checkpoint] = []
@@ -131,7 +170,12 @@ def eligible_checkpoints(runs_root: Path, job_id: str) -> list[Checkpoint]:
         except ValueError:
             continue
         native = wrapper / f"global_step_{step}"
-        hf_path = native / "actor" / "huggingface"
+        source_hf_path = native / "actor" / "huggingface"
+        hf_path = serveable_export_path(native) if require_serveable else source_hf_path
+        if require_serveable and not is_serveable_export(hf_path):
+            raise HeldoutEvaluationError(
+                f"checkpoint step {step} lacks a completed serveable Hugging Face export"
+            )
         if not native.is_dir() or not hf_path.is_dir() or not list(hf_path.glob("*.safetensors")):
             raise HeldoutEvaluationError(
                 f"checkpoint step {step} lacks an exported Hugging Face safetensors model"
@@ -394,6 +438,7 @@ def _publish_unavailable_report(
     checkpoint_results: list[CheckpointResult] | None = None,
     frozen_identity: dict[str, Any] | None = None,
     control_curve: dict[str, str] | None = None,
+    artifact_name: str = "heldout/report.json",
 ) -> None:
     report = {
         "schema_version": 1,
@@ -410,7 +455,15 @@ def _publish_unavailable_report(
     }
     path = evidence_dir / "report.json"
     _write_json_atomic(path, report)
-    storage.put_artifact(main_job, "heldout/report.json", path)
+    storage.put_artifact(main_job, artifact_name, path)
+
+
+def _validate_output_names(evidence_name: str, artifact_name: str) -> None:
+    if Path(evidence_name).name != evidence_name or not evidence_name:
+        raise ValueError("evidence_name must be one job-local directory name")
+    artifact = Path(artifact_name)
+    if artifact.is_absolute() or ".." in artifact.parts or not artifact_name:
+        raise ValueError("artifact_name must be a relative Storage artifact path")
 
 
 def _sha256_file(path: Path) -> str:
