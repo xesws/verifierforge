@@ -1262,8 +1262,8 @@ were not launched.
 
 ### v0.12.6 — checkpoint space governance and M3 resume
 
-**Status:** S1--S3 complete; S4 resume authorized with an accepted host-side
-2.6% ghost allocation risk.
+**Status:** S1--S3 complete; S4's host-side ghost-allocation guard passed and
+M3 continues toward step 400.
 
 - [x] **S1 — state freeze:** tmux is absent; `d4-m3-1p5b-r1-v0125` ends at
   bridged metric step 150 (`2026-07-17T02:12:56.416371Z`) and Storage steps
@@ -1308,6 +1308,13 @@ were not launched.
   **Acceptance:** step 150 publishes under the new policy, then reach 400 with
   a final artifact and GPU clear. **Stop:** quota, bridge, entropy, CUDA/OOM,
   or guard-window anomaly.
+- [x] **S4 guard — resumed step 150:** `Published Storage checkpoint step_150`
+  appeared before new public metrics 151--155; `ckpt/step_150` exists, staging
+  is only 1.2 MiB, and Storage is 27 GiB (older native payloads pruned while HF
+  exports remain). The progress line at step 150 reported 15.17 seconds/step,
+  about 3.95 steps/minute; CUDA/OOM scans were empty. The H100 ghost allocation
+  is therefore confirmed harmless for this run. Continue M3 without waiting;
+  M4--M6 remain serially queued after its successful step-400 final artifact.
 - [ ] **S5 — serial continuation:** only after S4 passes, continue approved
   M4, M5, and M6 without waiting. Existing held-out and artifact gates remain
   unchanged.
