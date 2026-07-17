@@ -1202,7 +1202,7 @@ were not launched.
 
 ### v0.12.5 — total-step guard and fresh D4 rerun
 
-**Status:** approved; documentation gate complete before implementation.
+**Status:** M3 stopped at a Storage gate; M4--M6 were not launched.
 
 - [x] **Guard:** resolve null `total_epochs` from actual prepared
   `steps_per_epoch` as `ceil(total_steps / steps_per_epoch) + 2`; reject an
@@ -1215,7 +1215,7 @@ were not launched.
   explicit ten-epoch config now raises before a verl child starts. Focused
   tests, `pytest -q` (`195 passed, 1 skipped`), and both launch shell syntax
   checks passed. **Stop:** any test or preflight failure.
-- [ ] **Fresh M3:** run `d4-m3-1p5b-r1-v0125` from scratch with the frozen
+- [x] **Fresh M3 (STOP):** run `d4-m3-1p5b-r1-v0125` from scratch with the frozen
   50-row pool, 400 steps, `k=8`, 50-step checkpoints, entropy brake, H100
   diagnostic environment, and explicit 40 epochs. Preserve the original
   `d4-m3-1p5b-v0124` metrics/checkpoints unchanged and do not resume it.
@@ -1225,22 +1225,40 @@ were not launched.
   scratch. **Step-50 throughput check:** metrics steps 1--50 took `373.356` s,
   or `7.875` steps/minute. This exceeds the 1.75--5.25 report band around the
   3.5 baseline, so it was reported and did not stop the job. Storage checkpoint
-  step 50 published successfully.
+  step 50 published successfully. **Stopped at the step-150 Storage gate:**
+  `LocalStorage.save_checkpoint()` raised `shutil.Error` while copying the
+  native/HF checkpoint, with `[Errno 122] Disk quota exceeded`. The wrapper
+  therefore stopped bridging at 150 append-only metrics; only Storage steps 50
+  and 100 exist. The child verl process continued without a bridge until
+  `vf kill` stopped the tmux session/process group and `ray stop --force`.
+  The ignored laptop evidence hashes are metrics
+  `20b58bba09a115c3a39ea25c4cad193f5a349d1e95c210c678b1c4e8ddc2214c`
+  and train log
+  `6611014cae45c2516d41166cd40df2cd15747e6696985a1470eb1569df5e0743`.
+  The new job used 28 GiB under `ckpt/` and 41 GiB under `.verl-staging/`; the
+  prior job remains 55 GiB. The shared filesystem reported 135 TiB free, but
+  the quota command is unavailable, so the specific per-volume quota is not
+  known. **Cleanup gate also failed:** after `vf kill`, tmux was down but
+  `nvidia-smi` still reported PID `2743762`, `[Not Found]`, using 2,118 MiB.
+  Do not start another job or delete evidence without a new approved plan.
   **Acceptance:** 400 metrics/final artifact, released GPU, and evidence files.
   At 50 metrics report rate if outside 1.75--5.25 steps/minute; do not stop for
   that alert. **Stop:** entropy brake or any job/Storage gate failure.
 - [ ] **Serial M4:** only after M3 completion/release, run the 0.5B
   random-reward control for 200 steps using the derived epoch guard.
   **Acceptance:** complete curve/evidence in a distinct job namespace.
-  **Stop:** any job or Storage failure.
+  **Stop:** any job or Storage failure. **Blocked:** v0.12.5 M3 did not
+  complete and the GPU cleanup gate remains failed.
 - [ ] **M5:** evaluate only fresh eligible M3 checkpoints on frozen held-out
   60 rows at `k=8`, retain full sample/tier evidence, and select highest
   pass@1 (lower step on ties). **Acceptance:** hash-bound report next to before
   `0.5833333333333334 / 0.7666666666666667 / 0.4666666666666667`.
   **Stop:** evaluation gate rejection or after pass@1 below 0.5833333333333334.
+  **Not launched:** no completed 400-step M3 candidate set exists.
 - [ ] **M6:** archive curve PNG, final checkpoint identity, pip/driver runtime
   evidence, and pod/laptop SHA-256 matches. **Acceptance:** all listed hashes
-  are recorded. **Stop:** any artifact or sync mismatch.
+  are recorded. **Stop:** any artifact or sync mismatch. **Not launched:** M3
+  did not publish a final artifact.
 
 **N6 pre-implementation decision:** use a new
 `grpo_v1_1p5b_h100_smoke` target, not the historical Blackwell config. It has
