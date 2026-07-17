@@ -1408,8 +1408,8 @@ exports, training logic, and external API access remain untouched.
   state, merge LoRA, then save standard bf16 HF weights. Merely stripping the
   prefix would leave `base_layer`/LoRA keys and discard trained deltas.
 - [ ] **X2 — non-destructive batch converter:** convert all eight M3 candidate
-  exports to sibling serveable standard-HF directories, keeping the original
-  sources byte-for-byte intact. Pure adapter means local frozen base + adapter
+  exports to `actor/serveable_huggingface/` sibling standard-HF directories,
+  keeping the original sources byte-for-byte intact. Pure adapter means local frozen base + adapter
   + `merge_and_unload` in bf16; confirmed prefix layout means only the evidenced
   key/index rewrite. Add focused tests and commit before pod conversion.
   **Stop:** source mutation, converter/test failure, or insufficient pod space.
