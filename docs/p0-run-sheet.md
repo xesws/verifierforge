@@ -54,19 +54,31 @@ instructions. It does not authorize a trainer or frozen-data change.
   (training pod), and
   `94931e73d828549394959144e1843fc69085b66cef610c17a55ca0742e225f00`
   (`vfserve`).
-- [ ] **S2 — constrained alignment:** install precisely the training-pod
-  `transformers` and `tokenizers` versions on `vfserve`, without changing
-  vLLM or torch.
-- [ ] **S3/S4 — service gate:** restart warning-level vLLM with the rotated
-  key and test `/v1/models` plus one local completion. If compatibility still
-  fails, align only the minimally implicated packages from the training freeze,
-  with at most three total rounds; then record and skip S5/S6.
-- [ ] **S5 — public SDK proof:** only after S3 succeeds, use the official
-  OpenAI SDK against the RunPod proxy URL and archive a redacted source/output
-  proof under ignored `assets/`.
-- [ ] **S6 — production handoff proof:** only after S5 succeeds, point the
-  local proxy at the real tuned endpoint, canary synthetic data-pull traffic
-  at 50%, preserve route/guardian evidence, and reset canary to zero.
+- [x] **S2 — constrained alignment:** installed the training-pod
+  `transformers==4.57.6` and `tokenizers==0.22.2` on `vfserve`, without
+  changing vLLM or torch. The first start-preflight then correctly exposed
+  `huggingface-hub==1.23.0` as incompatible with Transformers 4; the approved
+  second minimal alignment installed the training-pod
+  `huggingface_hub==0.36.2`. `pip check` returned `No broken requirements
+  found`; vLLM remains `0.10.2` and torch remains `2.8.0+cu128` at runtime.
+- [x] **S3/S4 — service gate:** warning-level vLLM restarted with the rotated
+  key. `/v1/models` returned 200 for `verifierforge-step-350`; its local,
+  real NL→SQL completion returned `SELECT name FROM users;` with 35 prompt and
+  6 completion tokens. The first completion wrapper attempt is preserved as a
+  401 caused by literal `\\n` header encoding, not a key/service failure; the
+  corrected one-retry wrapper succeeded. The current vLLM log scans clean for
+  `api_key` markers.
+- [ ] **S5 — public SDK proof: BLOCKED.** The first public SDK inference
+  produced no completion and an empty stdout artifact. To classify it without
+  another inference request, one HTTP HEAD probe to
+  `https://e5bae2au0f867m-8000.proxy.runpod.net/v1/models` timed out after
+  `30006 milliseconds with 0 bytes received` (curl exit 28). The local service
+  remains healthy; the public RunPod proxy route is not reachable from this
+  machine. This is the E5 stop condition; do not retry until the endpoint
+  owner exposes/repairs port 8000.
+- [ ] **S6 — skipped because S5 is blocked.** `VF_PROXY_TUNED_UPSTREAM` and
+  `data-pull-sql` routing were not changed, so canary remains at its previous
+  zero/placeholder state and no guardian claim is made.
 
 **Global stops:** a single permission error is recorded as `OWNER-ACTION` and
 is not retried. A blocker exceeding 30 minutes is recorded and skipped. No
