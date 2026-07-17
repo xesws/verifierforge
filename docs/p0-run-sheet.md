@@ -78,9 +78,15 @@ secret, raw endpoint key, or paid external LLM request is allowed.
 once its documentation gate is committed. It does not authorize `trainer/` or
 frozen-data changes.
 
-- [ ] **S7a — implementation and moto:** add the S3 Storage backend and cover
-  all ABC methods, atomic checkpoint publication, idempotent overwrite, and
-  append-only metrics with moto.
+- [x] **S7a — implementation and moto:** added the S3 Storage backend and
+  covered all ABC methods, atomic checkpoint publication, idempotent overwrite,
+  and append-only metrics with moto. **Result:** `S3Storage` keeps immutable
+  generations below `.tmp/` and publishes a single manifest object last; cache
+  downloads SHA-verify every file. Metrics use immutable
+  `metrics.jsonl/<step>-<uuid>.json` objects, avoiding S3 read-modify-write.
+  Tests cover an interrupted second upload (no manifest visible), 50 records,
+  artifact file/directory round trips, fresh-cache recovery, and explicit
+  `VF_STORAGE_BACKEND=s3` selection. Validation: `230 passed, 1 skipped`.
 - [ ] **S7b — true cloud round trip:** upload/download a checkpoint with SHA,
   append 50 metrics, and prove interrupted data remains unpublished. A single
   `AccessDenied`/403/scope failure becomes `OWNER-ACTION` with the exact

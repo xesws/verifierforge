@@ -16,6 +16,23 @@ _STEP_DIR = re.compile(r"step_(\d+)")
 class LocalStorage(Storage):
     """Store each job beneath a simple, inspectable ``runs/`` directory."""
 
+    def __new__(cls, root: Path | str | None = None):
+        """Select the explicitly requested durable backend without touching callers.
+
+        Trainer modules intentionally construct ``LocalStorage`` directly.  The
+        opt-in selector keeps that established call surface while allowing an
+        operator to use S3 for one resilience proof.  The normal, unset path
+        remains a real ``LocalStorage`` instance.
+        """
+        backend = os.environ.get("VF_STORAGE_BACKEND", "local").strip().lower()
+        if cls is LocalStorage and backend == "s3":
+            from .s3 import S3Storage
+
+            return S3Storage.from_env(cache_root=root)
+        if backend not in {"", "local", "s3"}:
+            raise ValueError("VF_STORAGE_BACKEND must be 'local' or 's3'")
+        return super().__new__(cls)
+
     def __init__(self, root: Path | str | None = None) -> None:
         configured_root = root if root is not None else os.environ.get("VF_RUNS_DIR", "./runs")
         self.root = Path(configured_root)
