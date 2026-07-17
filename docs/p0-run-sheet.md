@@ -198,6 +198,26 @@ contracts.
   v0.17.0.
 - Every completed numbered step: tick it here, record factual results, commit only its scoped files, then report one concise line. A stop condition ends the run; no threshold, budget, or trainer change is allowed without human direction.
 
+## v0.17.2 — S10 reviewer sandbox and morning handoff
+
+**Status:** planned before implementation. This is a delivery-only patch: it
+may package a local artifact-API/fake-proxy launcher and timebox a secure
+reviewer-tunnel check. It does not authorize a trainer/frozen-data change, a
+paid provider call, a credential write, a custom auth system, or interruption
+of the existing serving pod.
+
+- [ ] **S10a — sandbox feasibility:** inspect available tunnel and existing
+  authorization mechanisms without changing `vfserve`. An unauthenticated
+  public URL is not a valid substitute for invitation authentication.
+- [ ] **S10b — reproducible fallback:** if the 30-minute secure-tunnel budget
+  cannot pass, add and smoke a one-command local launcher for artifact API plus
+  fake proxy. It must leave background-process ownership visible and use no
+  secret.
+- [ ] **S10c — morning handoff:** append a dated report after factual outcomes
+  are known, with an ascending-time `OWNER` checklist, S1--S10 states, commit
+  list, and raw blockers. Do not mark partial S7c or unavailable public serving
+  as passed.
+
 ## Fixed artifacts
 
 | Purpose | Path |
