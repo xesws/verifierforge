@@ -1315,6 +1315,11 @@ M3 continues toward step 400.
   about 3.95 steps/minute; CUDA/OOM scans were empty. The H100 ghost allocation
   is therefore confirmed harmless for this run. Continue M3 without waiting;
   M4--M6 remain serially queued after its successful step-400 final artifact.
+- [x] **S4 progress — step 200 retention proof:** `Published Storage
+  checkpoint step_200` appeared while the job continued through public step
+  208. `global_step_200` is the only wrapper retaining model/optimizer files;
+  steps 50, 100, and 150 are HF-only exports. Storage is 34 GiB and active
+  staging is 1.4 MiB, with an empty CUDA/OOM/bridge-failure scan.
 - [ ] **S5 — serial continuation:** only after S4 passes, continue approved
   M4, M5, and M6 without waiting. Existing held-out and artifact gates remain
   unchanged.
