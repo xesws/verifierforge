@@ -1222,7 +1222,10 @@ were not launched.
   **Started 2026-07-17T01:39:43Z:** `vf train` detached a tmux session with
   PGID `33936` after the pod fast-forwarded to `70fe4d2`; old evidence remained
   at 120 metrics and Storage steps 50/100 before launch. The job starts from
-  scratch.
+  scratch. **Step-50 throughput check:** metrics steps 1--50 took `373.356` s,
+  or `7.875` steps/minute. This exceeds the 1.75--5.25 report band around the
+  3.5 baseline, so it was reported and did not stop the job. Storage checkpoint
+  step 50 published successfully.
   **Acceptance:** 400 metrics/final artifact, released GPU, and evidence files.
   At 50 metrics report rate if outside 1.75--5.25 steps/minute; do not stop for
   that alert. **Stop:** entropy brake or any job/Storage gate failure.
