@@ -1,6 +1,7 @@
 # N6: bounded single-H100 compatibility and throughput probe.
 model_path: Qwen/Qwen2.5-1.5B-Instruct
 total_steps: 30
+total_epochs: null
 train_batch_size: 4
 rollout_n: 8
 max_prompt_length: 1024

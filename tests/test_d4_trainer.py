@@ -38,6 +38,7 @@ def test_d4_main_and_control_configs_are_explicit_and_separate(tmp_path: Path) -
         validation_file=tmp_path / "validation.parquet",
         staging_dir=tmp_path / "staging",
         resume_path=None,
+        steps_per_epoch=12,
         python="python",
     )
     assert "actor_rollout_ref.actor.checkpoint.save_contents=['model','optimizer','extra','hf_model']" in command
@@ -50,6 +51,7 @@ def test_d4_main_and_control_configs_are_explicit_and_separate(tmp_path: Path) -
         validation_file=tmp_path / "validation.parquet",
         staging_dir=tmp_path / "staging",
         resume_path=None,
+        steps_per_epoch=12,
         python="python",
     )
     assert "reward.custom_reward_function.name=compute_random_score" in control_command
@@ -71,6 +73,8 @@ def test_frozen_training_mode_uses_all_pool_rows_and_no_heldout(monkeypatch, tmp
 
     assert paths.train.is_file()
     assert paths.validation.is_file()
+    assert paths.train_rows == 50
+    assert paths.steps_per_epoch(4) == 12
     assert len(written["train.parquet"]) == 50
     assert len(written["validation.parquet"]) == 10
     train_ids = [str(row["extra_info"]["case_id"]) for row in written["train.parquet"]]

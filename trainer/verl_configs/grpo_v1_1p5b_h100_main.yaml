@@ -1,6 +1,8 @@
 # D4 M3: frozen-pool main training on the admitted single H100 path.
 model_path: Qwen/Qwen2.5-1.5B-Instruct
 total_steps: 400
+# Explicitly above the observed ceil(400 / 12) = 34 H100 requirement.
+total_epochs: 40
 train_batch_size: 4
 rollout_n: 8
 max_prompt_length: 1024

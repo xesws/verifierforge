@@ -16,6 +16,18 @@ DATA_SOURCE = "nl2sql_v1"
 class VerlInputPaths:
     train: Path
     validation: Path
+    train_rows: int
+
+    def steps_per_epoch(self, train_batch_size: int) -> int:
+        """Return verl's effective drop-last train batches for this input."""
+        if train_batch_size < 1:
+            raise ValueError("train_batch_size must be positive")
+        steps = self.train_rows // train_batch_size
+        if steps < 1:
+            raise ValueError(
+                "train_batch_size exceeds prepared training rows; cannot form a verl training batch"
+            )
+        return steps
 
 
 def build_verl_rows(cases: Sequence[Mapping[str, Any]]) -> list[dict[str, Any]]:
@@ -95,4 +107,4 @@ def prepare_v1_inputs(
     input_dir = Path(runs_root) / job_id / "input"
     train = write_parquet(build_verl_rows(train_cases), input_dir / "train.parquet")
     validation = write_parquet(build_verl_rows(validation_cases), input_dir / "validation.parquet")
-    return VerlInputPaths(train=train, validation=validation)
+    return VerlInputPaths(train=train, validation=validation, train_rows=len(train_cases))

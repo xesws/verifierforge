@@ -1,6 +1,9 @@
 import json
+from dataclasses import replace
 from pathlib import Path
 import subprocess
+
+import pytest
 
 from core.storage.local import LocalStorage
 from trainer.checkpoint_bridge import CheckpointBridge, latest_storage_resume_path
@@ -104,6 +107,7 @@ def test_grpo_config_builds_storage_only_resume_command(tmp_path: Path) -> None:
         validation_file=tmp_path / "validation.parquet",
         staging_dir=tmp_path / "staging",
         resume_path=resume,
+        steps_per_epoch=10,
         python="python",
     )
 
@@ -136,6 +140,7 @@ def test_blackwell_smoke_config_is_bounded_single_gpu_probe(tmp_path: Path) -> N
         validation_file=tmp_path / "validation.parquet",
         staging_dir=tmp_path / "staging",
         resume_path=None,
+        steps_per_epoch=10,
         python="python",
     )
 
@@ -163,6 +168,7 @@ def test_h100_smoke_config_is_bounded_single_gpu_probe(tmp_path: Path) -> None:
         validation_file=tmp_path / "validation.parquet",
         staging_dir=tmp_path / "staging",
         resume_path=None,
+        steps_per_epoch=10,
         python="python",
     )
 
@@ -197,11 +203,45 @@ def test_h100_diagnostic_environment_reaches_ray_workers(monkeypatch, tmp_path: 
         validation_file=tmp_path / "validation.parquet",
         staging_dir=tmp_path / "staging",
         resume_path=None,
+        steps_per_epoch=10,
         python="python",
     )
 
     for name, value in expected.items():
         assert f"+ray_kwargs.ray_init.runtime_env.env_vars.{name}='{value}'" in command
+
+
+def test_total_epoch_guard_derives_or_rejects_before_verl_launch(tmp_path: Path) -> None:
+    default = GrpoSmokeConfig.load()
+    assert default.resolve_total_epochs(10) == 12
+
+    main = GrpoSmokeConfig.load("grpo_v1_1p5b_h100_main")
+    assert main.resolve_total_epochs(12) == 40
+    command = build_verl_command(
+        config=main,
+        job_id="m3",
+        train_file=tmp_path / "train.parquet",
+        validation_file=tmp_path / "validation.parquet",
+        staging_dir=tmp_path / "staging",
+        resume_path=None,
+        steps_per_epoch=12,
+        python="python",
+    )
+    assert "trainer.total_epochs=40" in command
+    assert "trainer.total_epochs=10" not in command
+
+    unsafe = replace(main, total_epochs=10)
+    with pytest.raises(ValueError, match="would cap trainer.total_training_steps"):
+        build_verl_command(
+            config=unsafe,
+            job_id="unsafe",
+            train_file=tmp_path / "train.parquet",
+            validation_file=tmp_path / "validation.parquet",
+            staging_dir=tmp_path / "staging",
+            resume_path=None,
+            steps_per_epoch=12,
+            python="python",
+        )
 
 
 def test_runtime_evidence_captures_pip_driver_and_diagnostic_environment(

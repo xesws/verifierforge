@@ -1,6 +1,7 @@
 # D4 M4: serial random-reward control; it never invokes the SQL verifier.
 model_path: Qwen/Qwen2.5-0.5B-Instruct
 total_steps: 200
+total_epochs: null
 train_batch_size: 4
 rollout_n: 8
 max_prompt_length: 1024

@@ -154,6 +154,7 @@ def build_verl_command(
     validation_file: Path,
     staging_dir: Path,
     resume_path: Path | None,
+    steps_per_epoch: int,
     python: str | None = None,
 ) -> list[str]:
     """Return, but do not run, the pinned verl 0.8 synchronous PPO command."""
@@ -165,6 +166,7 @@ def build_verl_command(
         reward_file=reward_file,
         job_id=job_id,
         resume_path=resume_path,
+        steps_per_epoch=steps_per_epoch,
     )
     return [python or sys.executable, "-m", "verl.trainer.main_ppo", *overrides]
 
@@ -205,6 +207,14 @@ def run(
         print(f"Starting {job_id} from scratch", flush=True)
 
     inputs = prepare_v1_inputs(runs_root, job_id, dataset_mode=config.dataset_mode)
+    steps_per_epoch = inputs.steps_per_epoch(config.train_batch_size)
+    total_epochs = config.resolve_total_epochs(steps_per_epoch)
+    print(
+        "Resolved training schedule: "
+        f"target_steps={config.total_steps} steps_per_epoch={steps_per_epoch} "
+        f"total_epochs={total_epochs}",
+        flush=True,
+    )
     # FileLogger opens this path in write mode on every native invocation.  Clear
     # stale lines before the child starts; append-only public metrics are kept in
     # LocalStorage and de-duplicated by the metric bridge.
@@ -219,6 +229,7 @@ def run(
         validation_file=inputs.validation,
         staging_dir=staging_dir,
         resume_path=resume_path,
+        steps_per_epoch=steps_per_epoch,
     )
     print("Launching:", " ".join(command), flush=True)
     environment = os.environ.copy()

@@ -1204,13 +1204,17 @@ were not launched.
 
 **Status:** approved; documentation gate complete before implementation.
 
-- [ ] **Guard:** resolve null `total_epochs` from actual prepared
+- [x] **Guard:** resolve null `total_epochs` from actual prepared
   `steps_per_epoch` as `ceil(total_steps / steps_per_epoch) + 2`; reject an
   explicit epoch override that cannot reach the requested target. Remove the
   fixed hidden ten-epoch command value. **Acceptance:** focused tests prove a
   400-step/12-batch configuration cannot silently end at 120 and command
-  construction contains the resolved epoch value. **Stop:** any test or
-  preflight failure.
+  construction contains the resolved epoch value. **Passed:** the main config
+  resolves 12 batches/epoch to its explicit 40 epochs (minimum 34); the
+  control resolves 200 steps to 19 epochs (minimum 17). A 400-step/12-batch
+  explicit ten-epoch config now raises before a verl child starts. Focused
+  tests, `pytest -q` (`195 passed, 1 skipped`), and both launch shell syntax
+  checks passed. **Stop:** any test or preflight failure.
 - [ ] **Fresh M3:** run `d4-m3-1p5b-r1-v0125` from scratch with the frozen
   50-row pool, 400 steps, `k=8`, 50-step checkpoints, entropy brake, H100
   diagnostic environment, and explicit 40 epochs. Preserve the original

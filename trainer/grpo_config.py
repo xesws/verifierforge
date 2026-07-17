@@ -17,6 +17,8 @@ RAY_DIAGNOSTIC_ENVIRONMENT = (
     "PYTHONFAULTHANDLER",
 )
 
+TOTAL_EPOCHS_SAFETY_MARGIN = 2
+
 
 def _hydra_string_literal(value: str) -> str:
     """Return a Hydra override value that cannot be coerced to a scalar."""
@@ -43,6 +45,7 @@ class GrpoSmokeConfig:
 
     model_path: str
     total_steps: int
+    total_epochs: int | None
     train_batch_size: int
     rollout_n: int
     max_prompt_length: int
@@ -104,6 +107,12 @@ class GrpoSmokeConfig:
         ):
             if getattr(self, name) < 1:
                 raise ValueError(f"{name} must be positive")
+        if self.total_epochs is not None and (
+            not isinstance(self.total_epochs, int) or isinstance(self.total_epochs, bool)
+        ):
+            raise ValueError("total_epochs must be a positive integer or null")
+        if self.total_epochs is not None and self.total_epochs < 1:
+            raise ValueError("total_epochs must be a positive integer or null")
         if self.learning_rate <= 0 or self.kl_loss_coef < 0:
             raise ValueError("learning_rate must be positive and kl_loss_coef non-negative")
         if not 0 < self.rollout_gpu_memory_utilization <= 1:
@@ -154,6 +163,31 @@ class GrpoSmokeConfig:
         config.validate()
         return config
 
+    def resolve_total_epochs(self, steps_per_epoch: int) -> int:
+        """Return a safe epoch count for the actual prepared train input.
+
+        verl's epoch loop can end before ``total_training_steps``. A null YAML
+        value therefore derives a small safety margin after the minimum count;
+        an explicit value remains an operator choice but must be large enough
+        to reach the requested target.
+        """
+        if not isinstance(steps_per_epoch, int) or isinstance(steps_per_epoch, bool):
+            raise ValueError("steps_per_epoch must be a positive integer")
+        if steps_per_epoch < 1:
+            raise ValueError("steps_per_epoch must be a positive integer")
+
+        minimum = (self.total_steps + steps_per_epoch - 1) // steps_per_epoch
+        if self.total_epochs is None:
+            return minimum + TOTAL_EPOCHS_SAFETY_MARGIN
+        if self.total_epochs < minimum:
+            raise ValueError(
+                "total_epochs would cap trainer.total_training_steps before its target: "
+                f"total_epochs={self.total_epochs}, steps_per_epoch={steps_per_epoch}, "
+                f"reachable_steps={self.total_epochs * steps_per_epoch}, "
+                f"target_steps={self.total_steps}; use null or at least {minimum}"
+            )
+        return self.total_epochs
+
     def verl_overrides(
         self,
         *,
@@ -163,9 +197,11 @@ class GrpoSmokeConfig:
         reward_file: Path,
         job_id: str,
         resume_path: Path | None,
+        steps_per_epoch: int,
     ) -> list[str]:
         """Build the explicit overrides for ``verl.trainer.main_ppo_sync``."""
         self.validate()
+        total_epochs = self.resolve_total_epochs(steps_per_epoch)
         overrides = [
             "model_engine=dp",
             "algorithm.adv_estimator=grpo",
@@ -233,7 +269,7 @@ class GrpoSmokeConfig:
             "trainer.nnodes=1",
             "trainer.n_gpus_per_node=1",
             f"trainer.total_training_steps={self.total_steps}",
-            "trainer.total_epochs=10",
+            f"trainer.total_epochs={total_epochs}",
             "trainer.val_before_train=True",
             f"trainer.save_freq={self.checkpoint_every}",
             f"trainer.test_freq={self.validation_every}",
