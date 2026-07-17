@@ -86,9 +86,8 @@ secret, raw endpoint key, or paid external LLM request is allowed.
 
 ## v0.16.0 — overnight S7 S3 durability proof
 
-**Status:** planned; this wave starts independently of serving compatibility
-once its documentation gate is committed. It does not authorize `trainer/` or
-frozen-data changes.
+**Status:** S7a/S7b passed; S7c timeboxed partial and explicitly not a
+node-loss pass. This wave does not authorize `trainer/` or frozen-data changes.
 
 - [x] **S7a — implementation and moto:** added the S3 Storage backend and
   covered all ABC methods, atomic checkpoint publication, idempotent overwrite,
@@ -111,9 +110,27 @@ frozen-data changes.
   one-shot command is `python -m scripts.s3_roundtrip --load-dotenv --job
   <job> --metrics 50 --evidence <path>`; it writes `OWNER-ACTION` with the
   original access error and rerun command if a future credential lacks access.
-- [ ] **S7c — GPU node-loss proof:** only after S7b, run a 0.5B 100-step job
-  with S3 durable storage, kill near 60, resume to 100, retain S3 inventory /
-  SHA / curve evidence, and then print `S3 实证完成,训练 pod 可停`.
+- [ ] **S7c — GPU node-loss proof: TIMEBOX STOP / not passed.** The 0.5B H100
+  job wrote 49 S3 metrics, then the strict serving gate rejected its complete
+  step-50 native state because `actor/huggingface` had no safetensors. v0.16.1
+  published and re-materialized that native state through manifest-last S3:
+  15 files, source/restored tree SHA-256
+  `e4c37b47f6b32e9e5444fa86385687032d316d43b8a51b6ee00b8b085c5ba737`,
+  manifest SHA-256
+  `c9806714537389455b6c8557c9bd4861b34c382b7632963e5ac5591739f5d2d3`.
+  Unchanged `vf train` then resumed from S3 and reached native step 100, but
+  the same serving gate rejected publication again. The S3 inventory has 123
+  objects and 98 unique metric records (steps 1–49 and 51–99; 50/100 absent).
+  The five-minute operator read interval observed the resumed job only after it
+  had already crossed step 60, so no intentional `vf kill` occurred near 60;
+  do not call this a node-loss proof. `vf kill` was used only after failure for
+  cleanup and passed at 0 MiB. Ignored, explicitly incomplete assets are
+  `assets/v0.16.1-s3-partial/summary.json`
+  (`676fb20fc5469d4d57437e56792ed1792aea973664f1b93b640f17ebe7553812`)
+  and its pre/recovery/combined PNGs. A compliant retry needs an owner decision
+  to permit a serving-compatible 0.5B export path or to accept an S3-only
+  native-checkpoint proof without the publication gate; neither is allowed by
+  tonight's no-`trainer/` constraint.
 
 ## v0.17.0 — overnight S8 delivery artifacts
 
@@ -157,16 +174,17 @@ contracts.
   `docs/submission/devpost-draft.md`, exact three-minute
   `docs/submission/video-script.md`, and GPU-free `JUDGES.md`. All claims
   trace to committed artifacts and retain the public-endpoint limitation.
-- [ ] **S7c recovery (v0.16.1):** first H100 attempt reached step 50 with 49
-  S3 metric records, then stopped before a manifest because its strict serving
-  gate reported `no safetensors files in .../actor/huggingface`. This is not an
-  S3/IAM failure. Per the no-`trainer/` rule, add and test an external native
-  checkpoint wrapper publisher, publish the preserved complete step-50 native
-  payload through S3, then resume/kill/resume unchanged `vf train`.
-- [ ] **S7 lifecycle audit repair (v0.16.2):** `vf kill` verified 0 MiB after
-  the partial S7 run, but its non-secret lifecycle marker remained `injected`.
-  Add a post-GPU-cleanup `cleared_by=vf_kill` marker; this is evidence hygiene,
-  not a substitute for the uncompleted step-60 node-loss injection.
+- [x] **S7c recovery (v0.16.1):** external native wrapper publisher was added
+  and tested outside `trainer/`; it retained the first-attempt log as an S3
+  artifact, verified the 15-file checkpoint identity after materialization,
+  and enabled the unchanged resume command. Validation at commit: `242 passed,
+  1 skipped`. It demonstrates native S3 recovery, but not the requested timed
+  kill/resume proof above.
+- [x] **S7 lifecycle audit repair (v0.16.2):** `vf kill` now writes
+  `{"storage_credentials":"cleared","cleared_by":"vf_kill"}` only after
+  process-group/tmux/Ray cleanup and a 0-MiB GPU check. Actual pod verification
+  passed after the partial run: tmux absent, GPU 0 MiB, lifecycle marker
+  `cleared_by=vf_kill`; validation at commit: `243 passed, 1 skipped`.
 
 ## Fixed boundaries
 
@@ -175,7 +193,9 @@ contracts.
 - Evaluation uses only `VF_EVAL_BASE_URL` / `VF_EVAL_MODEL` against pod-local
   vLLM. Never print, commit, rsync, SSH-forward, or copy `.env` / API keys to
   RunPod; this runbook has no OpenRouter budget.
-- Keep the pre-existing unstaged `AGENTS.md` change out of every P0 commit.
+- `AGENTS.md` changes require explicit owner instruction and documentation
+  consistency review; the owner-approved delivery-documentation sync landed in
+  v0.17.0.
 - Every completed numbered step: tick it here, record factual results, commit only its scoped files, then report one concise line. A stop condition ends the run; no threshold, budget, or trainer change is allowed without human direction.
 
 ## Fixed artifacts
