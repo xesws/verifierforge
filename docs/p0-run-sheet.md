@@ -206,13 +206,17 @@ reviewer-tunnel check. It does not authorize a trainer/frozen-data change, a
 paid provider call, a credential write, a custom auth system, or interruption
 of the existing serving pod.
 
-- [ ] **S10a — sandbox feasibility:** inspect available tunnel and existing
-  authorization mechanisms without changing `vfserve`. An unauthenticated
-  public URL is not a valid substitute for invitation authentication.
-- [ ] **S10b — reproducible fallback:** if the 30-minute secure-tunnel budget
-  cannot pass, add and smoke a one-command local launcher for artifact API plus
-  fake proxy. It must leave background-process ownership visible and use no
-  secret.
+- [x] **S10a — sandbox feasibility:** `cloudflared` is absent on both the
+  laptop and `vfserve`; repository inspection found no invitation/authentication
+  implementation. Existing vLLM remains running and untouched. An
+  unauthenticated public URL is not an acceptable replacement, so no tunnel or
+  model request was launched.
+- [x] **S10b — reproducible fallback:** added
+  `scripts/start_reviewer_sandbox.sh`, which binds only `127.0.0.1`, starts the
+  committed artifact API and fake proxy, preflights distinct ports, retains
+  transient logs/SQLite under ignored `runs/reviewer-sandbox/`, and terminates
+  both children on exit. Focused launcher/API/proxy validation: `10 passed`;
+  full suite: `246 passed, 1 skipped`.
 - [ ] **S10c — morning handoff:** append a dated report after factual outcomes
   are known, with an ascending-time `OWNER` checklist, S1--S10 states, commit
   list, and raw blockers. Do not mark partial S7c or unavailable public serving

@@ -10,18 +10,28 @@ python -m pip install -r requirements-app.txt
 pytest -q
 ```
 
-Expected current result: `239 passed, 1 skipped` (the optional live-S3 test is
+Expected current result: `246 passed, 1 skipped` (the optional live-S3 test is
 skipped without explicit credentials).
 
-## 2. Serve the immutable evidence (about 1 minute)
-
-In one terminal:
+## 2. Start the one-command reviewer sandbox (about 1 minute)
 
 ```bash
-VF_API_DATA_MODE=artifacts uvicorn app.api.main:app --host 127.0.0.1 --port 8012
+bash scripts/start_reviewer_sandbox.sh
 ```
 
-In another:
+It opens only loopback endpoints and keeps running until you press Ctrl-C:
+
+```text
+API:   http://127.0.0.1:8012/docs
+Proxy: http://127.0.0.1:8013/v1/chat/completions
+```
+
+The API serves committed immutable evidence; the proxy is deterministic fake
+mode, so this path needs no API key or model-provider request.
+
+## 3. Inspect the immutable evidence (about 1 minute)
+
+In one terminal:
 
 ```bash
 curl http://127.0.0.1:8012/jobs
@@ -34,7 +44,7 @@ The selected main job is `d4-m3-1p5b-r1-v0125`; the control is
 the local-runs API and rejects route mutation rather than pretending the demo
 is live state.
 
-## 3. Check the result and provenance (about 3 minutes)
+## 4. Check the result and provenance (about 3 minutes)
 
 ```bash
 cat data/demo-artifacts/manifest.json
@@ -46,7 +56,7 @@ The manifest records held-out pass@1 `0.5833 → 0.7833`, pass@8
 `be3fdb965dc72a2333761a8f50181053af3c4b5355e83624c3784b6be30cd433`.
 The 0.5B random-reward control JSONL is included next to it.
 
-## 4. Inspect the engineering claims (about 3 minutes)
+## 5. Inspect the engineering claims (about 3 minutes)
 
 - [`README.md`](README.md) explains the system boundary and limitations.
 - [`docs/dev_doc_v0.md`](docs/dev_doc_v0.md) is the external design/evidence
