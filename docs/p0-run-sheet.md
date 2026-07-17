@@ -1407,12 +1407,24 @@ exports, training logic, and external API access remain untouched.
   is to reconstruct the matching rank-16/alpha-32 PEFT wrapper, load the full
   state, merge LoRA, then save standard bf16 HF weights. Merely stripping the
   prefix would leave `base_layer`/LoRA keys and discard trained deltas.
-- [ ] **X2 — non-destructive batch converter:** convert all eight M3 candidate
+- [x] **X2 — non-destructive batch converter:** converted all eight M3 candidate
   exports to `actor/serveable_huggingface/` sibling standard-HF directories,
   keeping the original sources byte-for-byte intact. Pure adapter means local frozen base + adapter
   + `merge_and_unload` in bf16; confirmed prefix layout means only the evidenced
-  key/index rewrite. Add focused tests and commit before pod conversion.
-  **Stop:** source mutation, converter/test failure, or insufficient pod space.
+  key/index rewrite. The actual observed branch merged LoRA delta into each
+  full base-layer tensor, then rewrote standard names/index in bf16. Local
+  converter/held-out tests: 27 passed; full suite: **205 passed, 1 skipped**.
+  **Passed 2026-07-17 04:50:18 UTC:** all steps 50/100/150/200/250/300/350/400
+  have a completed sibling manifest. Source step-50 index remains
+  `095941e502f62d2b3d627389a6e418d6631c57fb550cc3b83c6a68a364421eb2`;
+  its new serving index is
+  `ed3866074287fe117daaef054110831ee0e6c7e3152ae2280f435d592eb36848`.
+  The conversion summary SHA-256 is
+  `59f36ea655e8106be87b152b46359363a1c7368091eec5ff981992c22b373ddb`;
+  step 50 has 12 source files plus 13 serving files (including its manifest),
+  and its bf16 serving representation is 3.4 GiB. M3 checkpoint storage rose
+  from 61 GiB to 88 GiB, within the mounted-volume budget. **Stop:** source
+  mutation, converter/test failure, or insufficient pod space.
 - [ ] **X3 — serving gate:** serve converted step 50 locally; record
   `/v1/models` and one real completion in evidence. **Stop:** any serve/load or
   completion failure; do not launch M5.
