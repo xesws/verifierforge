@@ -1,0 +1,12 @@
+{
+  "default": {
+    "input_per_million_usd": 0.5,
+    "output_per_million_usd": 1.5
+  },
+  "models": {
+    "vf-demo": {
+      "input_per_million_usd": 0.25,
+      "output_per_million_usd": 0.75
+    }
+  }
+}
