@@ -1262,7 +1262,8 @@ were not launched.
 
 ### v0.12.6 — checkpoint space governance and M3 resume
 
-**Status:** S1--S3 complete; M3 remains stopped pending the H100 cleanup gate.
+**Status:** S1--S3 complete; S4 resume authorized with an accepted host-side
+2.6% ghost allocation risk.
 
 - [x] **S1 — state freeze:** tmux is absent; `d4-m3-1p5b-r1-v0125` ends at
   bridged metric step 150 (`2026-07-17T02:12:56.416371Z`) and Storage steps
@@ -1289,17 +1290,19 @@ were not launched.
   accepted/rejected arithmetic is written as an artifact. Focused tests: 24
   passed; full suite: **200 passed, 1 skipped**; shell syntax checks passed.
   **Stop:** any test or preflight failure.
-- [ ] **S4 — resume (blocked at cleanup gate):** at the H100 preflight the
-  remote repository was still `70fe4d2` (no launch/pull was issued), tmux had
-  no server, and Storage step 100 still had `data.pt`,
-  `model_world_size_1_rank_0.pt`, and `optim_world_size_1_rank_0.pt`. However,
-  `nvidia-smi` reported 2,134 MiB used with no process table entry; the compute
-  query showed `2743762, [Not Found], 2118 MiB`. Do not start resume or reset
-  the device without an explicit operator decision. Once clear, atomically move
-  failed step-150 staging into evidence, then resume from Storage step 100 with
-  the same job ID. **Acceptance:** next metric/checkpoint is bridged through
-  the new policy; reach 400 with a final artifact and GPU clear. **Stop:** any
-  quota, bridge, entropy, or cleanup gate failure.
+- [ ] **S4 — resume (authorized host-side ghost risk):** the H100 preflight
+  found no tmux server and a complete Storage step 100 (`data.pt`, model, and
+  optimizer). `nvidia-smi` reported 2,134 MiB / 81,559 MiB (~2.6%) with only
+  `2743762, [Not Found], 2118 MiB`, which the operator judges to be a
+  host-namespace residual and below the practical impact threshold. No GPU
+  reset is permitted. Resume the same job from Storage step 100, atomically
+  quarantine failed staging step 150, and monitor through the new step-150
+  checkpoint: expected throughput is about 3.5 steps/minute, with zero CUDA
+  errors and zero OOMs. Any anomaly in that guard window requires immediate
+  `vf kill` and a stop report; a pod restart then requires a new operator-supplied
+  SSH endpoint. **Acceptance:** step 150 publishes under the new policy, then
+  reach 400 with a final artifact and GPU clear. **Stop:** quota, bridge,
+  entropy, CUDA/OOM, or guard-window anomaly.
 - [ ] **S5 — serial continuation:** only after S4 passes, continue approved
   M4, M5, and M6 without waiting. Existing held-out and artifact gates remain
   unchanged.
