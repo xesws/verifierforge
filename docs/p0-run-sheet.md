@@ -72,6 +72,23 @@ instructions. It does not authorize a trainer or frozen-data change.
 is not retried. A blocker exceeding 30 minutes is recorded and skipped. No
 secret, raw endpoint key, or paid external LLM request is allowed.
 
+## v0.16.0 — overnight S7 S3 durability proof
+
+**Status:** planned; this wave starts independently of serving compatibility
+once its documentation gate is committed. It does not authorize `trainer/` or
+frozen-data changes.
+
+- [ ] **S7a — implementation and moto:** add the S3 Storage backend and cover
+  all ABC methods, atomic checkpoint publication, idempotent overwrite, and
+  append-only metrics with moto.
+- [ ] **S7b — true cloud round trip:** upload/download a checkpoint with SHA,
+  append 50 metrics, and prove interrupted data remains unpublished. A single
+  `AccessDenied`/403/scope failure becomes `OWNER-ACTION` with the exact
+  follow-up command and skips S7c.
+- [ ] **S7c — GPU node-loss proof:** only after S7b, run a 0.5B 100-step job
+  with S3 durable storage, kill near 60, resume to 100, retain S3 inventory /
+  SHA / curve evidence, and then print `S3 实证完成,训练 pod 可停`.
+
 ## Fixed boundaries
 
 - Work only on `main`; do not create a parallel worktree.
