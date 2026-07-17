@@ -1376,7 +1376,7 @@ serving evidence, so M6 is blocked pending human direction.
 
 ### v0.12.7 — export/serving compatibility repair and M5 rerun
 
-**Status:** X3 serving gate passed; X4 formal held-out rerun is next. This version supersedes
+**Status:** X4 passed; X5 archive and future-publication serving gate are in progress. This version supersedes
 v0.12.6's M5 stop only for the explicitly approved conversion, serving proof,
 M5 rerun, and future-publication serving gate. Frozen data, verifier, original
 exports, training logic, and external API access remain untouched.
@@ -1436,17 +1436,35 @@ exports, training logic, and external API access remain untouched.
   shutdown settled, `nvidia-smi` returned to the pre-existing 2,134 MiB
   `[Not Found]` ghost allocation at 0% utilization. **Admission passed:** X4
   may use only `actor/serveable_huggingface` paths.
-- [ ] **X4 — formal M5 rerun:** serially evaluate eight converted checkpoints ×
-  frozen 60 held-out rows × `k=8`; retain all 3,840 completions/tier records.
-  Publish every checkpoint triplet and select highest held-out pass@1 (lower
-  step tie-break), next to before `0.5833 / 0.7667 / 0.4667`. **Only automatic
-  human call:** selected after pass@1 below `0.5833333333333334`; otherwise
-  proceed immediately to X5.
-- [ ] **X5 — M6 archive and permanent publication gate:** archive the selected
-  checkpoint, M3/M4 curves, all evidence SHA-256 values, pip freeze, and driver
-  evidence; sync/hash-check laptop copies. Make bridge publication require a
-  local vLLM models-plus-completion smoke and add focused tests. **Stop:** any
-  archive/hash/publication-smoke failure; no after claim from incomplete data.
+- [x] **X4 — formal M5 rerun:** serially evaluated eight converted checkpoints ×
+  frozen 60 held-out rows × `k=8`, retaining all 3,840 completions/tier records.
+  Report SHA-256: `ebe29fb19d02ac3072ff09a0f1756d18373bfb1d1eb4d123f07457e9b9b5ceb8`.
+  The exact triplets (`pass@1 / pass@8 / mixed`) are: step 50
+  `0.55 / 0.7666666667 / 0.4166666667`; step 100
+  `0.6166666667 / 0.8166666667 / 0.45`; step 150
+  `0.6666666667 / 0.8333333333 / 0.3833333333`; step 200
+  `0.6833333333 / 0.8166666667 / 0.3333333333`; step 250
+  `0.6333333333 / 0.8333333333 / 0.3833333333`; step 300
+  `0.6333333333 / 0.8833333333 / 0.45`; step 350
+  `0.7833333333 / 0.9 / 0.4333333333`; and step 400
+  `0.7166666667 / 0.9333333333 / 0.4`. Deterministic selection chose step 350.
+  **Before:** `0.5833333333 / 0.7666666667 / 0.4666666667`; **after:**
+  `0.7833333333 / 0.9 / 0.4333333333`. The after pass@1 clears the sole human
+  stop threshold, so X5 proceeds automatically.
+- [ ] **X5 — M6 archive and permanent publication gate:** create an atomic
+  archive manifest that identifies both the selected step-350 serving export
+  and the final step-400 resumable checkpoint, M3/M4 curve PNGs, every M3/M4
+  evidence-file SHA-256, and runtime pip-freeze/driver evidence. Sync that
+  manifest and its referenced small artifacts through `vf watch` and compare
+  remote/local SHA-256 values. Before a future bridge stores any checkpoint,
+  it must convert the staged PEFT export to a standard bf16 sibling, bind vLLM
+  only to loopback on a free port, obtain `/v1/models` plus one real completion,
+  atomically retain the exchange, then call Storage. Failure leaves the staged
+  checkpoint unpublished for the existing quarantine path. Pass LoRA rank and
+  alpha from `GrpoSmokeConfig`; use a small smoke memory cap so it can coexist
+  with the rollout engine. Focused unit tests inject the gateway and prove both
+  success ordering and no-publication-on-failure. **Stop:** any archive/hash or
+  publication-smoke failure; no after claim from incomplete data.
 
 **N6 pre-implementation decision:** use a new
 `grpo_v1_1p5b_h100_smoke` target, not the historical Blackwell config. It has
