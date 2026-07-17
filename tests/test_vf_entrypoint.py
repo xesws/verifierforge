@@ -47,6 +47,8 @@ def test_vf_kill_owns_recorded_job_process_groups_and_gpu_cleanup() -> None:
     assert 'ray" stop --force' in script
     assert "nvidia-smi --query-compute-apps=pid,process_name,used_memory" in script
     assert "vf kill failed: GPU still has" in script
+    assert '"storage_credentials":"cleared","cleared_by":"vf_kill"' in script
+    assert 'lifecycle="runs/$job/evidence/s3-credential-lifecycle.json"' in script
 
 
 def test_vf_watch_excludes_pod_only_failed_staging_weights() -> None:

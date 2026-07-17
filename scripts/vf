@@ -194,6 +194,11 @@ if [[ -n "${compute_apps//[[:space:]]/}" ]] || (( gpu_memory != 0 )); then
   exit 1
 fi
 
+lifecycle="runs/$job/evidence/s3-credential-lifecycle.json"
+if [[ -f "$lifecycle" ]]; then
+  printf '%s\n' '{"storage_credentials":"cleared","cleared_by":"vf_kill"}' > "$lifecycle"
+fi
+
 printf 'vf kill complete: %s (GPU memory: %s MiB)\n' "$job" "$gpu_memory"
 REMOTE
 }

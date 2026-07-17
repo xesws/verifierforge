@@ -3,6 +3,7 @@ from pathlib import Path
 
 import pytest
 
+from scripts import s3_job_env
 from scripts.s3_job_env import _job_shell_command, _recovery_shell_command, _validate_payload, local_payload
 
 
@@ -66,3 +67,22 @@ def test_recovery_tmux_command_is_credential_free_and_clears_environment(tmp_pat
     assert '"storage_credentials":"injected"' in command
     assert '"storage_credentials":"cleared"' in command
     assert "unset AWS_ACCESS_KEY_ID AWS_SECRET_ACCESS_KEY" in command
+
+
+def test_missing_tmux_session_is_a_quiet_false(monkeypatch):
+    captured = {}
+
+    class Completed:
+        returncode = 1
+
+    def fake_run(arguments, **kwargs):
+        captured["arguments"] = arguments
+        captured.update(kwargs)
+        return Completed()
+
+    monkeypatch.setattr(s3_job_env.subprocess, "run", fake_run)
+
+    assert s3_job_env._session_exists("missing") is False
+    assert captured["arguments"] == ["tmux", "has-session", "-t", "missing"]
+    assert captured["stdout"] is s3_job_env.subprocess.DEVNULL
+    assert captured["stderr"] is s3_job_env.subprocess.DEVNULL

@@ -222,7 +222,15 @@ def _recovery_shell_command(
 
 
 def _session_exists(job: str) -> bool:
-    return subprocess.run(["tmux", "has-session", "-t", job], check=False).returncode == 0
+    return (
+        subprocess.run(
+            ["tmux", "has-session", "-t", job],
+            check=False,
+            stdout=subprocess.DEVNULL,
+            stderr=subprocess.DEVNULL,
+        ).returncode
+        == 0
+    )
 
 
 def _valid_pgid(value: str) -> bool:

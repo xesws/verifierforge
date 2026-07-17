@@ -163,6 +163,10 @@ contracts.
   S3/IAM failure. Per the no-`trainer/` rule, add and test an external native
   checkpoint wrapper publisher, publish the preserved complete step-50 native
   payload through S3, then resume/kill/resume unchanged `vf train`.
+- [ ] **S7 lifecycle audit repair (v0.16.2):** `vf kill` verified 0 MiB after
+  the partial S7 run, but its non-secret lifecycle marker remained `injected`.
+  Add a post-GPU-cleanup `cleared_by=vf_kill` marker; this is evidence hygiene,
+  not a substitute for the uncompleted step-60 node-loss injection.
 
 ## Fixed boundaries
 
