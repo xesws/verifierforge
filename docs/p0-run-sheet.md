@@ -115,6 +115,26 @@ frozen-data changes.
   with S3 durable storage, kill near 60, resume to 100, retain S3 inventory /
   SHA / curve evidence, and then print `S3 实证完成,训练 pod 可停`.
 
+## v0.17.0 — overnight S8 delivery artifacts
+
+**Status:** planned; this wave does not alter trainer code, frozen data, or
+contracts.
+
+- [ ] **S8a — committed demo artifacts and read-only API mode:** ship factual
+  D4 metrics/report metadata under `data/demo-artifacts/`, add an explicit
+  `VF_API_DATA_MODE=artifacts` path to the real API, and prove contract/data
+  consistency.
+- [ ] **S8b — public-facing documentation:** make README factual and complete;
+  rewrite the outward-facing development document; synchronize AGENTS links
+  and document actual limitations including the public endpoint blocker.
+- [ ] **S8c — serve/runtime packaging:** add a verified direct-lock
+  `requirements-serve.txt` and operational NOTES without keys or invented
+  hosting facts.
+- [ ] **S8d — workspace disposition:** classify every pre-existing untracked
+  or modified path; preserve user-owned work, commit only scoped deliverables,
+  and leave the repository status clean or explicitly record an owner-owned
+  blocker.
+
 ## Fixed boundaries
 
 - Work only on `main`; do not create a parallel worktree.
