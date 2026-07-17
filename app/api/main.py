@@ -11,6 +11,7 @@ import sqlite3
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 
+from app.api.artifacts import ArtifactDataError, ArtifactStore
 from app.api.copilot import router as copilot_router
 from app.proxy.routing import LivePassRateRecord, RouteRecord, get_route, list_live_pass_rate, put_route
 from app.proxy.traffic import DEFAULT_DB_PATH
@@ -39,6 +40,26 @@ app.include_router(copilot_router)
 
 def _runs_dir() -> Path:
     return Path(os.environ.get("VF_RUNS_DIR", "./runs")).expanduser()
+
+
+def _data_mode() -> str:
+    mode = os.environ.get("VF_API_DATA_MODE", "runs").strip().lower()
+    if mode not in {"runs", "artifacts"}:
+        raise HTTPException(status_code=500, detail="VF_API_DATA_MODE must be runs or artifacts")
+    return mode
+
+
+def _artifact_store() -> ArtifactStore:
+    root = Path(
+        os.environ.get(
+            "VF_DEMO_ARTIFACTS_DIR",
+            str(Path(__file__).resolve().parents[2] / "data" / "demo-artifacts"),
+        )
+    ).expanduser()
+    try:
+        return ArtifactStore(root)
+    except ArtifactDataError as error:
+        raise HTTPException(status_code=503, detail="Demo artifacts are unavailable") from error
 
 
 def _proxy_db_path() -> Path:
@@ -91,6 +112,8 @@ def _metrics_for(job_dir: Path) -> Metrics:
 @app.get("/jobs")
 def list_jobs() -> list[dict[str, str]]:
     """List local run IDs and their file-inferred status."""
+    if _data_mode() == "artifacts":
+        return _artifact_store().list_jobs()
     root = _runs_dir()
     if not root.is_dir():
         return []
@@ -104,6 +127,11 @@ def list_jobs() -> list[dict[str, str]]:
 @app.get("/jobs/{job_id}", response_model=Job)
 def get_job(job_id: str) -> Job:
     """Return a minimal Job built from files already present under runs/."""
+    if _data_mode() == "artifacts":
+        try:
+            return _artifact_store().job(job_id)
+        except KeyError as error:
+            raise HTTPException(status_code=404, detail="Job not found") from error
     job_dir = _job_dir(job_id)
     created = datetime.fromtimestamp(job_dir.stat().st_mtime, tz=timezone.utc)
     return Job(
@@ -122,12 +150,22 @@ def get_job(job_id: str) -> Job:
 @app.get("/jobs/{job_id}/metrics", response_model=Metrics)
 def job_metrics(job_id: str) -> Metrics:
     """Aggregate the append-only metric log into the shared Metrics shape."""
+    if _data_mode() == "artifacts":
+        try:
+            return _artifact_store().metrics(job_id)
+        except KeyError as error:
+            raise HTTPException(status_code=404, detail="Job not found") from error
     return _metrics_for(_job_dir(job_id))
 
 
 @app.get("/clusters/{cluster_id}/routing", response_model=RoutingState)
 def get_cluster_routing(cluster_id: str) -> RoutingState:
     """Read the frontend routing switch in the existing contract shape."""
+    if _data_mode() == "artifacts":
+        try:
+            return _artifact_store().routing(cluster_id)
+        except KeyError as error:
+            raise HTTPException(status_code=404, detail="Cluster not found") from error
     try:
         return _routing_state(get_route(cluster_id, db_path=_proxy_db_path()))
     except (OSError, sqlite3.Error, ValueError) as error:
@@ -137,6 +175,8 @@ def get_cluster_routing(cluster_id: str) -> RoutingState:
 @app.put("/clusters/{cluster_id}/routing", response_model=RoutingState)
 def put_cluster_routing(cluster_id: str, state: RoutingState) -> RoutingState:
     """Persist the frontend routing switch without adding a new public contract."""
+    if _data_mode() == "artifacts":
+        raise HTTPException(status_code=409, detail="Demo artifact mode is read-only")
     if state.cluster_id != cluster_id:
         raise HTTPException(status_code=422, detail="routing cluster_id must match the path")
     try:
@@ -157,6 +197,11 @@ def put_cluster_routing(cluster_id: str, state: RoutingState) -> RoutingState:
 @app.get("/clusters/{cluster_id}/live-pass-rate", response_model=LivePassRate)
 def get_live_pass_rate(cluster_id: str) -> LivePassRate:
     """Serve guardian rolling exact-pass points in the shared contract shape."""
+    if _data_mode() == "artifacts":
+        try:
+            return _artifact_store().live_pass_rate(cluster_id)
+        except KeyError as error:
+            raise HTTPException(status_code=404, detail="Cluster not found") from error
     try:
         points = list_live_pass_rate(cluster_id, db_path=_proxy_db_path())
     except (OSError, sqlite3.Error, ValueError) as error:

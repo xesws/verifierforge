@@ -1,0 +1,16 @@
+{
+  "live_pass_rate": {
+    "data-pull-sql": {
+      "cluster_id": "data-pull-sql",
+      "points": []
+    }
+  },
+  "routing": {
+    "data-pull-sql": {
+      "canary_percent": 0,
+      "cluster_id": "data-pull-sql",
+      "enabled": false,
+      "target_model": "tuned"
+    }
+  }
+}

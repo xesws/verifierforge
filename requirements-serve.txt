@@ -1,0 +1,13 @@
+# v0.17.0 verified direct serving/proxy environment (L4 local-serving gate).
+# Install this on a disposable serving pod; it is intentionally not the GRPO trainer stack.
+fastapi==0.139.2
+uvicorn==0.51.0
+pydantic==2.13.4
+openai==2.46.0
+python-dotenv==1.2.2
+sqlparse==0.5.5
+torch==2.8.0
+vllm==0.10.2
+transformers==4.57.6
+tokenizers==0.22.2
+huggingface_hub==0.36.2

@@ -120,10 +120,17 @@ frozen-data changes.
 **Status:** planned; this wave does not alter trainer code, frozen data, or
 contracts.
 
-- [ ] **S8a — committed demo artifacts and read-only API mode:** ship factual
-  D4 metrics/report metadata under `data/demo-artifacts/`, add an explicit
-  `VF_API_DATA_MODE=artifacts` path to the real API, and prove contract/data
-  consistency.
+- [x] **S8a — committed demo artifacts and read-only API mode:** shipped
+  factual D4 metrics/report metadata under `data/demo-artifacts/` and added
+  `VF_API_DATA_MODE=artifacts` to the real API. **Result:** the main 400-row
+  and control 200-row JSONL curves retain SHA-256
+  `be3fdb965dc72a2333761a8f50181053af3c4b5355e83624c3784b6be30cd433` and
+  `b9acd2c38c702dc6b32b481425010f8c0afc780b52937ce62a09e6c11f76c14f`;
+  the artifact manifest is
+  `0e37408131363ac404a8aa83192062fe5d9289baccf021dd0d42415981cdfc0f`.
+  Artifact mode validates Job/Metrics/RoutingState/LivePassRate shapes,
+  reconstructs metrics from JSONL, and returns 409 for routing PUT. Focused
+  and full validation: `239 passed, 1 skipped`.
 - [ ] **S8b — public-facing documentation:** make README factual and complete;
   rewrite the outward-facing development document; synchronize AGENTS links
   and document actual limitations including the public endpoint blocker.

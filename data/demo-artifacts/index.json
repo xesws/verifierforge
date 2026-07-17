@@ -1,0 +1,16 @@
+{
+  "clusters_path": "clusters.json",
+  "jobs": [
+    {
+      "job_id": "d4-m3-1p5b-r1-v0125",
+      "job_path": "jobs/d4-m3-1p5b-r1-v0125/job.json",
+      "metrics_path": "jobs/d4-m3-1p5b-r1-v0125/metrics.jsonl"
+    },
+    {
+      "job_id": "d4-m4-0p5b-random-v0126",
+      "job_path": "jobs/d4-m4-0p5b-random-v0126/job.json",
+      "metrics_path": "jobs/d4-m4-0p5b-random-v0126/metrics.jsonl"
+    }
+  ],
+  "schema_version": 1
+}
