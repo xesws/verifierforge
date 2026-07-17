@@ -38,8 +38,9 @@ un-decomposable lock and cannot diagnose an identity dispute.
 
 ## v0.15.2 — overnight S1–S6 serving recovery
 
-**Status:** in progress. This section replaces all earlier unfinished serving
-instructions. It does not authorize a trainer or frozen-data change.
+**Status:** closed with S1--S4 passed, S5 blocked, and S6 skipped. This section
+replaces all earlier unfinished serving instructions. It does not authorize a
+trainer or frozen-data change.
 
 - [x] **S1 — three-machine runtime evidence:** archived full `pip freeze` from
   laptop, training pod, and `vfserve`; recorded exact `transformers` /
@@ -134,8 +135,8 @@ node-loss pass. This wave does not authorize `trainer/` or frozen-data changes.
 
 ## v0.17.0 — overnight S8 delivery artifacts
 
-**Status:** planned; this wave does not alter trainer code, frozen data, or
-contracts.
+**Status:** completed except the explicit S8d owner-action disposition; this
+wave does not alter trainer code, frozen data, or contracts.
 
 - [x] **S8a — committed demo artifacts and read-only API mode:** shipped
   factual D4 metrics/report metadata under `data/demo-artifacts/` and added
@@ -200,11 +201,10 @@ contracts.
 
 ## v0.17.2 — S10 reviewer sandbox and morning handoff
 
-**Status:** planned before implementation. This is a delivery-only patch: it
-may package a local artifact-API/fake-proxy launcher and timebox a secure
-reviewer-tunnel check. It does not authorize a trainer/frozen-data change, a
-paid provider call, a credential write, a custom auth system, or interruption
-of the existing serving pod.
+**Status:** completed with the local-safe fallback. This is a delivery-only
+patch: it does not authorize a trainer/frozen-data change, a paid provider
+call, a credential write, a custom auth system, or interruption of the existing
+serving pod.
 
 - [x] **S10a — sandbox feasibility:** `cloudflared` is absent on both the
   laptop and `vfserve`; repository inspection found no invitation/authentication
@@ -217,10 +217,9 @@ of the existing serving pod.
   transient logs/SQLite under ignored `runs/reviewer-sandbox/`, and terminates
   both children on exit. Focused launcher/API/proxy validation: `10 passed`;
   full suite: `246 passed, 1 skipped`.
-- [ ] **S10c — morning handoff:** append a dated report after factual outcomes
-  are known, with an ascending-time `OWNER` checklist, S1--S10 states, commit
-  list, and raw blockers. Do not mark partial S7c or unavailable public serving
-  as passed.
+- [x] **S10c — morning handoff:** appended at end-of-file below with an
+  ascending-time owner checklist, S1--S10 states, commit list, and verbatim
+  safe blockers. Partial S7c and unavailable public serving remain unpassed.
 
 ## Fixed artifacts
 
@@ -1721,3 +1720,90 @@ auditable, and N3 must not be treated as complete.
   terminated immediately to avoid concurrent venv writes, while the original
   was allowed to complete. **Stop:** any future installation/status/import/version
   failure; N4 is now authorized.
+
+## 2026-07-17 晨报 — 最终交接（S10c）
+
+### 【OWNER 晨间清单】
+
+1. **约 2 分钟 — 处置四个未跟踪文件。** 确认
+   `docs/vllm-debug/`、`scripts/freeze_nl2sql.py`、
+   `tests/test_freeze_nl2sql.py`、`tq/transferqueue-0.1.7-py3-none-any.whl`
+   应分别保留提交、归档或删除；这是让全局 `git status` 变干净的唯一
+   人工决策。无安全的一键命令，因为这些可能是 owner 证据。
+2. **约 3 分钟 — 本地演示评委路径。** 运行
+   `bash scripts/start_reviewer_sandbox.sh`，在浏览器打开其输出的
+   `http://127.0.0.1:8012/docs`；Ctrl-C 会同时关闭 API 和 proxy。
+3. **约 5 分钟 — 若需要公网推理演示，先修 RunPod 的 8000 公网入口。**
+   修复后再提供确认可达的 endpoint；当前不应重试旧 URL，因为一次
+   30 秒超时已按规则记录。
+4. **约 10 分钟 — 裁决 S7c 的证明边界。** 二选一授权：允许为 0.5B
+   native checkpoint 增加可服务导出路径，或接受不经过 serving gate 的
+   S3-only native node-loss 证明；未获授权前不要重跑。
+5. **约 30 分钟 — 如确实需要公网评委沙箱，提供可审计的邀请码/鉴权
+   方案和 Cloudflare 账户边界。** 现仓库没有该机制；不能用无鉴权 quick
+   tunnel 替代。获批后须先开新的文档版本再执行。
+
+### S1--S10 状态
+
+| 项目 | 状态 | 事实结论 |
+| --- | --- | --- |
+| S1 | 通过 | 三台机器完整 `pip freeze` 已归档；训练 pod 为 Transformers `4.57.6` / tokenizers `0.22.2`。 |
+| S2 | 通过 | `vfserve` 对齐为 Transformers `4.57.6`、tokenizers `0.22.2`、huggingface_hub `0.36.2`，未改 vLLM/torch。 |
+| S3 | 通过 | 警告级 vLLM 本地 `/v1/models` 与一次真实本地 NL→SQL completion 成功。 |
+| S4 | 通过 | 未再出现兼容报错，故三轮最小对齐分支未触发；服务保持运行。 |
+| S5 | 阻塞 | 公网 SDK 路径超时；未重试。 |
+| S6 | 跳过 | 因 S5 未通过，未切 `VF_PROXY_TUNED_UPSTREAM`、canary 仍为 0，未作 guardian 真流量声明。 |
+| S7a | 通过 | `S3Storage`、moto 全接口覆盖、manifest-last 原子发布完成。 |
+| S7b | 通过 | 真 bucket checkpoint/50 metrics/断传原子性 roundtrip 通过。 |
+| S7c | 部分完成 / 未通过 | native S3 publish/materialize/resume 到 step 100 通过；没有在 step 60 注入 kill，且 strict serving gate 阻止 50/100 发布，不能称为节点死亡证明。 |
+| S8 | 通过（S8d OWNER-ACTION） | demo artifacts、真实 API artifact 模式、README/requirements-serve 完成；四个既存未跟踪文件未擅自处理。 |
+| S9 | 通过 | `xesws/verifierforge` 已验证为 `PRIVATE`；Devpost 文案、视频脚本、`JUDGES.md` 已入库。 |
+| S10 | 通过（安全 fallback） | 没有 `cloudflared` 或邀请码机制，未公开服务；已交付回环 artifact API + fake proxy 一键评委沙箱。 |
+
+### 本轮已推送 commit
+
+- `7366896` `v0.15.0 Docs: reserve D5 serving endpoint`
+- `09acc08` `v0.15.1 Infrastructure: inventory M6 tree identities`
+- `925be96` `v0.15.1 Docs: record M6 identity arbitration`
+- `14e9201` `v0.15.2 Docs: reserve serving runtime recovery`
+- `9f1b1c2` `v0.15.2 Infra: archive serving runtime inventories`
+- `9906e97` `v0.15.2 Infra: record serving gateway result`
+- `6b77354` `v0.16.0 Docs: reserve S3 resilience proof`
+- `97776ce` `v0.16.0 Storage: add atomic S3 backend`
+- `c778986` `v0.16.0 Storage: add real bucket proof`
+- `ee18ae5` `v0.16.0 Docs: reserve S3 credential handoff`
+- `c30c938` `v0.16.0 Infra: inject S3 credentials into tmux`
+- `06bb2bf` `v0.16.1 Storage: recover native S3 checkpoint`
+- `e59d1ea` `v0.16.2 Infra: close S3 credential audit`
+- `4b1e339` `v0.16.2 Docs: record S3 proof outcome`
+- `4ba35a1` `v0.17.0 Docs: reserve delivery artifact wave`
+- `5770085` `v0.17.0 API: add reviewer demo artifacts`
+- `e0af607` `v0.17.0 Docs: finalize reviewer delivery`
+- `50943f5` `v0.17.0 Docs: record workspace disposition`
+- `80cec47` `v0.17.1 Docs: add submission package`
+- `49fda2d` `v0.17.2 Docs: plan reviewer sandbox handoff`
+- `9d56373` `v0.17.2 Infra: package reviewer sandbox`
+
+### 阻塞原文与边界
+
+```text
+curl: (28) Operation timed out after 30006 milliseconds with 0 bytes received
+```
+
+This is the single S5 public-gateway probe; it is a stop condition, not a
+reason to retry the old endpoint.
+
+```text
+ServingSmokeError: checkpoint export conversion failed:
+no safetensors files in .../actor/huggingface
+```
+
+This is the S7c strict publication-gate failure at steps 50 and 100. S3 itself
+was reachable and native recovery was verified, but the requested timed kill
+was missed under the mandated five-minute observation cadence. No AccessDenied
+or 403 occurred in the successful real-bucket S7b probe.
+
+`cloudflared` is absent on both eligible hosts and the repository has no
+invite/authentication implementation. Therefore no unauthenticated public
+quick tunnel was created. The four S8d paths listed in the morning checklist
+remain `OWNER-ACTION`; they were not staged, deleted, or hidden.
