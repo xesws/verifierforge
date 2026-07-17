@@ -1262,8 +1262,8 @@ were not launched.
 
 ### v0.12.6 — checkpoint space governance and M3 resume
 
-**Status:** S1--S3 complete; S4's host-side ghost-allocation guard passed and
-M3 continues toward step 400.
+**Status:** S1--S4 complete; the serial M4 random-reward control is authorized
+and queued after a clean M3 completion.
 
 - [x] **S1 — state freeze:** tmux is absent; `d4-m3-1p5b-r1-v0125` ends at
   bridged metric step 150 (`2026-07-17T02:12:56.416371Z`) and Storage steps
@@ -1290,7 +1290,7 @@ M3 continues toward step 400.
   accepted/rejected arithmetic is written as an artifact. Focused tests: 24
   passed; full suite: **200 passed, 1 skipped**; shell syntax checks passed.
   **Stop:** any test or preflight failure.
-- [ ] **S4 — resume (authorized host-side ghost risk):** the H100 preflight
+- [x] **S4 — resume (authorized host-side ghost risk):** the H100 preflight
   found no tmux server and a complete Storage step 100 (`data.pt`, model, and
   optimizer). `nvidia-smi` reported 2,134 MiB / 81,559 MiB (~2.6%) with only
   `2743762, [Not Found], 2118 MiB`, which the operator judges to be a
@@ -1306,8 +1306,15 @@ M3 continues toward step 400.
   accepted the capacity budget: count 8, projected peak `101173860823` bytes,
   free `148562451234816` bytes, allowed `118849960987852` bytes.
   **Acceptance:** step 150 publishes under the new policy, then reach 400 with
-  a final artifact and GPU clear. **Stop:** quota, bridge, entropy, CUDA/OOM,
-  or guard-window anomaly.
+  a final artifact and GPU clear. **Passed 2026-07-17 03:21:55 UTC:** public
+  metrics reached exactly 400; `Published Storage checkpoint step_400` and
+  `Finished d4-m3-1p5b-r1-v0125` were logged; `artifacts/curve.png` and
+  `artifacts/final/model.txt` exist. The only native resume payload is
+  `ckpt/step_400/global_step_400`; all eight scheduled HF exports (50--400)
+  remain available for M5. The job tmux session is down and its GPU work is
+  released; only the explicitly accepted 2,134 MiB host-namespace ghost remains
+  at 0% utilization. Targeted CUDA/OOM/bridge/entropy scans are empty.
+  **Stop:** quota, bridge, entropy, CUDA/OOM, or guard-window anomaly.
 - [x] **S4 guard — resumed step 150:** `Published Storage checkpoint step_150`
   appeared before new public metrics 151--155; `ckpt/step_150` exists, staging
   is only 1.2 MiB, and Storage is 27 GiB (older native payloads pruned while HF
@@ -1320,9 +1327,16 @@ M3 continues toward step 400.
   208. `global_step_200` is the only wrapper retaining model/optimizer files;
   steps 50, 100, and 150 are HF-only exports. Storage is 34 GiB and active
   staging is 1.4 MiB, with an empty CUDA/OOM/bridge-failure scan.
-- [ ] **S5 — serial continuation:** only after S4 passes, continue approved
-  M4, M5, and M6 without waiting. Existing held-out and artifact gates remain
-  unchanged.
+- [ ] **S5 — serial continuation:** M4 will use the distinct job namespace
+  `d4-m4-0p5b-random-v0126` and the pre-existing
+  `grpo_v1_0p5b_random_control` config: 0.5B, 200 steps, frozen 50-row
+  training pool, deterministic Bernoulli(0.5) random reward, 50-step
+  checkpoints, derived epoch guard, and the same five diagnostic environment
+  variables. It is serial after M3, does not use held-out data, and is not a
+  gain claim. On its complete artifact/evidence result, launch M5 against only
+  the frozen 60-row held-out set and then M6 SHA/sync archive. **Stop:** any M4
+  job or Storage failure; M5 after pass@1 below `0.5833333333333334`; or any
+  artifact/sync mismatch.
 
 **N6 pre-implementation decision:** use a new
 `grpo_v1_1p5b_h100_smoke` target, not the historical Blackwell config. It has
