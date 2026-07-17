@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import hashlib
 from pathlib import Path
 
 import pytest
@@ -32,7 +33,7 @@ def _write_completed_pair(storage: LocalStorage) -> tuple[str, str]:
     selected_native = main / "ckpt" / "step_50" / "global_step_50"
     _serveable_export(selected_native)
     final_native = main / "ckpt" / "step_100" / "global_step_100"
-    final_native.mkdir(parents=True)
+    _serveable_export(final_native)
     (final_native / "data.pt").write_bytes(b"resume")
 
     report = {
@@ -73,8 +74,26 @@ def test_m6_archive_records_selected_final_curves_and_every_preexisting_evidence
     )
 
     payload = json.loads(evidence.read_text(encoding="utf-8"))
+    assert payload["schema_version"] == 2
     assert payload["heldout"]["selected_checkpoint_step"] == 50
     assert payload["selected_checkpoint"]["path"].endswith("step_50/global_step_50/actor/serveable_huggingface")
+    assert payload["tree_hash_algorithm"]["id"] == "sha256-relative-posix-path-nul-file-sha256-lf-v1"
+    assert [entry["step"] for entry in payload["checkpoint_exports"]] == [50, 100]
+    selected_files = payload["selected_checkpoint"]["files"]
+    selected_export = storage.root / main_job / "ckpt" / "step_50" / "global_step_50" / "actor" / "serveable_huggingface"
+    assert selected_files == sorted(selected_files, key=lambda entry: entry["path"])
+    assert selected_files[0] == {
+        "path": "config.json",
+        "size_bytes": 2,
+        "sha256": sha256_file(selected_export / "config.json"),
+    }
+    digest = hashlib.sha256()
+    for entry in selected_files:
+        digest.update(entry["path"].encode("utf-8"))
+        digest.update(b"\0")
+        digest.update(entry["sha256"].encode("ascii"))
+        digest.update(b"\n")
+    assert payload["selected_checkpoint"]["tree_sha256"] == digest.hexdigest()
     assert payload["final_training_checkpoint"]["step"] == 100
     assert payload["curves"]["m3"]["sha256"] == sha256_file(
         storage.root / main_job / "artifacts" / "curve.png"
