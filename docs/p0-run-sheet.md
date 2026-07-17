@@ -145,6 +145,12 @@ contracts.
   or modified path; preserve user-owned work, commit only scoped deliverables,
   and leave the repository status clean or explicitly record an owner-owned
   blocker.
+- [x] **S9 — submission package (v0.17.1):** GitHub visibility is now
+  `PRIVATE`, verified via `gh repo view`; the explicit visibility-consequences
+  flag was required by local CLI preflight before the one API mutation. Added
+  `docs/submission/devpost-draft.md`, exact three-minute
+  `docs/submission/video-script.md`, and GPU-free `JUDGES.md`. All claims
+  trace to committed artifacts and retain the public-endpoint limitation.
 
 ## Fixed boundaries
 
