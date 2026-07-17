@@ -141,10 +141,16 @@ contracts.
   stack and recorded endpoint facts in NOTES. The L4 hourly price is explicitly
   unknown because the supplied console did not show it; no secret, endpoint
   key, or invented LivePassRate was added.
-- [ ] **S8d — workspace disposition:** classify every pre-existing untracked
-  or modified path; preserve user-owned work, commit only scoped deliverables,
-  and leave the repository status clean or explicitly record an owner-owned
-  blocker.
+- [ ] **S8d — workspace disposition (OWNER-ACTION):** inspection found four
+  pre-existing, untracked, unignored paths with no Git history: the 13,761-byte
+  `docs/vllm-debug/2026-07-16-grpo-init-stall-diagnosis.md`; the paired
+  15,639-byte `scripts/freeze_nl2sql.py` and 7,438-byte
+  `tests/test_freeze_nl2sql.py`; and 297,782-byte
+  `tq/transferqueue-0.1.7-py3-none-any.whl`. They may be owner work/evidence
+  and are outside this delivery scope, so they were neither staged, deleted,
+  nor hidden by `.gitignore`. The tracked tree is clean after each scoped
+  commit, but overall `git status` cannot be clean until the owner chooses
+  archive/commit/delete for these four paths.
 - [x] **S9 — submission package (v0.17.1):** GitHub visibility is now
   `PRIVATE`, verified via `gh repo view`; the explicit visibility-consequences
   flag was required by local CLI preflight before the one API mutation. Added
