@@ -15,6 +15,12 @@ pytest -q
 
 Use `python -m trainer.fake_train --job demo1 --steps 10 --interval 0.1` for a resumable local smoke test. Start the API with `uvicorn app.api.main:app --reload`, the mock with `python mock/server.py`, and check shell changes with `bash -n scripts/vf`.
 
+For a disposable vLLM/proxy serving pod, install the separately locked direct
+stack with `python -m pip install -r requirements-serve.txt`. Reviewer-safe API
+verification uses `VF_API_DATA_MODE=artifacts`; operational recovery context is
+always `docs/p0-run-sheet.md`, while `docs/dev_doc_v0.md` is the external design
+and evidence record.
+
 ## Coding Style & Naming Conventions
 
 Target Python 3.11 and Pydantic v2. Use four-space indentation, public type hints, `snake_case` functions/variables, and `PascalCase` models/classes. Prefer small modules over new abstractions. Keep contracts additive: do not rename or remove fields consumed by the mock or frontend.
@@ -23,7 +29,7 @@ Metrics are append-only JSONL; checkpoints publish through a temporary directory
 
 ## Versioning & Worktree Merge Rules
 
-Pre-1.0 scaffold: **`v0.1.0`**. `docs/dev_doc_v0.md`'s `v0` and `v2.1` are document revisions, not product releases. Every change needs one target version in its branch name, commit subject, and PR title. Increment the minor for a new capability (`v0.2.0`) and the patch for a bug, compatibility, infrastructure, or docs-only change (`v0.1.1`, then `v0.1.2`). Examples: `feature/v0.2.0-verifier-copilot`, `fix/v0.1.1-checkpoint-resume`, and `docs/v0.1.2-runbook`; commit subjects begin `v0.2.0 Verifier: ...`.
+Pre-1.0 scaffold: **`v0.1.0`**. `docs/dev_doc_v0.md` is the external v0 design/evidence record, not a product-release number; `docs/p0-run-sheet.md` is the sole live operational context. Every change needs one target version in its branch name, commit subject, and PR title. Increment the minor for a new capability (`v0.2.0`) and the patch for a bug, compatibility, infrastructure, or docs-only change (`v0.1.1`, then `v0.1.2`). Examples: `feature/v0.2.0-verifier-copilot`, `fix/v0.1.1-checkpoint-resume`, and `docs/v0.1.2-runbook`; commit subjects begin `v0.2.0 Verifier: ...`.
 
 **Trunk-first default.** Develop on `main` by default. Branches are allowed only for a single purpose and must be created and merged the same day. Do not leave long-lived parallel feature branches.
 
@@ -42,6 +48,8 @@ The parent agent must give every sub-agent the target version and required docum
 ## Testing Guidelines
 
 Use pytest and name tests `test_*.py`. Add focused failure and boundary coverage for changed contracts, storage, or verifier behavior. Run `pytest -q` plus the narrow smoke command relevant to the change before committing.
+
+If you need to use the API to do the model testing, only use OpenRouter (and prefer the model GLM 5.2 - xhigh effort to do so). We want to save money during the tests. You should only use the real OpenAI models during production.
 
 ## Commit & Pull Request Guidelines
 

@@ -131,12 +131,16 @@ contracts.
   Artifact mode validates Job/Metrics/RoutingState/LivePassRate shapes,
   reconstructs metrics from JSONL, and returns 409 for routing PUT. Focused
   and full validation: `239 passed, 1 skipped`.
-- [ ] **S8b — public-facing documentation:** make README factual and complete;
-  rewrite the outward-facing development document; synchronize AGENTS links
-  and document actual limitations including the public endpoint blocker.
-- [ ] **S8c — serve/runtime packaging:** add a verified direct-lock
-  `requirements-serve.txt` and operational NOTES without keys or invented
-  hosting facts.
+- [x] **S8b — public-facing documentation:** completed a factual README,
+  rewrote `docs/dev_doc_v0.md` as the external design/evidence record, and
+  synchronized AGENTS links. The documents distinguish local vLLM success from
+  the public proxy timeout, preserve the held-out numbers and control caveat,
+  and retain this run sheet as the only live operational context.
+- [x] **S8c — serve/runtime packaging:** added direct-lock
+  `requirements-serve.txt` for the verified vLLM 0.10.2 / Transformers 4.57.6
+  stack and recorded endpoint facts in NOTES. The L4 hourly price is explicitly
+  unknown because the supplied console did not show it; no secret, endpoint
+  key, or invented LivePassRate was added.
 - [ ] **S8d — workspace disposition:** classify every pre-existing untracked
   or modified path; preserve user-owned work, commit only scoped deliverables,
   and leave the repository status clean or explicitly record an owner-owned

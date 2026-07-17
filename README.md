@@ -1,14 +1,105 @@
 # VerifierForge
 
-VerifierForge is a developer tool for RL-fine-tuning small open models against programmatic verifiers.
+VerifierForge is a developer tool for improving small open models against a
+programmatic verifier, then proving that the improvement survives a held-out
+evaluation and operational handoff.
+
+It is deliberately a narrow, inspectable system: a verifier is the source of
+truth; training nodes are disposable; metrics and checkpoints flow through a
+small Storage contract; and a routing/guardian layer makes a canary reversible.
+
+## What is real in this repository
+
+The committed demo artifacts preserve the completed NL→SQL D4 result without
+shipping model weights:
+
+| Measurement | Before | Selected step-350 after |
+| --- | ---: | ---: |
+| Held-out pass@1 (60 rows) | 0.5833 | 0.7833 |
+| Held-out pass@8 | 0.7667 | 0.9000 |
+| Mixed fraction | 0.4667 | 0.4333 |
+
+The 0.5B random-reward control curve is included beside the main curve. It is a
+falsification reference, not proof that one training run establishes a general
+causal claim.
 
 ## Architecture
 
-TODO
+```text
+Laptop / CI                         Disposable GPU worker
+───────────                         ─────────────────────
+FastAPI + proxy + verifier ─SSH──▶  verl GRPO + vLLM rollout
+     │                                      │
+     │  contracts / Storage                 │ append metrics, publish checkpoints
+     ▼                                      ▼
+Demo artifacts / local runs  ◀──────  LocalStorage or S3Storage
+     │
+     └── routing canary + sampled verifier guardian
+```
+
+The laptop owns development and reviewable artifacts. A RunPod worker is an
+executor, not a source of truth: it may be replaced after a failure. Local
+Storage is the normal path; S3 Storage uses immutable object generations and a
+manifest-last publication boundary so an interrupted upload cannot become a
+resume checkpoint.
+
+## Six-step workflow
+
+1. Define a task and a deterministic verifier with tiered scoring.
+2. Build and verifier-screen a candidate prompt set.
+3. Measure a baseline with multiple samples, then freeze data and verifier
+   identities before training.
+4. Train a small model and run a random-reward control under the same control
+   plane.
+5. Select checkpoints only on held-out data; retain sample-level evidence.
+6. Serve through an OpenAI-compatible endpoint, route a reversible canary, and
+   score sampled traffic in a non-blocking guardian.
 
 ## Quickstart
 
-TODO
+Install the lightweight local dependencies and run the test suite:
+
+```bash
+python -m pip install -r requirements-app.txt -r requirements-trainer.txt
+pytest -q
+```
+
+Serve the committed, reviewer-safe D4 evidence without a GPU or cloud account:
+
+```bash
+VF_API_DATA_MODE=artifacts uvicorn app.api.main:app --reload
+curl http://127.0.0.1:8000/jobs
+curl http://127.0.0.1:8000/jobs/d4-m3-1p5b-r1-v0125/metrics
+```
+
+The default API mode reads ignored local `runs/`; artifact mode is deliberately
+read-only. For proxy development, use `VF_PROXY_UPSTREAM=fake`; it makes no
+network request. A disposable serving pod uses the direct, locked
+`requirements-serve.txt` environment and an ignored `VF_ENDPOINT_API_KEY`.
+
+## Stateless-compute battle history
+
+The project was built against disposable GPU nodes rather than treating a pod
+as a workstation. The control plane detaches jobs in tmux, records process
+groups for kill/recovery, and keeps checkpoint publication separate from
+transient verl staging. A real S3 round trip has already verified checkpoint
+SHA recovery, 50 append-only metrics, and invisible interrupted uploads. The
+separate GPU node-loss proof is recorded live in `docs/p0-run-sheet.md` rather
+than being claimed early here.
+
+## Limitations
+
+- The demonstrated quality result is one NL→SQL task family with 50 training
+  rows and a 60-row held-out set; it is not a broad benchmark claim.
+- The public RunPod proxy endpoint was not reachable during the delivery test
+  (30-second timeout with zero bytes). Local vLLM serving passed, but public
+  canary/guardian claims are therefore intentionally absent.
+- S3 object semantics are tested and a true-bucket proof passed; automated
+  multi-node rescheduling, cross-card FSDP recovery, and spot orchestration are
+  explicitly out of scope.
+- Demo artifacts exclude weights, checkpoints, credentials, raw traffic, and
+  any paid-provider dependency.
+
 
 ## How we worked with Codex
 
