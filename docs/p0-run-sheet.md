@@ -1262,8 +1262,8 @@ were not launched.
 
 ### v0.12.6 — checkpoint space governance and M3 resume
 
-**Status:** S1--S4 and serial M4 complete; M5 held-out evaluation is authorized
-and queued.
+**Status:** S1--S4 and serial M4 complete; M5 stopped on unavailable held-out
+serving evidence, so M6 is blocked pending human direction.
 
 - [x] **S1 — state freeze:** tmux is absent; `d4-m3-1p5b-r1-v0125` ends at
   bridged metric step 150 (`2026-07-17T02:12:56.416371Z`) and Storage steps
@@ -1346,7 +1346,7 @@ and queued.
   during teardown after the final publish/`Finished` lines. It is retained as a
   nonfatal teardown observation (matching prior Gate B/E1 behavior), not
   silently discarded or treated as a training/Storage failure.
-- [ ] **S5b — M5 held-out evaluation:** launch detached tmux session
+- [x] **S5b — M5 held-out evaluation (STOP):** detached tmux session
   `d4-m5-heldout-v0126` on the pod. It runs
   `python -m trainer.heldout_eval --job d4-m3-1p5b-r1-v0125 --control-job
   d4-m4-0p5b-random-v0126` against all eight M3 HF exports (50--400), one
@@ -1356,9 +1356,23 @@ and queued.
   training-pool value is a gain claim. **Acceptance:** a complete hash-bound
   report containing before `0.5833333333333334 / 0.7666666666666667 /
   0.4666666666666667`, all eight checkpoint evidence pairs, selected checkpoint,
-  and M4 control-curve hash. **Stop:** unavailable/incomplete evidence, any
-  evaluation/hash failure, or selected after pass@1 below `0.5833333333333334`.
-  Only then proceed to M6 SHA/sync archive.
+  and M4 control-curve hash. **Stopped 2026-07-17 04:04:58 UTC:** frozen
+  held-out identity passed (60 rows, SHA
+  `482f0e7678e7603311f72aeead381364cd92f0596c20745cc58c96916a9177e8`,
+  verifier v2), but the first candidate (step 50) exited during vLLM readiness
+  before any evaluator request or sample was written. The preserved server log
+  gives the direct cause: `ValueError: There is no module or parameter named
+  'base_model' in Qwen2ForCausalLM` while loading the exported safetensors.
+  `report.json` is deliberately `status: unavailable`, `after: null`, and has
+  exactly one unavailable checkpoint result (zero evidence/sample hashes); its
+  SHA-256 is
+  `97c72f99c9a4f577bfc9ea14e8bdc1647f90b59c06ae127182b36ac3a9f12fcf`.
+  The checkpoint-result and vLLM-server evidence SHA-256 values are
+  `216811e936160dd4fe92c8a3df167fed592dfa763cd3dccd2ef20760e089c822` and
+  `d9bf7c52412ac118a828a206381dc316cb7e8661856aa954d7032df13f595e09`.
+  M5 tmux exited and GPU returned to the approved 2,134 MiB residual. **Stop
+  honored:** no repair, retry, after metric, gain claim, or M6 archive was
+  attempted. A human decision is required before changing export/serving logic.
 
 **N6 pre-implementation decision:** use a new
 `grpo_v1_1p5b_h100_smoke` target, not the historical Blackwell config. It has
