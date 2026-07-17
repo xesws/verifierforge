@@ -1200,6 +1200,37 @@ were not launched.
   partial checkpoints for a held-out or gain claim, and do not retry without a
   separately approved versioned repair plan.
 
+### v0.12.5 — total-step guard and fresh D4 rerun
+
+**Status:** approved; documentation gate complete before implementation.
+
+- [ ] **Guard:** resolve null `total_epochs` from actual prepared
+  `steps_per_epoch` as `ceil(total_steps / steps_per_epoch) + 2`; reject an
+  explicit epoch override that cannot reach the requested target. Remove the
+  fixed hidden ten-epoch command value. **Acceptance:** focused tests prove a
+  400-step/12-batch configuration cannot silently end at 120 and command
+  construction contains the resolved epoch value. **Stop:** any test or
+  preflight failure.
+- [ ] **Fresh M3:** run `d4-m3-1p5b-r1-v0125` from scratch with the frozen
+  50-row pool, 400 steps, `k=8`, 50-step checkpoints, entropy brake, H100
+  diagnostic environment, and explicit 40 epochs. Preserve the original
+  `d4-m3-1p5b-v0124` metrics/checkpoints unchanged and do not resume it.
+  **Acceptance:** 400 metrics/final artifact, released GPU, and evidence files.
+  At 50 metrics report rate if outside 1.75--5.25 steps/minute; do not stop for
+  that alert. **Stop:** entropy brake or any job/Storage gate failure.
+- [ ] **Serial M4:** only after M3 completion/release, run the 0.5B
+  random-reward control for 200 steps using the derived epoch guard.
+  **Acceptance:** complete curve/evidence in a distinct job namespace.
+  **Stop:** any job or Storage failure.
+- [ ] **M5:** evaluate only fresh eligible M3 checkpoints on frozen held-out
+  60 rows at `k=8`, retain full sample/tier evidence, and select highest
+  pass@1 (lower step on ties). **Acceptance:** hash-bound report next to before
+  `0.5833333333333334 / 0.7666666666666667 / 0.4666666666666667`.
+  **Stop:** evaluation gate rejection or after pass@1 below 0.5833333333333334.
+- [ ] **M6:** archive curve PNG, final checkpoint identity, pip/driver runtime
+  evidence, and pod/laptop SHA-256 matches. **Acceptance:** all listed hashes
+  are recorded. **Stop:** any artifact or sync mismatch.
+
 **N6 pre-implementation decision:** use a new
 `grpo_v1_1p5b_h100_smoke` target, not the historical Blackwell config. It has
 30 steps, 1.5B, `k=8`, one GPU/TP 1, `rollout_gpu_memory_utilization=0.45`,
