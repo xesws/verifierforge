@@ -2263,8 +2263,8 @@ data, GPU, paid LLM, or real provider-provisioning call.
   disposition `tq/` and the superseded vLLM runbook, and leave Git clean.
 - [x] **DB-1 — v0.23.0 complete:** unified relational persistence behind async SQLAlchemy stores;
   tag `db-1-complete` follows the recorded SQLite/Alembic/full-suite gates.
-- [ ] **P-1 — v0.24.0 reserved:** implement mock-only provisioning contracts, state machine, six
-  fuses, and audit persistence; keep `VF_AUTOPROVISION=false`.
+- [x] **P-1 — v0.24.0 complete:** implemented mock-only provisioning contracts, state machine,
+  six fuses, and DB-1 audit persistence; `VF_AUTOPROVISION=false` remains the default.
 - [ ] **DB-2 — v0.25.0 reserved:** migrate and reconcile the legacy SQLite/runs history against
   Supabase without logging a DSN. Owner performs the persistent default flip.
 - [ ] **DB-3 — v0.26.0 reserved:** add Fernet credential protection, secret scanning, explicit
@@ -2311,3 +2311,18 @@ the only untracked paths were `docs/vllm-debug/`, `scripts/freeze_nl2sql.py`,
 - Validation: DB focus `13 passed`; proxy/Agent focus `41 passed`; API/mock
   shape focus `26 passed`; isolated DB-1 full suite `326 passed, 1 skipped`; `git diff
   --check` passed.
+
+### v0.24.0 Provisioner P-1 result
+
+- Strict Pydantic contracts accept only abstract Ada/Ampere/H100 classes;
+  Blackwell/concrete GPU names and secret-bearing env keys are rejected.
+- The deterministic async mock covers REQUESTED → PROVISIONING → BOOTSTRAPPING
+  → RUNNING → COLLECTING → TERMINATED plus create timeout, unreachable SSH,
+  and mid-run provider termination. Every path leaves zero active handles.
+- Budget, concurrency, maximum runtime, global kill, orphan reaping, and
+  append-only audit fuses each have focused coverage. A DB-1 integration test
+  persists a complete mock lifecycle under a real approval FK.
+- Validation: P-1 focus `25 passed`; all seven CLI scenarios returned
+  `active_handles=[]`; package scan found no vendor SDK, network, subprocess,
+  trainer, `scripts/vf`, or real provisioning path. Isolated P-1 full suite:
+  `351 passed, 1 skipped`.
