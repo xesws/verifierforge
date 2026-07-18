@@ -1,12 +1,16 @@
 from __future__ import annotations
 
+import asyncio
 from datetime import datetime, timedelta, timezone
+import os
 from pathlib import Path
 
 import pytest
+from sqlalchemy import text
+from sqlalchemy.ext.asyncio import async_sessionmaker
 
-from app.db.engine import create_database_runtime
-from app.db.migration import migrate_sqlite
+from app.db.engine import DatabaseRuntime, create_database_runtime
+from app.db.migration import migrate_sqlite, run_migrations
 from app.db.records import (
     AgentDecisionRecord,
     ApprovalRecord,
@@ -25,13 +29,56 @@ from app.db.settings import DatabaseSettings
 NOW = datetime(2026, 7, 18, 12, 0, tzinfo=timezone.utc)
 
 
-@pytest.fixture
-async def repositories(tmp_path: Path):
-    settings = DatabaseSettings.sqlite(tmp_path / "repository.sqlite3")
-    await migrate_sqlite(settings)
+_BACKENDS = ["sqlite"]
+if os.environ.get("VF_TEST_POSTGRES_URL", "").strip():
+    _BACKENDS.append("postgres")
+
+
+@pytest.fixture(params=_BACKENDS)
+async def repositories(request, tmp_path: Path):
+    if request.param == "sqlite":
+        settings = DatabaseSettings.sqlite(tmp_path / "repository.sqlite3")
+        await migrate_sqlite(settings)
+        runtime = create_database_runtime(settings)
+        try:
+            yield create_repositories(runtime)
+        finally:
+            await runtime.close()
+        return
+
+    settings = DatabaseSettings.from_env(
+        {
+            "VF_DB_BACKEND": "postgres",
+            "SUPABASE_DB_URL": os.environ["VF_TEST_POSTGRES_URL"],
+        }
+    )
+    await asyncio.to_thread(run_migrations, settings)
     runtime = create_database_runtime(settings)
     try:
-        yield create_repositories(runtime)
+        async with runtime.engine.connect() as connection:
+            transaction = await connection.begin()
+            for table_name in (
+                "provision_events",
+                "approvals",
+                "provider_credentials",
+                "agent_decisions",
+                "live_pass_rate",
+                "guardian_scores",
+                "routing_state",
+                "traffic_requests",
+                "jobs",
+                "clusters",
+            ):
+                await connection.execute(text(f'DELETE FROM "{table_name}"'))
+            test_runtime = DatabaseRuntime(
+                settings=settings,
+                engine=runtime.engine,
+                sessions=async_sessionmaker(connection, expire_on_commit=False),
+            )
+            try:
+                yield create_repositories(test_runtime)
+            finally:
+                await transaction.rollback()
     finally:
         await runtime.close()
 

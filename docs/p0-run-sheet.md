@@ -2368,3 +2368,57 @@ the only untracked paths were `docs/vllm-debug/`, `scripts/freeze_nl2sql.py`,
   generation.
 - Validation: focused security/disconnect suite `30 passed`; full suite
   `365 passed, 1 skipped`; `git diff --check` passed.
+
+## 2026-07-18 afternoon wave closeout
+
+### OWNER morning checklist (shortest first)
+
+1. **Supabase pooler DSN — about 2 minutes of owner input.** In Supabase
+   Dashboard → Connect, copy the transaction-pooler PostgreSQL DSN into the
+   ignored `.env` as `SUPABASE_DB_URL`. Then run:
+
+   ```bash
+   dotenv run -- sh -c 'export VF_DB_BACKEND=postgres; alembic upgrade head && VF_TEST_POSTGRES_URL="$SUPABASE_DB_URL" pytest -q tests/test_repository_contracts.py && python -m scripts.import_legacy_database apply && python -m scripts.import_legacy_database verify'
+   ```
+
+   If that passes, the owner alone sets persistent `VF_DB_BACKEND=postgres`
+   and triggers the full regression/product six-step smoke; only then create
+   `db-2-complete`.
+
+2. **Serving public mapping — about 5 minutes if the pod still exists.** Restore
+   `vfserve` SSH/public port 8000 exposure, update the ignored endpoint URL/key
+   values, then run `dotenv run -- python -m scripts.public_endpoint_proof`.
+   A pass reopens the already documented S6 50% canary/200-request guardian
+   closeout; a failure remains OWNER-ACTION and must not be retried blindly.
+
+### Stage ledger
+
+- **LA-1:** blocked, OWNER-ACTION. Exact local preflight error:
+  `ssh: connect to host 157.157.221.29 port 43314: Operation timed out`.
+  No public completion or S6 traffic was sent and canary stayed at zero.
+- **LA-2:** complete in `3a7e3db`; legacy freezer delegated, redundant wheel
+  ignored, destructive obsolete runbook removed, repository debt clean.
+- **DB-1:** complete in `b752c65`; tag `db-1-complete`.
+- **P-1:** complete in `56ed263`; tag `provisioner-p1-complete`.
+- **DB-2:** importer complete in `fcf4066`; external DNS blocker remains, so
+  no milestone tag and no backend default switch.
+- **DB-3:** complete in `8bb62b4`; tag `db-3-complete`.
+- **CI correction:** `575b681` then `33db89a`; final security run
+  `29659886406` passed. Local final suite: `365 passed, 1 skipped`; tracked
+  secret scan passed.
+
+### Commit and tag ledger
+
+- `7391b9b` — v0.22.5 Lane A reservation
+- `3a7e3db` — v0.22.5 Lane A repository debt closeout
+- `19899ad` / `2c44eee` / `7df20dc` / `00d6aa0` — DB-1, P-1, DB-2, DB-3
+  documentation reservations
+- `b752c65` — v0.23.0 DB-1 (`db-1-complete`)
+- `56ed263` — v0.24.0 P-1 (`provisioner-p1-complete`)
+- `fcf4066` — v0.25.0 importer (no DB-2 tag)
+- `8bb62b4` — v0.26.0 DB-3 (`db-3-complete`)
+- `575b681` / `33db89a` — v0.26.1 security CI corrections
+
+No trainer, frozen dataset, GPU, provider-provisioning API, or paid LLM path
+was touched. The final worktree must be clean after the v0.26.2 documentation
+commit and push.
