@@ -2267,7 +2267,7 @@ data, GPU, paid LLM, or real provider-provisioning call.
   fuses, and audit persistence; keep `VF_AUTOPROVISION=false`.
 - [ ] **DB-2 — v0.25.0 reserved:** migrate and reconcile the legacy SQLite/runs history against
   Supabase without logging a DSN. Owner performs the persistent default flip.
-- [ ] **DB-3:** add Fernet credential protection, secret scanning, explicit
+- [ ] **DB-3 — v0.26.0 reserved:** add Fernet credential protection, secret scanning, explicit
   disconnect behavior, and operational documentation if the timebox permits.
 
 Initial evidence: `main == origin/main == b819187`; tracked files were clean;
