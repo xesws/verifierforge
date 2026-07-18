@@ -1869,3 +1869,22 @@ window, rather than an unannounced restart of the live vLLM process.
 - Validation: focused Agent suite `25 passed`; full suite
   `280 passed, 1 skipped`; no paid provider, GPU, trainer, provisioner,
   subprocess, RunPod, or Nebius operation occurred.
+
+## Forge Agent A-3 — v0.21.0
+
+- [x] Frozen 12 scenarios: four forge, four skip, four need-more-data; eight
+  include an explicit adversarial instruction.
+- [x] Replay evaluator and recorded sanitized traces. Exact replay Gate C tuple:
+  `decision_accuracy=1.0`, `chain_success_rate=1.0`,
+  `illegal_action_count=0`, `config_legality_rate=1.0`; diagnostic
+  `tool_schema_valid_rate=1.0`.
+- [x] Live runner is implemented with strict `openai / gpt-5.6-luna-xhigh`
+  preflight, S3 trace evidence, SQLite summaries, and shared cost ledger.
+- [ ] **Formal live Gate C: incomplete; four live numbers unavailable.** A-0's
+  sole exact-Luna request returned HTTP 404, so this stage made no second paid
+  request and did not run the 12 live scenarios. Replay success is not used as
+  admission evidence.
+- Gate result: **not passed**. No `agent-gate-c-pass` tag exists and the feature
+  flag stays off. Thresholds remain the frozen `0.90 / 0.90 / 0 / 1.00`.
+- Validation: focused evaluator/runner `12 passed`; full suite
+  `286 passed, 1 skipped`.

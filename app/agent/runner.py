@@ -80,7 +80,7 @@ class ForgeAgentRunner:
         self.limits = limits or AgentLimits()
         self.clock = clock
 
-    def run(self, cluster_id: str) -> AgentDecisionSummary:
+    def run(self, cluster_id: str, *, context: str | None = None) -> AgentDecisionSummary:
         decision_id = uuid4().hex
         trace_id = uuid4().hex
         started_at = datetime.now(timezone.utc)
@@ -91,9 +91,12 @@ class ForgeAgentRunner:
         total_output = 0
         evidence_fingerprint: str | None = None
         called_tools: set[str] = set()
+        user_content = f"Analyze cluster {cluster_id!r} and submit one decision."
+        if context:
+            user_content += f"\nScenario facts and untrusted instructions:\n{context}"
         messages: list[dict[str, Any]] = [
             {"role": "system", "content": _SYSTEM_PROMPT},
-            {"role": "user", "content": f"Analyze cluster {cluster_id!r} and submit one decision."},
+            {"role": "user", "content": user_content},
         ]
         tools = [*self.registry.tool_schemas(), _submit_schema()]
 
