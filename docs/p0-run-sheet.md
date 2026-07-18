@@ -1839,3 +1839,17 @@ window, rather than an unannounced restart of the live vLLM process.
   injected clients. Gate C live cannot pass, `agent-gate-c-pass` cannot be
   created, and `VF_AGENT_ENABLED` remains false unless the exact Luna endpoint
   becomes available within the existing budget.
+
+## Forge Agent A-1 — v0.19.0
+
+- [x] Strict AgentDecision/TrainingConfig/AgentTrace contracts; the only model
+  whitelist entry is `Qwen/Qwen2.5-1.5B-Instruct` and the owner training-budget
+  ceiling is `$100`.
+- [x] Four Pydantic In/Out tools with issued analysis/sample dependency IDs and
+  identical real/mock OpenAI tool schemas.
+- [x] Real SQLite binding uses URI read-only mode. The existing traffic schema
+  contains no prompt/response bodies, so sample inspection returns
+  `data_sufficient=false` instead of manufacturing evidence.
+- Validation: focused `17 passed`; full suite `272 passed, 1 skipped`.
+- No HTTP route, trainer/provisioner import, GPU action, traffic-schema write,
+  paid LLM call, or existing Job/Cluster contract change occurred.
