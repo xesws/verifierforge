@@ -3,6 +3,7 @@ from __future__ import annotations
 from pathlib import Path
 
 import pytest
+from sqlalchemy.engine import URL
 
 from app.agent.tools import ToolDependencyError, ToolRegistry
 from app.proxy.clusters import SYSTEM_PROMPTS_BY_CLUSTER, system_prompt_hash
@@ -59,7 +60,20 @@ def test_registry_rejects_fabricated_dependency_ids() -> None:
         )
 
 
-def test_real_binding_reads_metadata_without_mutating_database(tmp_path: Path) -> None:
+def test_real_binding_reads_metadata_without_mutating_database(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.setenv("VF_DB_BACKEND", "postgres")
+    monkeypatch.setenv(
+        "SUPABASE_DB_URL",
+        URL.create(
+            "postgresql",
+            username="must-not-connect",
+            password="fixture",
+            host="invalid.test",
+            database="postgres",
+        ).render_as_string(hide_password=False),
+    )
     db_path = tmp_path / "traffic.db"
     assert record_traffic(
         TrafficRecord(
@@ -89,7 +103,20 @@ def test_real_binding_reads_metadata_without_mutating_database(tmp_path: Path) -
     assert db_path.read_bytes() == before
 
 
-def test_real_binding_does_not_create_missing_database(tmp_path: Path) -> None:
+def test_real_binding_does_not_create_missing_database(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.setenv("VF_DB_BACKEND", "postgres")
+    monkeypatch.setenv(
+        "SUPABASE_DB_URL",
+        URL.create(
+            "postgresql",
+            username="must-not-connect",
+            password="fixture",
+            host="invalid.test",
+            database="postgres",
+        ).render_as_string(hide_password=False),
+    )
     db_path = tmp_path / "missing.db"
     analysis = ToolRegistry("real", db_path=db_path).call(
         "analyze_traffic", {"cluster_id": "data-pull-sql"}

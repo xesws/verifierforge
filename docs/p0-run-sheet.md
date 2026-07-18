@@ -2265,8 +2265,9 @@ data, GPU, paid LLM, or real provider-provisioning call.
   tag `db-1-complete` follows the recorded SQLite/Alembic/full-suite gates.
 - [x] **P-1 — v0.24.0 complete:** implemented mock-only provisioning contracts, state machine,
   six fuses, and DB-1 audit persistence; `VF_AUTOPROVISION=false` remains the default.
-- [ ] **DB-2 — OWNER-ACTION:** importer is complete, but Supabase DNS failed before DDL;
-  owner must provide a resolvable transaction-pooler DSN, then perform the persistent flip.
+- [x] **DB-2 — v0.25.0 complete:** the owner supplied a Supavisor session-pooler
+  DSN; schema, import/reimport, reconciliation, Postgres tests, persistent
+  backend selection, and the six-step product smoke all passed.
 - [x] **DB-3 — v0.26.0 complete:** added Fernet credential protection, secret scanning,
   explicit disconnect behavior, bounded pools, and operational documentation.
 
@@ -2327,7 +2328,7 @@ the only untracked paths were `docs/vllm-debug/`, `scripts/freeze_nl2sql.py`,
   trainer, `scripts/vf`, or real provisioning path. Isolated P-1 full suite:
   `351 passed, 1 skipped`.
 
-### v0.25.0 DB-2 partial result — OWNER-ACTION
+### v0.25.0 DB-2 result
 
 - Read-only source plan: `traffic_requests=220`, `clusters=3`,
   `routing_state=1`, `guardian_scores=113`, `live_pass_rate=113`, `jobs=16`,
@@ -2343,13 +2344,24 @@ the only untracked paths were `docs/vllm-debug/`, `scripts/freeze_nl2sql.py`,
   decisions `0f001b53a0e794ac107d9c14677ab1e84de8004b2d5ee5be57374e4bb5ce7032`;
   approvals `ad900187955407dc70772ef572ed1a92431e3af5c3d182cb7f5e49b4f4de1251`.
 - Importer validation: `6 passed`; dry-run completed without mutating the
-  source. The one real migration attempt stopped before DDL with exact error
+  source. The first direct-endpoint attempt stopped before DDL with exact error
   `[Errno 8] nodename nor servname provided, or not known`. No URL or password
   appeared in output.
-- OWNER-ACTION: Supabase Dashboard → Connect → copy the transaction-pooler
-  PostgreSQL DSN into `SUPABASE_DB_URL`; then run the three resume commands in
-  `docs/infrastructure/v0.25.0-supabase-migration.md`. Do not tag DB-2 until
-  counts/digests, Postgres tests, and the owner backend-switch smoke pass.
+- The owner supplied a Supavisor session-pooler DSN. `SELECT 1` passed, Alembic
+  applied revision `20260718_0001`, and the rollback-owned PostgreSQL repository
+  suite passed `4 passed`.
+- The first import produced the frozen eight-table counts above. A second import
+  reported zero inserted rows in every table; independent verify matched every
+  expected/actual count and canonical digest with `mismatched_tables=[]`.
+- Product smoke against the real Postgres backend passed six checks: fake proxy
+  traffic write, three-cluster read, routing read, 113 guardian points,
+  Discover HTML, and Agent decision/approval reads. No paid/provider request
+  was made.
+- The persistent-backend full suite initially reported `3 failed, 362 passed,
+  1 skipped`: explicit Agent SQLite fixture paths were redirected to Supabase.
+  Codex classified and fixed the configuration-precedence bug; focused tests
+  passed `14 passed`, then the Postgres-selected full suite passed `365 passed,
+  1 skipped`. The owner-authorized ignored `.env` now selects Postgres.
 
 ### v0.26.0 DB-3 result
 
@@ -2373,17 +2385,15 @@ the only untracked paths were `docs/vllm-debug/`, `scripts/freeze_nl2sql.py`,
 
 ### OWNER morning checklist (shortest first)
 
-1. **Supabase pooler DSN — about 2 minutes of owner input.** In Supabase
-   Dashboard → Connect, copy the transaction-pooler PostgreSQL DSN into the
-   ignored `.env` as `SUPABASE_DB_URL`. Then run:
+1. **Supabase cutover — completed.** The owner supplied a session-pooler DSN in
+   the ignored `.env`; the following migration/reconciliation path passed:
 
    ```bash
    dotenv run -- sh -c 'export VF_DB_BACKEND=postgres; alembic upgrade head && VF_TEST_POSTGRES_URL="$SUPABASE_DB_URL" pytest -q tests/test_repository_contracts.py && python -m scripts.import_legacy_database apply && python -m scripts.import_legacy_database verify'
    ```
 
-   If that passes, the owner alone sets persistent `VF_DB_BACKEND=postgres`
-   and triggers the full regression/product six-step smoke; only then create
-   `db-2-complete`.
+   The owner then authorized persistent `VF_DB_BACKEND=postgres`; the full
+   regression and six-step product smoke passed, permitting `db-2-complete`.
 
 2. **Serving public mapping — about 5 minutes if the pod still exists.** Restore
    `vfserve` SSH/public port 8000 exposure, update the ignored endpoint URL/key
@@ -2400,8 +2410,8 @@ the only untracked paths were `docs/vllm-debug/`, `scripts/freeze_nl2sql.py`,
   ignored, destructive obsolete runbook removed, repository debt clean.
 - **DB-1:** complete in `b752c65`; tag `db-1-complete`.
 - **P-1:** complete in `56ed263`; tag `provisioner-p1-complete`.
-- **DB-2:** importer complete in `fcf4066`; external DNS blocker remains, so
-  no milestone tag and no backend default switch.
+- **DB-2:** complete; session-pooler migration/reconciliation, persistent
+  backend switch, `365 passed, 1 skipped`, and product smoke all passed.
 - **DB-3:** complete in `8bb62b4`; tag `db-3-complete`.
 - **CI correction:** `575b681` then `33db89a`; final security run
   `29659886406` passed. Local final suite: `365 passed, 1 skipped`; tracked
@@ -2415,7 +2425,8 @@ the only untracked paths were `docs/vllm-debug/`, `scripts/freeze_nl2sql.py`,
   documentation reservations
 - `b752c65` — v0.23.0 DB-1 (`db-1-complete`)
 - `56ed263` — v0.24.0 P-1 (`provisioner-p1-complete`)
-- `fcf4066` — v0.25.0 importer (no DB-2 tag)
+- `fcf4066` — v0.25.0 importer; the later cutover closeout carries
+  `db-2-complete`
 - `8bb62b4` — v0.26.0 DB-3 (`db-3-complete`)
 - `575b681` / `33db89a` — v0.26.1 security CI corrections
 

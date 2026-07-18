@@ -56,6 +56,7 @@ class ToolRegistry:
         if binding not in {"real", "mock"}:
             raise ValueError("tool binding must be real or mock")
         self.binding = binding
+        self._db_path_explicit = db_path is not None
         self.db_path = Path(
             db_path
             if db_path is not None
@@ -91,7 +92,12 @@ class ToolRegistry:
         output = (
             _mock_analysis(request.cluster_id)
             if self.binding == "mock"
-            else _real_analysis(request.cluster_id, self.db_path, self.gateway)
+            else _real_analysis(
+                request.cluster_id,
+                self.db_path,
+                self.gateway,
+                db_path_explicit=self._db_path_explicit,
+            )
         )
         self._analyses[output.analysis_id] = output
         return output
@@ -199,16 +205,23 @@ def _real_analysis(
     cluster_id: str,
     db_path: Path,
     gateway: RepositoryGateway | None,
+    *,
+    db_path_explicit: bool,
 ) -> AnalyzeTrafficOutput:
     rows: list[tuple[Any, ...]] = []
     if cluster_id in SYSTEM_PROMPTS_BY_CLUSTER:
         resolved = gateway
         if resolved is None:
-            settings = DatabaseSettings.from_env()
-            if settings.backend is DatabaseBackend.SQLITE and not db_path.is_file():
-                settings = None
-            elif settings.backend is DatabaseBackend.SQLITE:
-                settings = DatabaseSettings.sqlite(db_path)
+            if db_path_explicit:
+                settings = (
+                    DatabaseSettings.sqlite(db_path) if db_path.is_file() else None
+                )
+            else:
+                settings = DatabaseSettings.from_env()
+                if settings.backend is DatabaseBackend.SQLITE and not db_path.is_file():
+                    settings = None
+                elif settings.backend is DatabaseBackend.SQLITE:
+                    settings = DatabaseSettings.sqlite(db_path)
             if settings is not None:
                 resolved = repository_gateway(settings)
         if resolved is not None:
