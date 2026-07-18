@@ -2263,7 +2263,7 @@ data, GPU, paid LLM, or real provider-provisioning call.
   disposition `tq/` and the superseded vLLM runbook, and leave Git clean.
 - [ ] **DB-1 — v0.23.0 reserved:** unify relational persistence behind async SQLAlchemy stores and
   tag `db-1-complete` only after SQLite/Alembic/full-suite gates.
-- [ ] **P-1:** implement mock-only provisioning contracts, state machine, six
+- [ ] **P-1 — v0.24.0 reserved:** implement mock-only provisioning contracts, state machine, six
   fuses, and audit persistence; keep `VF_AUTOPROVISION=false`.
 - [ ] **DB-2:** migrate and reconcile the legacy SQLite/runs history against
   Supabase without logging a DSN. Owner performs the persistent default flip.
