@@ -201,7 +201,7 @@ class ForgeAgentRunner:
                 total_input=total_input,
                 total_output=total_output,
                 status=AgentRunStatus.FAILED,
-                guard_events=[type(error).__name__],
+                guard_events=[f"{type(error).__name__}: {error}"],
                 decision=None,
             )
             self._persist(decision_id, trace, evidence_fingerprint, None)

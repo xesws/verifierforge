@@ -70,6 +70,12 @@ add a provider prefix that was not returned, or reuse an ID from memory or old
 documentation. Record the relevant returned IDs in the active version document
 or run-sheet before adding the model to configuration.
 
+Before any paid live evaluator sends its scenario batch, run two minimal
+production-transport probes: one plain request without tools and one forced
+function call. Both must pass with their expected shapes. If either fails, send
+zero scenario requests, preserve the complete bounded provider error, and stop;
+replay success never bypasses this flight check.
+
 ## Commit & Pull Request Guidelines
 
 Keep commits focused and use the versioned prefix above. PRs state affected modules, validation results, contract/mock impact, and screenshots only for UI-visible changes. Do not stage generated `runs/`, `models/`, or cache files.

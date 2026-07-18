@@ -14,9 +14,16 @@ from app.agent.evaluator import (
     live_settings_from_env,
     load_replay,
     load_scenarios,
+    run_live_preflight,
     validate_live_settings,
 )
-from app.gpt import LLMConfigurationError, LLMSettings
+from app.gpt import (
+    LLMConfigurationError,
+    LLMSettings,
+    LLMToolCall,
+    LLMTurn,
+    LLMUsage,
+)
 from core.agent_contracts import AgentTrace
 
 
@@ -132,3 +139,79 @@ def test_live_settings_rejects_unlisted_or_forbidden_model(model: str) -> None:
                 "VF_AGENT_EVAL_MODEL": model,
             }
         )
+
+
+def test_live_preflight_requires_plain_and_tool_shapes() -> None:
+    class Client:
+        def chat_turn(self, messages, **kwargs):
+            del messages, kwargs
+            return LLMTurn("OK", (), LLMUsage(2, 1, 3), "gpt-5.6-luna", "completed")
+
+        def tool_turn(self, messages, **kwargs):
+            del messages, kwargs
+            return LLMTurn(
+                None,
+                (
+                    LLMToolCall(
+                        "call-1",
+                        "gate_c_preflight",
+                        '{"value":"ok"}',
+                    ),
+                ),
+                LLMUsage(4, 2, 6),
+                "gpt-5.6-luna",
+                "completed",
+            )
+
+    usage = run_live_preflight(Client())
+
+    assert usage == LLMUsage(6, 3, 9)
+
+
+def test_live_preflight_rejects_wrong_plain_shape_before_tool_probe() -> None:
+    class Client:
+        tool_called = False
+
+        def chat_turn(self, messages, **kwargs):
+            del messages, kwargs
+            return LLMTurn("not-ok", (), LLMUsage(1, 1, 2), "model", "completed")
+
+        def tool_turn(self, messages, **kwargs):
+            del messages, kwargs
+            self.tool_called = True
+            raise AssertionError("tool probe must not follow failed plain probe")
+
+    client = Client()
+    with pytest.raises(LLMConfigurationError, match="plain preflight"):
+        run_live_preflight(client)
+
+    assert client.tool_called is False
+
+
+def test_batch_sends_zero_scenarios_when_preflight_fails(
+    tmp_path: Path, monkeypatch
+) -> None:
+    import scripts.agent_gate_c as gate_cli
+
+    constructed = False
+
+    def fail_preflight(_client):
+        raise LLMConfigurationError("flight check failed")
+
+    def forbidden_runner(*args, **kwargs):
+        nonlocal constructed
+        constructed = True
+        raise AssertionError("scenario runner must not be constructed")
+
+    monkeypatch.setattr(gate_cli, "run_live_preflight", fail_preflight)
+    monkeypatch.setattr(gate_cli, "ForgeAgentRunner", forbidden_runner)
+    settings = LLMSettings(
+        api_key="test",
+        provider="openai",
+        model="gpt-5.6-luna",
+    )
+
+    with pytest.raises(LLMConfigurationError, match="flight check"):
+        gate_cli._run_live([object()], settings, tmp_path / "ledger.jsonl")
+
+    assert constructed is False

@@ -10,11 +10,12 @@ from app.agent.runner import (
     AgentGuardError,
     AgentLimits,
     AgentPersistenceError,
+    AgentRunError,
     ForgeAgentRunner,
 )
 from app.agent.stores import SQLiteAgentDecisionStore
 from app.agent.tools import ToolRegistry
-from app.gpt import LLMTurn, LLMToolCall, LLMUsage
+from app.gpt import LLMRequestError, LLMTurn, LLMToolCall, LLMUsage
 
 
 class MemoryTraceStore:
@@ -105,6 +106,18 @@ class EarlySubmitClient:
         )
 
 
+class FailedProviderClient:
+    model = "gpt-5.6-luna"
+
+    def tool_turn(self, messages, *, tools, **kwargs):
+        del messages, tools, kwargs
+        raise LLMRequestError(
+            "LLM request failed with HTTP status 400.",
+            status_code=400,
+            provider_body='{"error":{"message":"unsupported endpoint"}}',
+        )
+
+
 def _runner(tmp_path: Path, client, trace_store=None, limits=None) -> ForgeAgentRunner:
     return ForgeAgentRunner(
         client=client,
@@ -188,6 +201,19 @@ def test_trace_failure_is_fail_closed_and_records_failure_summary(tmp_path: Path
     assert summary["run_status"] == "trace_persist_failed"
     assert summary["decision"] is None
     assert summary["trace_s3_key"] is None
+
+
+def test_provider_error_status_and_body_are_preserved_in_trace(tmp_path: Path) -> None:
+    trace_store = MemoryTraceStore()
+    runner = _runner(tmp_path, FailedProviderClient(), trace_store)
+
+    with pytest.raises(AgentRunError, match="agent run failed"):
+        runner.run("data-pull-sql")
+
+    event = trace_store.traces[0].guard_events[0]
+    assert "LLMRequestError" in event
+    assert "HTTP status 400" in event
+    assert "unsupported endpoint" in event
 
 
 def test_agent_modules_have_no_execution_side_imports() -> None:

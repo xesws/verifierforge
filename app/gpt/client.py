@@ -39,9 +39,12 @@ class LLMRequestError(RuntimeError):
         status_code: int | None = None,
         provider_body: str | None = None,
     ) -> None:
-        super().__init__(message)
         self.status_code = status_code
         self.provider_body = provider_body
+        evidence = message
+        if provider_body:
+            evidence += f" Provider response: {provider_body}"
+        super().__init__(evidence)
 
 
 @dataclass(frozen=True)
@@ -185,6 +188,7 @@ class LLMClient:
 
     def __init__(self, settings: LLMSettings | EvalSettings, client: Any | None = None) -> None:
         self.settings = settings
+        self._responses_previous_id: str | None = None
         if client is not None:
             self._client = client
             return
@@ -255,6 +259,16 @@ class LLMClient:
         """Return one structured assistant/tool turn without interpreting it."""
         resolved_model = model or self.model
         _validate_model_policy(getattr(self.settings, "provider", "openrouter"), resolved_model)
+        if getattr(self.settings, "provider", "openrouter") == "openai":
+            return self._responses_tool_turn(
+                messages,
+                tools=tools,
+                tool_choice=tool_choice,
+                max_completion_tokens=max_completion_tokens,
+                timeout=timeout,
+                parallel_tool_calls=parallel_tool_calls,
+                model=resolved_model,
+            )
         request: dict[str, Any] = {
             "model": resolved_model,
             "messages": [dict(message) for message in messages],
@@ -299,6 +313,71 @@ class LLMClient:
             ),
         )
 
+    def _responses_tool_turn(
+        self,
+        messages: Sequence[Mapping[str, Any]],
+        *,
+        tools: Sequence[Mapping[str, Any]],
+        tool_choice: str | Mapping[str, Any],
+        max_completion_tokens: int,
+        timeout: float,
+        parallel_tool_calls: bool,
+        model: str,
+    ) -> LLMTurn:
+        request: dict[str, Any] = {
+            "model": model,
+            "input": _responses_input(messages, self._responses_previous_id),
+            "tools": _responses_tools(tools),
+            "tool_choice": _responses_tool_choice(tool_choice),
+            "parallel_tool_calls": parallel_tool_calls,
+            "max_output_tokens": max_completion_tokens,
+            "store": True,
+            "timeout": timeout,
+        }
+        instructions = _responses_instructions(messages, self._responses_previous_id)
+        if instructions:
+            request["instructions"] = instructions
+        if self._responses_previous_id:
+            request["previous_response_id"] = self._responses_previous_id
+        response = self._responses_create(request)
+        response_id = str(getattr(response, "id", "") or "")
+        if not response_id:
+            raise LLMResponseError("Responses API returned no response ID.")
+        self._responses_previous_id = response_id
+        calls: list[LLMToolCall] = []
+        for item in getattr(response, "output", None) or ():
+            if getattr(item, "type", None) != "function_call":
+                continue
+            try:
+                calls.append(
+                    LLMToolCall(
+                        call_id=str(item.call_id),
+                        name=str(item.name),
+                        arguments=str(item.arguments),
+                    )
+                )
+            except Exception as error:
+                raise LLMResponseError(
+                    "Responses API returned an invalid function call."
+                ) from error
+        content_value = getattr(response, "output_text", None)
+        content = (
+            content_value
+            if isinstance(content_value, str) and content_value.strip()
+            else None
+        )
+        if not calls and content is None:
+            raise LLMResponseError(
+                "Responses API returned neither content nor a function call."
+            )
+        return LLMTurn(
+            content=content,
+            tool_calls=tuple(calls),
+            usage=_usage_from_response(response),
+            model=str(getattr(response, "model", model) or model),
+            finish_reason=str(getattr(response, "status", "") or "") or None,
+        )
+
     def chat_turn(
         self,
         messages: Sequence[Mapping[str, Any]],
@@ -309,6 +388,31 @@ class LLMClient:
     ) -> LLMTurn:
         """Return one ordinary chat turn with the same usage envelope as tools."""
         resolved_model = model or self.model
+        if getattr(self.settings, "provider", "openrouter") == "openai":
+            response = self._responses_create(
+                {
+                    "model": resolved_model,
+                    "input": _responses_input(messages, None),
+                    "instructions": _responses_instructions(messages, None),
+                    "max_output_tokens": max_completion_tokens,
+                    "store": False,
+                    "timeout": timeout,
+                }
+            )
+            content_value = getattr(response, "output_text", None)
+            if not isinstance(content_value, str) or not content_value.strip():
+                raise LLMResponseError("Responses API returned an empty completion.")
+            return LLMTurn(
+                content=content_value,
+                tool_calls=(),
+                usage=_usage_from_response(response),
+                model=str(getattr(response, "model", resolved_model) or resolved_model),
+                finish_reason=(
+                    str(getattr(response, "status", ""))
+                    if getattr(response, "status", None) is not None
+                    else None
+                ),
+            )
         response = self._create(
             {
                 "model": resolved_model,
@@ -342,6 +446,18 @@ class LLMClient:
         _validate_model_policy(getattr(self.settings, "provider", "openrouter"), resolved_model)
         try:
             return self._client.chat.completions.create(**dict(request))
+        except Exception as error:
+            raise LLMRequestError(
+                _request_error_message(error),
+                status_code=_provider_status_code(error),
+                provider_body=_provider_error_body(error),
+            ) from error
+
+    def _responses_create(self, request: Mapping[str, Any]) -> Any:
+        resolved_model = str(request.get("model", self.model))
+        _validate_model_policy("openai", resolved_model)
+        try:
+            return self._client.responses.create(**dict(request))
         except Exception as error:
             raise LLMRequestError(
                 _request_error_message(error),
@@ -402,8 +518,12 @@ def _validate_model_policy(provider: str, model: str) -> None:
 
 def _usage_from_response(response: Any) -> LLMUsage:
     usage = getattr(response, "usage", None)
-    input_tokens = _nonnegative_int(getattr(usage, "prompt_tokens", 0))
-    output_tokens = _nonnegative_int(getattr(usage, "completion_tokens", 0))
+    input_tokens = _nonnegative_int(
+        getattr(usage, "prompt_tokens", getattr(usage, "input_tokens", 0))
+    )
+    output_tokens = _nonnegative_int(
+        getattr(usage, "completion_tokens", getattr(usage, "output_tokens", 0))
+    )
     total_tokens = _nonnegative_int(
         getattr(usage, "total_tokens", input_tokens + output_tokens)
     )
@@ -414,6 +534,91 @@ def _usage_from_response(response: Any) -> LLMUsage:
         else None
     )
     return LLMUsage(input_tokens, output_tokens, total_tokens, reported_cost)
+
+
+def _responses_input(
+    messages: Sequence[Mapping[str, Any]], previous_response_id: str | None
+) -> list[dict[str, Any]]:
+    if previous_response_id:
+        tool_messages = [message for message in messages if message.get("role") == "tool"]
+        if not tool_messages:
+            raise LLMConfigurationError(
+                "Responses continuation requires one function-call output"
+            )
+        message = tool_messages[-1]
+        call_id = str(message.get("tool_call_id", "")).strip()
+        if not call_id:
+            raise LLMConfigurationError(
+                "Responses function-call output requires tool_call_id"
+            )
+        return [
+            {
+                "type": "function_call_output",
+                "call_id": call_id,
+                "output": str(message.get("content", "")),
+            }
+        ]
+    inputs: list[dict[str, Any]] = []
+    for message in messages:
+        role = str(message.get("role", ""))
+        if role == "system":
+            continue
+        if role not in {"user", "assistant"}:
+            raise LLMConfigurationError(
+                f"Unsupported initial Responses message role: {role or '<missing>'}"
+            )
+        inputs.append({"role": role, "content": message.get("content", "")})
+    if not inputs:
+        raise LLMConfigurationError("Responses input must contain a user message")
+    return inputs
+
+
+def _responses_instructions(
+    messages: Sequence[Mapping[str, Any]], previous_response_id: str | None
+) -> str | None:
+    if previous_response_id:
+        return None
+    values = [
+        str(message.get("content", ""))
+        for message in messages
+        if message.get("role") == "system" and message.get("content")
+    ]
+    return "\n\n".join(values) or None
+
+
+def _responses_tools(
+    tools: Sequence[Mapping[str, Any]],
+) -> list[dict[str, Any]]:
+    converted: list[dict[str, Any]] = []
+    for tool in tools:
+        if tool.get("type") != "function":
+            raise LLMConfigurationError(
+                "Forge Agent Responses transport only accepts function tools"
+            )
+        function = tool.get("function")
+        if isinstance(function, Mapping):
+            converted.append({"type": "function", **dict(function)})
+            continue
+        if "name" not in tool:
+            raise LLMConfigurationError("Responses function tool requires a name")
+        converted.append(dict(tool))
+    return converted
+
+
+def _responses_tool_choice(
+    value: str | Mapping[str, Any],
+) -> str | dict[str, Any]:
+    if isinstance(value, str):
+        return value
+    if value.get("type") != "function":
+        return dict(value)
+    function = value.get("function")
+    if isinstance(function, Mapping):
+        name = str(function.get("name", "")).strip()
+        if not name:
+            raise LLMConfigurationError("Function tool_choice requires a name")
+        return {"type": "function", "name": name}
+    return dict(value)
 
 
 def _nonnegative_int(value: Any) -> int:

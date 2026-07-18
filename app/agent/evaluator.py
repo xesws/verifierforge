@@ -13,8 +13,10 @@ from dotenv import find_dotenv, load_dotenv
 
 from app.gpt import (
     DEFAULT_OPENAI_MODEL,
+    LLMClient,
     LLMConfigurationError,
     LLMSettings,
+    LLMUsage,
     OPENAI_BASE_URL,
 )
 from core.agent_contracts import AgentDecisionType, AgentTrace, TrainingConfig
@@ -206,6 +208,78 @@ def live_settings_from_env(
     )
     validate_live_settings(resolved)
     return resolved
+
+
+def run_live_preflight(client: LLMClient) -> LLMUsage:
+    """Prove plain and function-calling transport before a paid eval batch."""
+    plain = client.chat_turn(
+        [{"role": "user", "content": "Reply with exactly OK."}],
+        max_completion_tokens=32,
+    )
+    if plain.content is None or plain.content.strip() != "OK":
+        raise LLMConfigurationError(
+            "Gate C plain preflight did not return exact text OK"
+        )
+    tool = client.tool_turn(
+        [
+            {
+                "role": "user",
+                "content": "Call gate_c_preflight with value set to ok.",
+            }
+        ],
+        tools=[_preflight_tool_schema()],
+        tool_choice={
+            "type": "function",
+            "function": {"name": "gate_c_preflight"},
+        },
+        max_completion_tokens=32,
+    )
+    if len(tool.tool_calls) != 1 or tool.tool_calls[0].name != "gate_c_preflight":
+        raise LLMConfigurationError(
+            "Gate C tool preflight did not return gate_c_preflight"
+        )
+    try:
+        arguments = json.loads(tool.tool_calls[0].arguments)
+    except json.JSONDecodeError as error:
+        raise LLMConfigurationError(
+            "Gate C tool preflight returned invalid JSON arguments"
+        ) from error
+    if arguments != {"value": "ok"}:
+        raise LLMConfigurationError(
+            "Gate C tool preflight returned unexpected arguments"
+        )
+    return LLMUsage(
+        input_tokens=plain.usage.input_tokens + tool.usage.input_tokens,
+        output_tokens=plain.usage.output_tokens + tool.usage.output_tokens,
+        total_tokens=plain.usage.total_tokens + tool.usage.total_tokens,
+        provider_reported_cost_usd=_sum_reported_costs(
+            plain.usage.provider_reported_cost_usd,
+            tool.usage.provider_reported_cost_usd,
+        ),
+    )
+
+
+def _preflight_tool_schema() -> dict[str, Any]:
+    return {
+        "type": "function",
+        "function": {
+            "name": "gate_c_preflight",
+            "description": "Echo one fixed preflight value.",
+            "parameters": {
+                "type": "object",
+                "properties": {"value": {"type": "string"}},
+                "required": ["value"],
+                "additionalProperties": False,
+            },
+            "strict": True,
+        },
+    }
+
+
+def _sum_reported_costs(*values: float | None) -> float | None:
+    if any(value is None for value in values):
+        return None
+    return sum(value for value in values if value is not None)
 
 
 def _chain_is_valid(trace: AgentTrace) -> bool:

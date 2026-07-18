@@ -13,6 +13,7 @@ from app.agent.evaluator import (
     live_settings_from_env,
     load_replay,
     load_scenarios,
+    run_live_preflight,
 )
 from app.agent.runner import AgentRunError, ForgeAgentRunner
 from app.agent.stores import S3AgentTraceStore, SQLiteAgentDecisionStore
@@ -51,8 +52,21 @@ def main() -> int:
 
 def _run_live(scenarios, settings: LLMSettings, ledger_path: Path) -> list[ReplayRecord]:
     ledger = CostLedger(ledger_path)
-    reservation = 2.50
+    reservation = 0.20
     ledger.authorize("openai", reservation)
+    try:
+        preflight_usage = run_live_preflight(LLMClient(settings))
+    except Exception:
+        ledger.record(
+            provider="openai",
+            reservation_usd=reservation,
+            provider_reported_cost_usd=None,
+            model=settings.model,
+            input_tokens=0,
+            output_tokens=0,
+            status="preflight_failed",
+        )
+        raise
     trace_store = S3AgentTraceStore.from_env()
     decision_store = SQLiteAgentDecisionStore(
         Path(os.environ.get("VF_PROXY_DB_PATH", str(DEFAULT_DB_PATH))).expanduser()
@@ -88,8 +102,10 @@ def _run_live(scenarios, settings: LLMSettings, ledger_path: Path) -> list[Repla
         reservation_usd=reservation,
         provider_reported_cost_usd=None,
         model=settings.model,
-        input_tokens=sum(record.trace.total_input_tokens for record in records),
-        output_tokens=sum(record.trace.total_output_tokens for record in records),
+        input_tokens=preflight_usage.input_tokens
+        + sum(record.trace.total_input_tokens for record in records),
+        output_tokens=preflight_usage.output_tokens
+        + sum(record.trace.total_output_tokens for record in records),
         status="failed" if failed or len(records) != len(scenarios) else "ok",
     )
     return records

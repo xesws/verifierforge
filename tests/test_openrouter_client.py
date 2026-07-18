@@ -328,6 +328,9 @@ def test_client_preserves_redacted_provider_body_and_exception_cause() -> None:
     assert raised.value.provider_body is not None
     assert secret not in raised.value.provider_body
     assert "[REDACTED]" in raised.value.provider_body
+    assert "HTTP status 503" in str(raised.value)
+    assert "Provider response:" in str(raised.value)
+    assert "[REDACTED]" in str(raised.value)
     assert isinstance(raised.value.__cause__, FakeHTTPError)
 
 
@@ -428,6 +431,152 @@ def test_client_returns_structured_tool_turn_and_usage() -> None:
     assert requests[0]["parallel_tool_calls"] is False
     assert requests[0]["max_completion_tokens"] == 50
     assert requests[0]["timeout"] == 4
+
+
+def test_openai_tool_turn_uses_responses_and_previous_response_id() -> None:
+    requests: list[dict[str, object]] = []
+
+    class FakeResponses:
+        def create(self, **kwargs):
+            requests.append(kwargs)
+            index = len(requests)
+            return SimpleNamespace(
+                id=f"resp-{index}",
+                model="gpt-5.6-luna",
+                status="completed",
+                output_text="",
+                output=[
+                    SimpleNamespace(
+                        type="function_call",
+                        call_id=f"call-{index}",
+                        name="analyze_traffic",
+                        arguments='{"cluster_id":"data-pull-sql"}',
+                    )
+                ],
+                usage=SimpleNamespace(
+                    input_tokens=12,
+                    output_tokens=6,
+                    total_tokens=18,
+                ),
+            )
+
+    client = LLMClient(
+        LLMSettings(
+            api_key="test-key",
+            provider="openai",
+            model="gpt-5.6-luna",
+        ),
+        client=SimpleNamespace(responses=FakeResponses()),
+    )
+    tools = [
+        {
+            "type": "function",
+            "function": {
+                "name": "analyze_traffic",
+                "parameters": {"type": "object", "properties": {}},
+            },
+        }
+    ]
+    first = client.tool_turn(
+        [
+            {"role": "system", "content": "Use the tool."},
+            {"role": "user", "content": "Analyze."},
+        ],
+        tools=tools,
+    )
+    second = client.tool_turn(
+        [
+            {"role": "system", "content": "Use the tool."},
+            {"role": "user", "content": "Analyze."},
+            {
+                "role": "assistant",
+                "content": None,
+                "tool_calls": [],
+            },
+            {
+                "role": "tool",
+                "tool_call_id": "call-1",
+                "content": '{"analysis_id":"abc"}',
+            },
+        ],
+        tools=tools,
+    )
+
+    assert first.tool_calls[0].call_id == "call-1"
+    assert second.tool_calls[0].call_id == "call-2"
+    assert first.usage.total_tokens == 18
+    assert requests[0]["instructions"] == "Use the tool."
+    assert requests[0]["input"] == [{"role": "user", "content": "Analyze."}]
+    assert requests[0]["tools"][0]["name"] == "analyze_traffic"
+    assert "function" not in requests[0]["tools"][0]
+    assert requests[1]["previous_response_id"] == "resp-1"
+    assert requests[1]["input"] == [
+        {
+            "type": "function_call_output",
+            "call_id": "call-1",
+            "output": '{"analysis_id":"abc"}',
+        }
+    ]
+
+
+def test_openai_plain_turn_uses_responses_api() -> None:
+    requests: list[dict[str, object]] = []
+
+    class FakeResponses:
+        def create(self, **kwargs):
+            requests.append(kwargs)
+            return SimpleNamespace(
+                model="gpt-5.6-luna",
+                status="completed",
+                output_text="OK",
+                usage=SimpleNamespace(
+                    input_tokens=2,
+                    output_tokens=1,
+                    total_tokens=3,
+                ),
+            )
+
+    client = LLMClient(
+        LLMSettings(
+            api_key="test-key",
+            provider="openai",
+            model="gpt-5.6-luna",
+        ),
+        client=SimpleNamespace(responses=FakeResponses()),
+    )
+
+    turn = client.chat_turn([{"role": "user", "content": "Say OK"}])
+
+    assert turn.content == "OK"
+    assert turn.usage.total_tokens == 3
+    assert requests[0]["input"] == [{"role": "user", "content": "Say OK"}]
+    assert "messages" not in requests[0]
+
+
+def test_responses_transport_preserves_http_body() -> None:
+    class FakeHTTPError(RuntimeError):
+        status_code = 400
+        body = {"error": {"message": "Responses rejected the request"}}
+
+    class FakeResponses:
+        def create(self, **kwargs):
+            del kwargs
+            raise FakeHTTPError("bad request")
+
+    client = LLMClient(
+        LLMSettings(
+            api_key="test-key",
+            provider="openai",
+            model="gpt-5.6-luna",
+        ),
+        client=SimpleNamespace(responses=FakeResponses()),
+    )
+
+    with pytest.raises(LLMRequestError) as raised:
+        client.chat_turn([{"role": "user", "content": "Say OK"}])
+
+    assert raised.value.status_code == 400
+    assert "Responses rejected the request" in str(raised.value)
 
 
 def test_runtime_openai_model_override_still_rejects_sol_before_request() -> None:

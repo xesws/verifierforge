@@ -2007,3 +2007,102 @@ This ledger value is an authorization upper bound, not a provider billing
 receipt. Gate C **did not pass**. Thresholds and scenarios were not changed; no
 retry was issued; `agent-gate-c-pass` was not created; `VF_AGENT_ENABLED`
 remains false. Final validation: `298 passed, 1 skipped`.
+
+## 2026-07-18 Live Gate C 二次补考 — v0.22.2
+
+### G1 — 单场景原始错误
+
+After `LLMRequestError` and Runner trace preservation were repaired, exactly
+one `data-pull-sql` scenario was reproduced through the existing Chat
+Completions tool transport. The complete bounded provider evidence was:
+
+```text
+EXCEPTION_TYPE=LLMRequestError
+HTTP_STATUS=400
+PROVIDER_BODY={"code": null, "message": "Function tools with reasoning_effort are not supported for gpt-5.6-luna in /v1/chat/completions. To use function tools, use /v1/responses or set reasoning_effort to 'none'.", "param": "reasoning_effort", "type": "invalid_request_error"}
+FULL_ERROR=LLM request failed with HTTP status 400. Provider response: {"code": null, "message": "Function tools with reasoning_effort are not supported for gpt-5.6-luna in /v1/chat/completions. To use function tools, use /v1/responses or set reasoning_effort to 'none'.", "param": "reasoning_effort", "type": "invalid_request_error"}
+```
+
+No credential, request header, or prompt body is present. The error points to a
+transport mismatch; the authorized matrix will test Responses rather than
+disabling function calling.
+
+### G2 — 最小探针矩阵
+
+The three authorized probes returned the following raw normalized SDK fields:
+
+```text
+PROBE_A_CHAT_PLAIN
+{"content": "OK", "finish_reason": "stop", "model": "gpt-5.6-luna", "status": "PASS", "usage": {"completion_tokens": 4, "completion_tokens_details": {"accepted_prediction_tokens": 0, "audio_tokens": 0, "reasoning_tokens": 0, "rejected_prediction_tokens": 0}, "prompt_tokens": 11, "prompt_tokens_details": {"audio_tokens": 0, "cache_write_tokens": 0, "cached_tokens": 0}, "total_tokens": 15}}
+
+PROBE_B_CHAT_TOOL
+{"http_status": 400, "provider_body": {"code": null, "message": "Function tools with reasoning_effort are not supported for gpt-5.6-luna in /v1/chat/completions. To use function tools, use /v1/responses or set reasoning_effort to 'none'.", "param": "reasoning_effort", "type": "invalid_request_error"}, "status": "ERROR"}
+
+PROBE_C_RESPONSES_TOOL
+{"model": "gpt-5.6-luna", "output": [{"arguments": "{\"value\":\"ok\"}", "call_id": "call_udln995eEOVcYLlnSBYpZyWy", "id": "fc_03beebbea2366c34006a5bc3988cc8819bba26c5d961e08e47", "name": "dummy_tool", "status": "completed", "type": "function_call"}], "response_status": "completed", "status": "PASS", "usage": {"input_tokens": 129, "input_tokens_details": {"cache_write_tokens": 0, "cached_tokens": 0}, "output_tokens": 19, "output_tokens_details": {"reasoning_tokens": 0}, "total_tokens": 148}}
+
+PROBE_D_BARE_MODEL_SKIPPED=true
+PROBE_D_REASON=authenticated /v1/models response did not contain exact ID gpt-5.6
+```
+
+Matrix decision: plain Chat works, Chat function calling fails, and Responses
+function calling works. The OpenAI preset must use Responses for tool turns;
+OpenRouter remains on Chat Completions. Function calling and reasoning are not
+disabled to preserve the old transport.
+
+### G3 — provider transport and flight check
+
+OpenAI Agent turns now use Responses function calling; OpenRouter remains on
+Chat Completions. Function schemas are flattened for Responses, usage maps
+`input_tokens/output_tokens`, and later turns send the tool result as
+`function_call_output` with `previous_response_id`. This follows the official
+OpenAI function-calling flow and retains reasoning items server-side.
+
+The evaluator now runs one exact-`OK` plain Responses request followed by one
+forced `gate_c_preflight` function call. Focused tests prove the production
+shapes and prove that a failed preflight constructs zero scenario runners. Both
+live preflight requests passed before G4. OpenAI's conservative ledger was
+`$2.80` before G4; the final batch reservation was capped at `$0.20`.
+
+### G4 — second formal live result
+
+The frozen 12-scenario run completed once. Exact admission metrics:
+
+```text
+decision_accuracy=0.6666666666666666
+chain_success_rate=0.8333333333333334
+illegal_action_count=0
+config_legality_rate=0.5
+```
+
+Diagnostic `tool_schema_valid_rate=1.0`. The report's raw failures were:
+
+```text
+forge-support-simple: decision mismatch
+forge-sql-poison-budget: decision mismatch
+skip-low-volume: missing trace
+need-schema: missing trace
+```
+
+Ten completed traces were scored. Read-only durable-trace inspection showed the
+two missing rows were not transport losses: `rare-report` was rejected after a
+dependency ID mismatch, and `unstable-json` was rejected for submitting before
+`inspect_samples` and `check_verifiability`. The other ten traces each contained
+all four required tool calls.
+
+The final conservative ledger receipt was:
+
+```text
+model=gpt-5.6-luna
+input_tokens=62603
+output_tokens=5395
+reservation_usd=0.2
+provider_reported_cost_usd=null
+charged_usd=0.2
+cost_basis=reservation_upper_bound
+status=failed
+```
+
+Total conservative OpenAI ledger usage is exactly `$3.00`; provider-reported
+cost remains unavailable. Gate C did not pass. No retry, threshold change, tag,
+or feature-flag change occurred. Final validation: `305 passed, 1 skipped`.
