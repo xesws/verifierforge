@@ -87,6 +87,35 @@ SHA recovery, 50 append-only metrics, and invisible interrupted uploads. The
 separate GPU node-loss proof is recorded live in `docs/p0-run-sheet.md` rather
 than being claimed early here.
 
+## Database operations
+
+SQLite remains the safe local default. Production Postgres is explicit and
+fail-closed: set `VF_DB_BACKEND=postgres` and provide a Supabase pooler DSN in
+`SUPABASE_DB_URL`; the application never falls back to SQLite after a database
+error. Apply schema changes and inspect current revision with:
+
+```bash
+alembic upgrade head
+alembic current
+```
+
+Before a migration, take a provider-managed backup or run `pg_dump` using the
+environment-only DSN. Restore local service explicitly with
+`VF_DB_BACKEND=sqlite VF_PROXY_DB_PATH=./runs/fallback.sqlite3`; this is an
+operator decision, not an automatic failover. Postgres pool defaults are 5
+connections + 5 overflow with 10-second pool/connect timeouts, overridable via
+`VF_DB_POOL_SIZE`, `VF_DB_MAX_OVERFLOW`, `VF_DB_POOL_TIMEOUT_SECONDS`, and
+`VF_DB_CONNECT_TIMEOUT_SECONDS`.
+
+Provider credentials require a Fernet key and are ciphertext-only in the
+repository. Generate a key once, store it in the deployment secret manager as
+`VF_CRED_KEY`, and never commit it:
+
+```bash
+python -c "from cryptography.fernet import Fernet; print(Fernet.generate_key().decode())"
+python -m scripts.scan_secrets
+```
+
 ## Limitations
 
 - The demonstrated quality result is one NL→SQL task family with 50 training

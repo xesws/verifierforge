@@ -6,6 +6,7 @@ from collections.abc import Callable, Mapping
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
 import json
+import logging
 import os
 from pathlib import Path
 import random
@@ -38,6 +39,9 @@ from app.proxy.upstream import (
     fake_tuned_chat_completion,
     forward_real,
 )
+
+
+_LOGGER = logging.getLogger(__name__)
 
 
 @dataclass(frozen=True)
@@ -129,6 +133,7 @@ def create_app(
                         )
                     except (OSError, RuntimeError, ValueError):
                         database = None
+                        _LOGGER.warning("proxy database initialization failed")
         return database
     schedule_guardian = guardian_scheduler or _schedule_background
     proxy = FastAPI(title="VerifierForge Proxy")
@@ -265,7 +270,9 @@ def _record_best_effort(
         route_path=route_path,
     )
     try:
-        recorder(record, gateway=gateway)
+        persisted = recorder(record, gateway=gateway)
+        if persisted is False:
+            _LOGGER.warning("proxy traffic persistence failed")
     except Exception:
         # A locked or unavailable observability database is never a customer-facing failure.
         pass
@@ -293,15 +300,19 @@ def _schedule_guardian_best_effort(
     if not prompt or not completion:
         return
     try:
-        scheduler(
-            lambda: score_tuned_sql_completion(
+        def score() -> None:
+            if not score_tuned_sql_completion(
                 cluster_id=decision.cluster_id,
                 prompt=prompt,
                 completion=completion,
                 gateway=gateway,
                 pool_path=settings.guardian_pool_path,
                 rolling_window=settings.guardian_rolling_window,
-            )
+            ):
+                _LOGGER.warning("proxy guardian persistence failed")
+
+        scheduler(
+            score
         )
     except Exception:
         # Guardian scheduling is also observability: never fail a completion for it.

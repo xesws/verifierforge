@@ -2267,8 +2267,8 @@ data, GPU, paid LLM, or real provider-provisioning call.
   six fuses, and DB-1 audit persistence; `VF_AUTOPROVISION=false` remains the default.
 - [ ] **DB-2 — OWNER-ACTION:** importer is complete, but Supabase DNS failed before DDL;
   owner must provide a resolvable transaction-pooler DSN, then perform the persistent flip.
-- [ ] **DB-3 — v0.26.0 reserved:** add Fernet credential protection, secret scanning, explicit
-  disconnect behavior, and operational documentation if the timebox permits.
+- [x] **DB-3 — v0.26.0 complete:** added Fernet credential protection, secret scanning,
+  explicit disconnect behavior, bounded pools, and operational documentation.
 
 Initial evidence: `main == origin/main == b819187`; tracked files were clean;
 the only untracked paths were `docs/vllm-debug/`, `scripts/freeze_nl2sql.py`,
@@ -2350,3 +2350,21 @@ the only untracked paths were `docs/vllm-debug/`, `scripts/freeze_nl2sql.py`,
   PostgreSQL DSN into `SUPABASE_DB_URL`; then run the three resume commands in
   `docs/infrastructure/v0.25.0-supabase-migration.md`. Do not tag DB-2 until
   counts/digests, Postgres tests, and the owner backend-switch smoke pass.
+
+### v0.26.0 DB-3 result
+
+- `CredentialCipher` requires `VF_CRED_KEY`; no default key is generated.
+  Ciphertext contains user/provider scope and the repository never receives
+  plaintext. Missing, invalid, mismatched, and corrupt-key paths are stable and
+  do not include secret material.
+- Postgres defaults: pool 5, overflow 5, pool timeout 10 seconds, connect
+  timeout 10 seconds. All four environment overrides are bounded before an
+  engine exists.
+- Disconnect drill: the control routing API returned sanitized HTTP 503;
+  proxy database initialization logged only
+  `proxy database initialization failed` and the completion remained HTTP 200.
+- Added tracked-file secret scan plus GitHub Actions gate and README operations
+  for Alembic, backup, explicit SQLite fallback, pool tuning, and Fernet key
+  generation.
+- Validation: focused security/disconnect suite `30 passed`; full suite
+  `365 passed, 1 skipped`; `git diff --check` passed.

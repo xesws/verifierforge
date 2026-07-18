@@ -30,12 +30,21 @@ class DatabaseRuntime:
 def create_database_runtime(settings: DatabaseSettings | None = None) -> DatabaseRuntime:
     resolved = settings or DatabaseSettings.from_env()
     connect_args: dict[str, object] = {}
+    engine_args: dict[str, object] = {}
     if resolved.backend is DatabaseBackend.SQLITE:
         connect_args["timeout"] = 5
+    else:
+        connect_args["timeout"] = resolved.connect_timeout_seconds
+        engine_args.update(
+            pool_size=resolved.pool_size,
+            max_overflow=resolved.max_overflow,
+            pool_timeout=resolved.pool_timeout_seconds,
+        )
     engine = create_async_engine(
         resolved.url,
         pool_pre_ping=True,
         connect_args=connect_args,
+        **engine_args,
     )
     if resolved.backend is DatabaseBackend.SQLITE:
         _enable_sqlite_foreign_keys(engine)

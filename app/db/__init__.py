@@ -5,6 +5,13 @@ behind :mod:`core.storage` and are intentionally outside this package.
 """
 
 from .engine import DatabaseRuntime, create_database_runtime
+from .credentials import (
+    CredentialCipher,
+    CredentialConfigurationError,
+    CredentialDecryptionError,
+    CredentialSecret,
+    CredentialService,
+)
 from .gateway import RepositoryGateway, repository_gateway
 from .migration import downgrade_database, migrate_sqlite, run_migrations
 from .repositories import (
@@ -16,6 +23,11 @@ from .settings import DatabaseBackend, DatabaseConfigurationError, DatabaseSetti
 
 __all__ = [
     "DatabaseBackend",
+    "CredentialCipher",
+    "CredentialConfigurationError",
+    "CredentialDecryptionError",
+    "CredentialSecret",
+    "CredentialService",
     "DatabaseConfigurationError",
     "DatabaseRuntime",
     "RepositoryGateway",

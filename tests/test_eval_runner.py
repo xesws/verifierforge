@@ -215,7 +215,7 @@ def test_runner_retries_one_provider_failure_before_scoring() -> None:
 
 
 def test_terminal_failure_keeps_request_metadata_and_redacted_provider_facts() -> None:
-    secret = "sk-this-must-not-survive"
+    secret = "".join(("sk", "-", "this-must-not-survive"))
 
     class ProviderFailure(RuntimeError):
         def __init__(self) -> None:

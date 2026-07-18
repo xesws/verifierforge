@@ -28,7 +28,7 @@ from app.agent.stores import (
 )
 from app.agent.tools import ToolRegistry
 from app.gpt import LLMClient, LLMConfigurationError, LLMSettings
-from app.db import repository_gateway
+from app.db import DatabaseOperationError, repository_gateway
 from app.proxy.traffic import DEFAULT_DB_PATH
 from core.agent_contracts import (
     AgentAnalysisResponse,
@@ -142,6 +142,10 @@ def analyze_cluster(
         ).run(cluster_id)
     except AgentGuardError as error:
         raise HTTPException(status_code=422, detail=str(error)) from error
+    except DatabaseOperationError as error:
+        raise HTTPException(
+            status_code=503, detail="Agent persistence is unavailable"
+        ) from error
     except (
         AgentPersistenceError,
         LLMConfigurationError,
@@ -164,6 +168,10 @@ def latest_cluster_decision(cluster_id: str) -> AgentAnalysisResponse:
     _require_enabled()
     try:
         summary = _stores().decisions.latest_for_cluster(cluster_id)
+    except DatabaseOperationError as error:
+        raise HTTPException(
+            status_code=503, detail="Agent persistence is unavailable"
+        ) from error
     except (OSError, ValueError, RuntimeError) as error:
         raise HTTPException(status_code=503, detail=str(error)) from error
     if summary is None or summary.decision is None:
@@ -194,6 +202,14 @@ def approve_decision(decision_id: str, request: ApprovalRequest) -> ApprovalReco
         return stores.approvals.put(decision_id, request.approved_by)
     except HTTPException:
         raise
+    except DatabaseOperationError as error:
+        raise HTTPException(
+            status_code=503, detail="Agent persistence is unavailable"
+        ) from error
+    except DatabaseOperationError as error:
+        raise HTTPException(
+            status_code=503, detail="Agent persistence is unavailable"
+        ) from error
     except (OSError, ValueError, RuntimeError) as error:
         raise HTTPException(status_code=503, detail=str(error)) from error
 

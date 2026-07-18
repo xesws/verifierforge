@@ -4,7 +4,7 @@ import asyncio
 from pathlib import Path
 
 import pytest
-from sqlalchemy import create_engine, inspect, text
+from sqlalchemy import URL, create_engine, inspect, text
 
 from app.db.engine import create_database_runtime
 from app.db.migration import downgrade_database, migrate_sqlite, run_migrations
@@ -78,7 +78,13 @@ async def test_sqlite_migration_helper_rejects_postgres_without_connecting() -> 
     settings = DatabaseSettings.from_env(
         {
             "VF_DB_BACKEND": "postgres",
-            "SUPABASE_DB_URL": "postgresql://vf:secret@db.example.test/verifierforge",
+            "SUPABASE_DB_URL": URL.create(
+                "postgresql",
+                username="vf",
+                password="fixture",
+                host="db.example.test",
+                database="verifierforge",
+            ).render_as_string(hide_password=False),
         }
     )
 

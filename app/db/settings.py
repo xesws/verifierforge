@@ -27,6 +27,10 @@ class DatabaseSettings:
 
     backend: DatabaseBackend
     _url: URL = field(repr=False)
+    pool_size: int = 5
+    max_overflow: int = 5
+    pool_timeout_seconds: int = 10
+    connect_timeout_seconds: int = 10
 
     @classmethod
     def from_env(cls, environ: Mapping[str, str] | None = None) -> "DatabaseSettings":
@@ -64,7 +68,20 @@ class DatabaseSettings:
             raise DatabaseConfigurationError("SUPABASE_DB_URL must be a PostgreSQL URL")
         if not parsed.host or not parsed.database:
             raise DatabaseConfigurationError("SUPABASE_DB_URL is incomplete")
-        return cls(backend=backend, _url=parsed.set(drivername="postgresql+asyncpg"))
+        return cls(
+            backend=backend,
+            _url=parsed.set(drivername="postgresql+asyncpg"),
+            pool_size=_bounded_int(values, "VF_DB_POOL_SIZE", 5, minimum=1, maximum=50),
+            max_overflow=_bounded_int(
+                values, "VF_DB_MAX_OVERFLOW", 5, minimum=0, maximum=50
+            ),
+            pool_timeout_seconds=_bounded_int(
+                values, "VF_DB_POOL_TIMEOUT_SECONDS", 10, minimum=1, maximum=120
+            ),
+            connect_timeout_seconds=_bounded_int(
+                values, "VF_DB_CONNECT_TIMEOUT_SECONDS", 10, minimum=1, maximum=120
+            ),
+        )
 
     @classmethod
     def sqlite(cls, path: Path | str) -> "DatabaseSettings":
@@ -85,3 +102,24 @@ class DatabaseSettings:
 
     def __str__(self) -> str:
         return f"DatabaseSettings(backend={self.backend.value})"
+
+
+def _bounded_int(
+    values: Mapping[str, str],
+    name: str,
+    default: int,
+    *,
+    minimum: int,
+    maximum: int,
+) -> int:
+    try:
+        value = int(values.get(name, str(default)))
+    except (TypeError, ValueError):
+        raise DatabaseConfigurationError(
+            f"{name} must be an integer in [{minimum}, {maximum}]"
+        ) from None
+    if not minimum <= value <= maximum:
+        raise DatabaseConfigurationError(
+            f"{name} must be an integer in [{minimum}, {maximum}]"
+        )
+    return value
