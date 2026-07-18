@@ -46,12 +46,33 @@ def _service_factory(db_path: Path, traces: MemoryTraceStore, *, binding: str = 
     return build
 
 
+def _install_services(
+    monkeypatch, db_path: Path, traces: MemoryTraceStore, *, binding: str = "mock"
+) -> None:
+    monkeypatch.setattr(
+        agent_api, "_services", _service_factory(db_path, traces, binding=binding)
+    )
+    monkeypatch.setattr(
+        agent_api,
+        "_stores",
+        lambda: agent_api.AgentStores(
+            decisions=SQLiteAgentDecisionStore(db_path),
+            approvals=SQLiteApprovalStore(db_path),
+        ),
+    )
+
+
 def test_flag_off_returns_404_before_service_construction(monkeypatch) -> None:
     monkeypatch.delenv("VF_AGENT_ENABLED", raising=False)
     monkeypatch.setattr(
         agent_api,
         "_services",
         lambda _cluster_id: (_ for _ in ()).throw(AssertionError("must not construct")),
+    )
+    monkeypatch.setattr(
+        agent_api,
+        "_stores",
+        lambda: (_ for _ in ()).throw(AssertionError("must not construct")),
     )
     client = TestClient(app)
 
@@ -66,7 +87,7 @@ def test_analyze_caches_identical_fingerprint_and_approval_is_idempotent(
     monkeypatch.setenv("VF_AGENT_ENABLED", "true")
     db_path = tmp_path / "traffic.db"
     traces = MemoryTraceStore()
-    monkeypatch.setattr(agent_api, "_services", _service_factory(db_path, traces))
+    _install_services(monkeypatch, db_path, traces)
     client = TestClient(app)
 
     first = client.post("/clusters/data-pull-sql/agent/analyze")
@@ -78,6 +99,13 @@ def test_analyze_caches_identical_fingerprint_and_approval_is_idempotent(
     assert second.json()["decision_id"] == first.json()["decision_id"]
     assert len(traces.values) == 1
     decision_id = first.json()["decision_id"]
+    monkeypatch.setattr(
+        agent_api,
+        "_services",
+        lambda _cluster_id: (_ for _ in ()).throw(
+            AssertionError("approval reads and writes must not construct runtime services")
+        ),
+    )
 
     approved = client.post(
         f"/agent-decisions/{decision_id}/approvals", json={"approved_by": "owner"}
@@ -88,14 +116,15 @@ def test_analyze_caches_identical_fingerprint_and_approval_is_idempotent(
     assert approved.status_code == repeated.status_code == 200
     assert approved.json() == repeated.json()
     ApprovalRecord.model_validate(approved.json())
+    persisted = client.get(f"/agent-decisions/{decision_id}/approval")
+    assert persisted.status_code == 200
+    assert persisted.json() == approved.json()
 
 
 def test_non_forge_decision_cannot_be_approved(tmp_path: Path, monkeypatch) -> None:
     monkeypatch.setenv("VF_AGENT_ENABLED", "true")
     db_path = tmp_path / "traffic.db"
-    monkeypatch.setattr(
-        agent_api, "_services", _service_factory(db_path, MemoryTraceStore())
-    )
+    _install_services(monkeypatch, db_path, MemoryTraceStore())
     client = TestClient(app)
     response = client.post("/clusters/invoice-field-extraction/agent/analyze")
 
@@ -127,9 +156,7 @@ def test_changed_traffic_fingerprint_invalidates_cache(tmp_path: Path, monkeypat
             (system_prompt_hash(SYSTEM_PROMPTS_BY_CLUSTER["data-pull-sql"]),),
         )
     traces = MemoryTraceStore()
-    monkeypatch.setattr(
-        agent_api, "_services", _service_factory(db_path, traces, binding="real")
-    )
+    _install_services(monkeypatch, db_path, traces, binding="real")
     client = TestClient(app)
     first = client.post("/clusters/data-pull-sql/agent/analyze")
     with sqlite3.connect(db_path) as connection:
@@ -147,11 +174,7 @@ def test_changed_traffic_fingerprint_invalidates_cache(tmp_path: Path, monkeypat
 
 def test_real_and_mock_agent_routes_share_contract_shape(tmp_path: Path, monkeypatch) -> None:
     monkeypatch.setenv("VF_AGENT_ENABLED", "true")
-    monkeypatch.setattr(
-        agent_api,
-        "_services",
-        _service_factory(tmp_path / "traffic.db", MemoryTraceStore()),
-    )
+    _install_services(monkeypatch, tmp_path / "traffic.db", MemoryTraceStore())
     _AGENT_DECISIONS.clear()
     _AGENT_APPROVALS.clear()
     real = TestClient(app).post("/clusters/data-pull-sql/agent/analyze")
@@ -165,9 +188,80 @@ def test_real_and_mock_agent_routes_share_contract_shape(tmp_path: Path, monkeyp
 
 def test_discover_page_contains_analyze_and_approval_controls(monkeypatch) -> None:
     monkeypatch.setenv("VF_AGENT_ENABLED", "true")
+    monkeypatch.delenv("VF_PROXY_DB_PATH", raising=False)
     response = TestClient(app).get("/discover")
 
     assert response.status_code == 200
     assert "Analyze" in response.text
     assert "Approve & Forge" in response.text
-    assert "never launches training" in response.text
+    assert "SQL Volume" in response.text
+    assert "Monthly Cost" in response.text
+    assert 'content="app/proxy/traffic.db"' in response.text
+    assert "No GPU allocated" in response.text
+    assert "No training started" in response.text
+
+
+def test_analyze_accepts_configured_source_and_rejects_other_paths(
+    tmp_path: Path, monkeypatch
+) -> None:
+    monkeypatch.setenv("VF_AGENT_ENABLED", "true")
+    db_path = tmp_path / "traffic.db"
+    monkeypatch.setenv("VF_PROXY_DB_PATH", str(db_path))
+    traces = MemoryTraceStore()
+    _install_services(monkeypatch, db_path, traces)
+    client = TestClient(app)
+
+    valid = client.post(
+        "/clusters/data-pull-sql/agent/analyze",
+        json={"data_source": str(db_path)},
+    )
+    invalid = client.post(
+        "/clusters/data-pull-sql/agent/analyze",
+        json={"data_source": str(tmp_path / "other.db")},
+    )
+
+    assert valid.status_code == 200
+    assert invalid.status_code == 422
+    assert "VF_PROXY_DB_PATH" in invalid.json()["detail"]
+    assert len(traces.values) == 1
+
+
+def test_cluster_catalog_is_shared_by_real_and_mock_api() -> None:
+    real = TestClient(app).get("/clusters")
+    mock = TestClient(mock_app).get("/clusters")
+
+    assert real.status_code == mock.status_code == 200
+    assert [item["cluster_id"] for item in real.json()] == [
+        item["cluster_id"] for item in mock.json()
+    ]
+    real_sql = next(item for item in real.json() if item["cluster_id"] == "data-pull-sql")
+    mock_sql = next(item for item in mock.json() if item["cluster_id"] == "data-pull-sql")
+    assert real_sql["monthly_calls"] == mock_sql["monthly_calls"] == 95_000
+    assert real_sql["monthly_cost_usd"] == mock_sql["monthly_cost_usd"] == 5_500.0
+    assert TestClient(app).get("/clusters/not-a-cluster").status_code == 404
+
+
+def test_mock_approval_receipt_can_be_reloaded(monkeypatch) -> None:
+    monkeypatch.setenv("VF_AGENT_ENABLED", "true")
+    _AGENT_DECISIONS.clear()
+    _AGENT_APPROVALS.clear()
+    client = TestClient(mock_app)
+    decision = client.post(
+        "/clusters/data-pull-sql/agent/analyze",
+        json={"data_source": "app/proxy/traffic.db"},
+    ).json()
+
+    missing = client.get(
+        f"/agent-decisions/{decision['decision_id']}/approval"
+    )
+    approved = client.post(
+        f"/agent-decisions/{decision['decision_id']}/approvals",
+        json={"approved_by": "demo-owner"},
+    )
+    reloaded = client.get(
+        f"/agent-decisions/{decision['decision_id']}/approval"
+    )
+
+    assert missing.status_code == 404
+    assert approved.status_code == reloaded.status_code == 200
+    assert reloaded.json() == approved.json()

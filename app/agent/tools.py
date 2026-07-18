@@ -11,7 +11,11 @@ import sqlite3
 from statistics import median
 from typing import Any, Callable, Literal
 
-from app.proxy.clusters import SYSTEM_PROMPTS_BY_CLUSTER, system_prompt_hash
+from app.proxy.clusters import (
+    SYSTEM_PROMPTS_BY_CLUSTER,
+    cluster_profile,
+    system_prompt_hash,
+)
 from app.proxy.traffic import DEFAULT_DB_PATH
 from core.agent_contracts import (
     AnalyzeTrafficInput,
@@ -209,7 +213,17 @@ def _real_analysis(cluster_id: str, db_path: Path) -> AnalyzeTrafficOutput:
                     ).fetchall()
         except sqlite3.Error:
             rows = []
-    fingerprint = _digest({"cluster_id": cluster_id, "rows": rows})
+    try:
+        profile = cluster_profile(cluster_id)
+    except KeyError:
+        profile = None
+    fingerprint = _digest(
+        {
+            "cluster_id": cluster_id,
+            "rows": rows,
+            "profile": profile.model_dump(mode="json") if profile else None,
+        }
+    )
     latencies = sorted(float(row[3]) for row in rows)
     timestamps = [_parse_timestamp(str(row[0])) for row in rows]
     timestamps = [value for value in timestamps if value is not None]
@@ -221,8 +235,8 @@ def _real_analysis(cluster_id: str, db_path: Path) -> AnalyzeTrafficOutput:
         evidence_fingerprint=fingerprint,
         data_sufficient=count > 0,
         request_count=count,
-        monthly_calls=count,
-        monthly_cost_usd=cost,
+        monthly_calls=profile.monthly_calls if profile else count,
+        monthly_cost_usd=profile.monthly_cost_usd if profile else cost,
         latency_p50_ms=float(median(latencies)) if latencies else 0.0,
         latency_p95_ms=_percentile(latencies, 0.95),
         growth_rate=_growth_rate(count),
@@ -232,11 +246,21 @@ def _real_analysis(cluster_id: str, db_path: Path) -> AnalyzeTrafficOutput:
 
 
 def _mock_analysis(cluster_id: str) -> AnalyzeTrafficOutput:
-    fixture = {
-        "data-pull-sql": (95_000, 5_500.0, 430.0, 0.18),
-        "invoice-field-extraction": (180_000, 6_000.0, 510.0, 0.08),
-        "support-ticket-extraction": (240_000, 4_800.0, 360.0, -0.02),
-    }.get(cluster_id, (0, 0.0, 0.0, 0.0))
+    try:
+        profile = cluster_profile(cluster_id)
+    except KeyError:
+        profile = None
+    latency, growth = {
+        "data-pull-sql": (430.0, 0.18),
+        "invoice-field-extraction": (510.0, 0.08),
+        "support-ticket-extraction": (360.0, -0.02),
+    }.get(cluster_id, (0.0, 0.0))
+    fixture = (
+        profile.monthly_calls if profile else 0,
+        profile.monthly_cost_usd if profile else 0.0,
+        latency,
+        growth,
+    )
     fingerprint = _digest({"binding": "mock", "cluster_id": cluster_id, "fixture": fixture})
     return AnalyzeTrafficOutput(
         cluster_id=cluster_id,

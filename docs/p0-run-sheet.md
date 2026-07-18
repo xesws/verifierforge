@@ -2220,3 +2220,31 @@ gate judgment; subsequent code records the unambiguous
 `agent-gate-c-pass` will point to the v0.22.3 verified commit. `VF_AGENT_ENABLED`
 and `VF_AGENT_GATE_C_PASSED` remain disabled by default; enabling either is an
 owner decision.
+
+## 2026-07-18 Discover evidence and approval flow — v0.22.4
+
+- [x] Reserved patch version and wrote version, frontend, Forge Agent, and API
+  documents before implementation.
+- [x] Centralized stable cluster profiles for real API, mock API, and Agent
+  tools. Data Pull SQL is `95,000 SQL queries/month` and `$5,500/month`;
+  short-window traffic rows are no longer mislabeled as monthly totals.
+- [x] Added true-API `GET /clusters` and `GET /clusters/{cluster_id}` parity,
+  optional validated Analyze `data_source`, and store-only approval receipt
+  lookup. Existing core contracts and bodyless Analyze remain unchanged.
+- [x] Rebuilt Data Pull SQL as Evidence → Solution → Schema → Approve. Input
+  defaults to `app/proxy/traffic.db`; Analyze stays disabled until confirmation;
+  the six-field `TrainingConfig` is human-readable.
+- [x] Kept the product label `Approve & Forge`, but acknowledgement and receipt
+  state explicitly that it writes one idempotent approval only: no GPU, no
+  training, no job, no spend, and no routing change.
+- [x] Full suite: `311 passed, 1 skipped`. Desktop mock walkthrough passed from
+  Input through persisted approval; 390px walkthrough passed with no horizontal
+  overflow. No paid LLM request was made.
+
+Screenshot evidence:
+
+```text
+d966dad714bc31c95e752d2de910d96aeee6567cf89ca5319150571e3025c44d  assets/forge-agent/v0.22.4-discover-overview.png
+69018b1af0e533b31825aab849a25cb18de15c279edb2ee805c5c2add0a5dddb  assets/forge-agent/v0.22.4-discover-schema.png
+a92b5fbbf763f05736b7e848f788a3d7c18fcac178ea8bf903f1b53cdc0e0a8f  assets/forge-agent/v0.22.4-discover-approval-receipt.png
+```

@@ -18,7 +18,6 @@ from core.contracts import (
     Arena,
     ArenaSample,
     Cluster,
-    ClusterStatus,
     Job,
     JobStatus,
     LivePassRate,
@@ -33,7 +32,8 @@ from core.agent_contracts import (
     ApprovalRequest,
     TrainingConfig,
 )
-from app.api.agent import agent_enabled
+from app.api.agent import AgentAnalyzeRequest, agent_enabled
+from app.proxy.clusters import list_cluster_profiles
 
 
 app = FastAPI(title="VerifierForge Mock API")
@@ -230,40 +230,20 @@ def _live_pass_rate(cluster_id: str) -> LivePassRate:
 
 
 CLUSTERS: list[Cluster] = [
-    Cluster(
-        cluster_id="support-ticket-extraction",
-        name="Support ticket extraction",
-        monthly_calls=240_000,
-        monthly_cost_usd=4800.0,
-        trainable=True,
-        status=ClusterStatus.LIVE,
-        job_id="nl2sql-gain",
-        routing=RoutingState(
-            cluster_id="support-ticket-extraction",
-            enabled=True,
-            canary_percent=100,
-            target_model="vf-nl2sql-gain",
-        ),
-        live_pass_rate=_live_pass_rate("support-ticket-extraction"),
-    ),
-    Cluster(
-        cluster_id="invoice-field-extraction",
-        name="Invoice field extraction",
-        monthly_calls=180_000,
-        monthly_cost_usd=6000.0,
-        trainable=True,
-        status=ClusterStatus.DISCOVERED,
-        job_id=None,
-    ),
-    Cluster(
-        cluster_id="data-pull-sql",
-        name="Data pull SQL",
-        monthly_calls=95_000,
-        monthly_cost_usd=5500.0,
-        trainable=True,
-        status=ClusterStatus.DISCOVERED,
-        job_id=None,
-    ),
+    cluster.model_copy(
+        update={
+            "routing": RoutingState(
+                cluster_id=cluster.cluster_id,
+                enabled=True,
+                canary_percent=100,
+                target_model="vf-nl2sql-gain",
+            ),
+            "live_pass_rate": _live_pass_rate(cluster.cluster_id),
+        }
+    )
+    if cluster.cluster_id == "support-ticket-extraction"
+    else cluster
+    for cluster in list_cluster_profiles()
 ]
 
 
@@ -361,9 +341,12 @@ def _require_cluster(cluster_id: str) -> None:
 @app.post(
     "/clusters/{cluster_id}/agent/analyze", response_model=AgentAnalysisResponse
 )
-def analyze_cluster(cluster_id: str) -> AgentAnalysisResponse:
+def analyze_cluster(
+    cluster_id: str, request: AgentAnalyzeRequest | None = None
+) -> AgentAnalysisResponse:
     _require_agent_enabled()
     _require_cluster(cluster_id)
+    del request  # The deterministic mock accepts the same optional body shape.
     existing = _AGENT_DECISIONS.get(cluster_id)
     if existing is not None:
         return existing.model_copy(update={"cached": True})
@@ -423,6 +406,17 @@ def approve_agent_decision(
         approved_at="2026-07-17T12:01:00Z",
     )
     _AGENT_APPROVALS[decision_id] = approval
+    return approval
+
+
+@app.get(
+    "/agent-decisions/{decision_id}/approval", response_model=ApprovalRecord
+)
+def get_agent_approval(decision_id: str) -> ApprovalRecord:
+    _require_agent_enabled()
+    approval = _AGENT_APPROVALS.get(decision_id)
+    if approval is None:
+        raise HTTPException(status_code=404, detail="Approval not found")
     return approval
 
 

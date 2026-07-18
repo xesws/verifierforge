@@ -14,9 +14,11 @@ from fastapi.middleware.cors import CORSMiddleware
 from app.api.artifacts import ArtifactDataError, ArtifactStore
 from app.api.agent import router as agent_router
 from app.api.copilot import router as copilot_router
+from app.proxy.clusters import cluster_profile, list_cluster_profiles
 from app.proxy.routing import LivePassRateRecord, RouteRecord, get_route, list_live_pass_rate, put_route
 from app.proxy.traffic import DEFAULT_DB_PATH
 from core.contracts import (
+    Cluster,
     Control,
     Job,
     JobStatus,
@@ -158,6 +160,21 @@ def job_metrics(job_id: str) -> Metrics:
         except KeyError as error:
             raise HTTPException(status_code=404, detail="Job not found") from error
     return _metrics_for(_job_dir(job_id))
+
+
+@app.get("/clusters", response_model=list[Cluster])
+def list_clusters() -> list[Cluster]:
+    """Return the stable product profiles used by Discover and the mock API."""
+    return list_cluster_profiles()
+
+
+@app.get("/clusters/{cluster_id}", response_model=Cluster)
+def get_cluster(cluster_id: str) -> Cluster:
+    """Return one stable product profile without deriving monthly facts from a short sample."""
+    try:
+        return cluster_profile(cluster_id)
+    except KeyError as error:
+        raise HTTPException(status_code=404, detail="Cluster not found") from error
 
 
 @app.get("/clusters/{cluster_id}/routing", response_model=RoutingState)

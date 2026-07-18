@@ -82,7 +82,9 @@ def test_real_binding_reads_metadata_without_mutating_database(tmp_path: Path) -
     analysis, samples, economics, verifiability = _run_chain(ToolRegistry("real", db_path=db_path))
 
     assert analysis["request_count"] == 1
-    assert analysis["monthly_cost_usd"] == 1.5
+    assert analysis["monthly_calls"] == 95_000
+    assert analysis["monthly_cost_usd"] == 5_500.0
+    assert economics["current_monthly_cost_usd"] == 5_500.0
     assert samples["samples"] == []
     assert samples["data_sufficient"] is False
     assert verifiability["data_sufficient"] is False
