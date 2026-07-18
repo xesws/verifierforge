@@ -45,6 +45,17 @@ Optional worktrees (when needed) come from current `origin/main`: `git fetch ori
 
 The parent agent must give every sub-agent the target version and required documentation paths before delegating code. A sub-agent that cannot find those documents must stop and ask for them; it may not create implementation files first. Scope changes require the version and area documents to be updated before the corresponding code. A merge is blocked until the version document, all affected area documents, tests, and implementation changes agree; the integration owner verifies that set during conflict resolution.
 
+Product versions continue to increment mechanically across stage boundaries;
+do not restart or reinterpret the sequence for a new subsystem. Semantic tags
+are separate: `v1.0-buildweek` is an owner-created submission freeze, while
+system milestones follow `docs/design/` stage names such as
+`db-N-complete`, `agent-gate-c-pass`, and `provisioner-pN-live`.
+
+Every new subsystem is disabled by default behind a feature flag. A gate pass
+does not enable it automatically: the owner must approve the deployment change,
+and the reviewer path must remain independent while the flag is off. Production
+work stays trunk-first; long-lived branches remain prohibited.
+
 ## Testing Guidelines
 
 Use pytest and name tests `test_*.py`. Add focused failure and boundary coverage for changed contracts, storage, or verifier behavior. Run `pytest -q` plus the narrow smoke command relevant to the change before committing.
@@ -54,3 +65,6 @@ If you need to use the API to do the model testing, only use OpenRouter (and pre
 ## Commit & Pull Request Guidelines
 
 Keep commits focused and use the versioned prefix above. PRs state affected modules, validation results, contract/mock impact, and screenshots only for UI-visible changes. Do not stage generated `runs/`, `models/`, or cache files.
+
+When recording an AI co-author, use `GPT` or `Codex`; never attribute the work
+to a different editor or framework.

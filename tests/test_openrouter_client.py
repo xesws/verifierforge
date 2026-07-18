@@ -6,6 +6,7 @@ import app.gpt.client as llm_module
 from app.gpt import (
     DEFAULT_AUGMENT_MODEL,
     DEFAULT_LLM_BASE_URL,
+    DEFAULT_OPENAI_MODEL,
     EvalSettings,
     LLMClient,
     LLMConfigurationError,
@@ -32,11 +33,52 @@ def test_settings_read_only_canonical_environment() -> None:
     assert settings.model == "provider/test-model"
 
 
-def test_settings_require_canonical_key_and_ignore_legacy_key() -> None:
-    with pytest.raises(LLMConfigurationError, match="VF_LLM_API_KEY") as raised:
-        LLMSettings.from_env({"OPENROUTER_API_KEY": "legacy-secret"})
+def test_openrouter_preset_uses_provider_key() -> None:
+    settings = LLMSettings.from_env({"OPENROUTER_API_KEY": "provider-secret"})
 
-    assert "legacy-secret" not in str(raised.value)
+    assert settings.provider == "openrouter"
+    assert settings.api_key == "provider-secret"
+    assert settings.base_url == DEFAULT_LLM_BASE_URL
+    assert settings.model == DEFAULT_AUGMENT_MODEL
+
+
+def test_openai_preset_resolves_luna_xhigh() -> None:
+    settings = LLMSettings.from_env(
+        {"VF_LLM_PROVIDER": "openai", "OPENAI_API_KEY": "openai-secret"}
+    )
+
+    assert settings.provider == "openai"
+    assert settings.model == DEFAULT_OPENAI_MODEL == "gpt-5.6-luna-xhigh"
+    assert settings.base_url == "https://api.openai.com/v1"
+
+
+@pytest.mark.parametrize("model", ["gpt-5.6-sol", "GPT-5.6-TERRA-xhigh"])
+def test_openai_preset_rejects_expensive_tiers_before_client_construction(model: str) -> None:
+    with pytest.raises(LLMConfigurationError, match="Sol and Terra"):
+        LLMSettings.from_env(
+            {
+                "VF_LLM_PROVIDER": "openai",
+                "OPENAI_API_KEY": "openai-secret",
+                "VF_LLM_MODEL": model,
+            }
+        )
+
+
+def test_generic_overrides_win_over_provider_preset() -> None:
+    settings = LLMSettings.from_env(
+        {
+            "VF_LLM_PROVIDER": "openrouter",
+            "OPENROUTER_API_KEY": "provider-key",
+            "VF_LLM_API_KEY": "override-key",
+            "VF_LLM_BASE_URL": "https://override.example/v1",
+            "VF_LLM_MODEL": "provider/override-model",
+            "VF_AUGMENT_MODEL": "provider/legacy-model",
+        }
+    )
+
+    assert settings.api_key == "override-key"
+    assert settings.base_url == "https://override.example/v1"
+    assert settings.model == "provider/override-model"
 
 
 def test_eval_settings_require_explicit_eval_variables_without_llm_fallback() -> None:
@@ -333,6 +375,81 @@ def test_client_extracts_fenced_json_and_requests_json_mode() -> None:
 
     assert client.complete_json([{"role": "user", "content": "Return JSON"}]) == {"ok": True}
     assert requests[0]["response_format"] == {"type": "json_object"}
+
+
+def test_client_returns_structured_tool_turn_and_usage() -> None:
+    requests: list[dict[str, object]] = []
+
+    class FakeCompletions:
+        def create(self, **kwargs):
+            requests.append(kwargs)
+            return SimpleNamespace(
+                model="provider/tool-model",
+                usage=SimpleNamespace(
+                    prompt_tokens=11,
+                    completion_tokens=7,
+                    total_tokens=18,
+                    cost=0.001,
+                ),
+                choices=[
+                    SimpleNamespace(
+                        finish_reason="tool_calls",
+                        message=SimpleNamespace(
+                            content=None,
+                            tool_calls=[
+                                SimpleNamespace(
+                                    id="call-1",
+                                    function=SimpleNamespace(
+                                        name="analyze_traffic",
+                                        arguments='{"cluster_id":"data-pull-sql"}',
+                                    ),
+                                )
+                            ],
+                        ),
+                    )
+                ],
+            )
+
+    client = LLMClient(
+        LLMSettings(api_key="test-key", model="provider/tool-model"),
+        client=SimpleNamespace(chat=SimpleNamespace(completions=FakeCompletions())),
+    )
+    turn = client.tool_turn(
+        [{"role": "user", "content": "Analyze"}],
+        tools=[{"type": "function", "function": {"name": "analyze_traffic"}}],
+        max_completion_tokens=50,
+        timeout=4,
+    )
+
+    assert turn.tool_calls[0].name == "analyze_traffic"
+    assert turn.usage.total_tokens == 18
+    assert turn.usage.provider_reported_cost_usd == 0.001
+    assert turn.finish_reason == "tool_calls"
+    assert requests[0]["parallel_tool_calls"] is False
+    assert requests[0]["max_completion_tokens"] == 50
+    assert requests[0]["timeout"] == 4
+
+
+def test_runtime_openai_model_override_still_rejects_sol_before_request() -> None:
+    requests: list[dict[str, object]] = []
+    client = LLMClient(
+        LLMSettings(
+            api_key="test-key",
+            provider="openai",
+            model="gpt-5.6-luna-xhigh",
+            base_url="https://api.openai.com/v1",
+        ),
+        client=SimpleNamespace(
+            chat=SimpleNamespace(
+                completions=SimpleNamespace(create=lambda **kwargs: requests.append(kwargs))
+            )
+        ),
+    )
+
+    with pytest.raises(LLMConfigurationError, match="Sol and Terra"):
+        client.complete([{"role": "user", "content": "Hello"}], model="gpt-5.6-sol")
+
+    assert requests == []
 
 
 def test_client_rejects_empty_or_invalid_structured_completions() -> None:

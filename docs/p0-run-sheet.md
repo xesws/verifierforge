@@ -1818,3 +1818,24 @@ process argument in agent tooling output. No secret value was copied into this
 repository, evidence, or documentation. It is nevertheless an exposure event;
 the first owner action is deliberate rotation in a short service-maintenance
 window, rather than an unannounced restart of the live vLLM process.
+
+## 2026-07-17 Forge Agent A-0 — v0.18.0
+
+- [x] Documentation-first reservation, design index normalization, and the four
+  version/flag/branch rules prepared before implementation.
+- [x] The shared client now resolves explicit `openrouter` and `openai`
+  presets, retains generic overrides, exposes structured tool-turn usage, and
+  rejects Sol/Terra model names before transport invocation.
+- [ ] Live provider gate. The sole OpenRouter request resolved
+  `https://openrouter.ai/api/v1` + `z-ai/glm-5.2` and ended with
+  `LLMResponseError` because no usable completion content was returned. The
+  sole OpenAI request resolved `https://api.openai.com/v1` +
+  `gpt-5.6-luna-xhigh` and returned HTTP 404. No retry, fallback, Sol/Terra
+  request, or raw provider body occurred.
+- Cost ledger: OpenRouter `$0.25` and OpenAI `$0.25`, both explicitly
+  `reservation_upper_bound`; provider-reported cost was absent. The declared
+  $10 OpenAI account balance is not treated as a queried billing fact.
+- **Downstream stop:** A-1/A-2/replay/A-4 may proceed with deterministic
+  injected clients. Gate C live cannot pass, `agent-gate-c-pass` cannot be
+  created, and `VF_AGENT_ENABLED` remains false unless the exact Luna endpoint
+  becomes available within the existing budget.
