@@ -54,7 +54,12 @@ def test_canary_route_selects_tuned_fake_and_records_actual_route_path(tmp_path:
     assert contents[0].startswith("SELECT 'vf-fake-tuned-")
     assert contents[1].startswith("vf-fake-completion-")
     with sqlite3.connect(settings.db_path) as connection:
-        paths = [row[0] for row in connection.execute("SELECT route_path FROM traffic ORDER BY id")]
+        paths = [
+            row[0]
+            for row in connection.execute(
+                "SELECT route_taken FROM traffic_requests ORDER BY id"
+            )
+        ]
     assert paths == ["tuned", "default", "tuned", "default"]
 
 
@@ -116,21 +121,6 @@ def test_guardian_scheduler_failure_never_changes_completion_response(tmp_path: 
 
 def test_route_storage_migrates_traffic_and_rolls_exact_pass_rate(tmp_path: Path) -> None:
     db_path = tmp_path / "traffic.db"
-    with sqlite3.connect(db_path) as connection:
-        connection.execute(
-            """
-            CREATE TABLE traffic (
-                id INTEGER PRIMARY KEY,
-                timestamp TEXT NOT NULL,
-                system_prompt_hash TEXT NOT NULL,
-                model TEXT NOT NULL,
-                input_tokens INTEGER NOT NULL,
-                output_tokens INTEGER NOT NULL,
-                latency_ms REAL NOT NULL,
-                estimated_cost_usd REAL NOT NULL
-            )
-            """
-        )
     assert record_traffic(
         TrafficRecord("2026-07-16T00:00:00Z", "hash", "vf-demo", 1, 1, 1.0, 0.0, "tuned"),
         db_path=db_path,
@@ -142,7 +132,10 @@ def test_route_storage_migrates_traffic_and_rolls_exact_pass_rate(tmp_path: Path
     assert get_route("data-pull-sql", db_path=db_path) == route
     assert (first.pass_rate, second.pass_rate) == (1.0, 0.5)
     with sqlite3.connect(db_path) as connection:
-        assert "route_path" in {row[1] for row in connection.execute("PRAGMA table_info(traffic)")}
+        assert connection.execute(
+            "SELECT route_taken FROM traffic_requests"
+        ).fetchone() == ("tuned",)
+        assert connection.execute("SELECT version_num FROM alembic_version").fetchone()
 
 
 def test_mock_and_real_routing_and_live_rate_endpoints_validate_the_same_contracts(

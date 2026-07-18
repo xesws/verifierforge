@@ -7,10 +7,11 @@ from hashlib import sha256
 import json
 import os
 from pathlib import Path
-import sqlite3
 from statistics import median
 from typing import Any, Callable, Literal
 
+from app.db import RepositoryGateway, repository_gateway
+from app.db.settings import DatabaseBackend, DatabaseSettings
 from app.proxy.clusters import (
     SYSTEM_PROMPTS_BY_CLUSTER,
     cluster_profile,
@@ -50,6 +51,7 @@ class ToolRegistry:
         binding: Literal["real", "mock"],
         *,
         db_path: Path | str | None = None,
+        gateway: RepositoryGateway | None = None,
     ) -> None:
         if binding not in {"real", "mock"}:
             raise ValueError("tool binding must be real or mock")
@@ -59,6 +61,7 @@ class ToolRegistry:
             if db_path is not None
             else os.environ.get("VF_PROXY_DB_PATH", str(DEFAULT_DB_PATH))
         ).expanduser()
+        self.gateway = gateway
         self._analyses: dict[str, AnalyzeTrafficOutput] = {}
         self._sample_sets: dict[str, InspectSamplesOutput] = {}
 
@@ -88,7 +91,7 @@ class ToolRegistry:
         output = (
             _mock_analysis(request.cluster_id)
             if self.binding == "mock"
-            else _real_analysis(request.cluster_id, self.db_path)
+            else _real_analysis(request.cluster_id, self.db_path, self.gateway)
         )
         self._analyses[output.analysis_id] = output
         return output
@@ -192,27 +195,43 @@ class ToolRegistry:
         return analysis
 
 
-def _real_analysis(cluster_id: str, db_path: Path) -> AnalyzeTrafficOutput:
+def _real_analysis(
+    cluster_id: str,
+    db_path: Path,
+    gateway: RepositoryGateway | None,
+) -> AnalyzeTrafficOutput:
     rows: list[tuple[Any, ...]] = []
-    if db_path.is_file() and cluster_id in SYSTEM_PROMPTS_BY_CLUSTER:
-        uri = db_path.resolve().as_uri() + "?mode=ro"
-        try:
-            with sqlite3.connect(uri, uri=True) as connection:
-                table = connection.execute(
-                    "SELECT 1 FROM sqlite_master WHERE type='table' AND name='traffic'"
-                ).fetchone()
-                if table:
-                    prompt_hash = system_prompt_hash(SYSTEM_PROMPTS_BY_CLUSTER[cluster_id])
-                    rows = connection.execute(
-                        """
-                        SELECT timestamp, input_tokens, output_tokens, latency_ms,
-                               estimated_cost_usd, route_path
-                        FROM traffic WHERE system_prompt_hash = ? ORDER BY id
-                        """,
-                        (prompt_hash,),
-                    ).fetchall()
-        except sqlite3.Error:
-            rows = []
+    if cluster_id in SYSTEM_PROMPTS_BY_CLUSTER:
+        resolved = gateway
+        if resolved is None:
+            settings = DatabaseSettings.from_env()
+            if settings.backend is DatabaseBackend.SQLITE and not db_path.is_file():
+                settings = None
+            elif settings.backend is DatabaseBackend.SQLITE:
+                settings = DatabaseSettings.sqlite(db_path)
+            if settings is not None:
+                resolved = repository_gateway(settings)
+        if resolved is not None:
+            try:
+                prompt_hash = system_prompt_hash(SYSTEM_PROMPTS_BY_CLUSTER[cluster_id])
+                records = resolved.call(
+                    lambda repositories: repositories.traffic.list_for_prompt_hash(
+                        prompt_hash, limit=10_000
+                    )
+                )
+                rows = [
+                    (
+                        record.ts.isoformat(),
+                        record.tokens_in,
+                        record.tokens_out,
+                        record.latency_ms,
+                        record.cost_usd,
+                        record.route_taken,
+                    )
+                    for record in records
+                ]
+            except (OSError, RuntimeError, ValueError):
+                rows = []
     try:
         profile = cluster_profile(cluster_id)
     except KeyError:

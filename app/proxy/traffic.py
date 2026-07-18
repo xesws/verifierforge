@@ -3,10 +3,14 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+from datetime import datetime
 import json
 from pathlib import Path
 import re
-import sqlite3
+
+from app.db import RepositoryGateway, repository_gateway
+from app.db.records import TrafficRequestRecord
+from app.db.settings import DatabaseSettings
 
 
 REPOSITORY_ROOT = Path(__file__).resolve().parents[2]
@@ -64,34 +68,43 @@ def best_effort_cost(
         return 0.0
 
 
-def record_traffic(record: TrafficRecord, *, db_path: Path) -> bool:
-    """Insert one metadata-only row; return false instead of blocking on SQLite failure."""
+def record_traffic(
+    record: TrafficRecord,
+    *,
+    db_path: Path | None = None,
+    gateway: RepositoryGateway | None = None,
+) -> bool:
+    """Insert one metadata-only row without exposing a database failure upstream."""
     try:
-        db_path = Path(db_path)
-        db_path.parent.mkdir(parents=True, exist_ok=True)
-        with sqlite3.connect(db_path) as connection:
-            _ensure_traffic_schema(connection)
-            connection.execute(
-                """
-                INSERT INTO traffic (
-                    timestamp, system_prompt_hash, model, input_tokens,
-                    output_tokens, latency_ms, estimated_cost_usd, route_path
-                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)
-                """,
-                (
-                    record.timestamp,
-                    record.system_prompt_hash,
-                    record.model,
-                    record.input_tokens,
-                    record.output_tokens,
-                    record.latency_ms,
-                    record.estimated_cost_usd,
-                    record.route_path,
-                ),
-            )
+        resolved = gateway or repository_gateway(
+            DatabaseSettings.sqlite(db_path or DEFAULT_DB_PATH)
+        )
+        saved = TrafficRequestRecord(
+            ts=_timestamp(record.timestamp),
+            prompt_hash=record.system_prompt_hash,
+            model=record.model,
+            tokens_in=record.input_tokens,
+            tokens_out=record.output_tokens,
+            latency_ms=record.latency_ms,
+            cost_usd=record.estimated_cost_usd,
+            route_taken=record.route_path,
+        )
+        resolved.call(
+            lambda repositories: repositories.traffic.append(saved)
+        )
         return True
-    except (OSError, sqlite3.Error):
+    except (OSError, RuntimeError, ValueError):
         return False
+
+
+def _timestamp(value: str) -> datetime:
+    try:
+        parsed = datetime.fromisoformat(value.replace("Z", "+00:00"))
+    except ValueError:
+        raise ValueError("traffic timestamp must be ISO-8601") from None
+    if parsed.tzinfo is None:
+        raise ValueError("traffic timestamp must include a timezone")
+    return parsed
 
 
 def _rate(rates: dict[object, object], name: str) -> float:
@@ -99,24 +112,3 @@ def _rate(rates: dict[object, object], name: str) -> float:
     if not isinstance(value, (int, float)) or isinstance(value, bool) or value < 0:
         raise ValueError(f"proxy price table has invalid {name}")
     return float(value)
-
-
-def _ensure_traffic_schema(connection: sqlite3.Connection) -> None:
-    connection.execute(
-        """
-        CREATE TABLE IF NOT EXISTS traffic (
-            id INTEGER PRIMARY KEY,
-            timestamp TEXT NOT NULL,
-            system_prompt_hash TEXT NOT NULL,
-            model TEXT NOT NULL,
-            input_tokens INTEGER NOT NULL,
-            output_tokens INTEGER NOT NULL,
-            latency_ms REAL NOT NULL,
-            estimated_cost_usd REAL NOT NULL,
-            route_path TEXT NOT NULL DEFAULT 'default'
-        )
-        """
-    )
-    columns = {row[1] for row in connection.execute("PRAGMA table_info(traffic)")}
-    if "route_path" not in columns:
-        connection.execute("ALTER TABLE traffic ADD COLUMN route_path TEXT NOT NULL DEFAULT 'default'")

@@ -9,7 +9,6 @@ import json
 import os
 from pathlib import Path
 import random
-import sqlite3
 import threading
 import time
 from typing import Any
@@ -18,6 +17,8 @@ from fastapi import FastAPI, HTTPException
 from fastapi.responses import JSONResponse
 
 from app.gpt import LLMConfigurationError, LLMSettings
+from app.db import RepositoryGateway, repository_gateway
+from app.db.settings import DatabaseSettings
 from app.proxy.clusters import cluster_id_for_system_prompt, system_prompt_hash
 from app.proxy.frozen_nl2sql import FROZEN_TRAINING_POOL
 from app.proxy.guardian import score_tuned_sql_completion
@@ -86,7 +87,7 @@ class ProxySettings:
         )
 
 
-Recorder = Callable[[TrafficRecord], bool]
+Recorder = Callable[..., bool]
 RealForwarder = Callable[..., ForwardedResponse]
 RandomDraw = Callable[[], float]
 GuardianScheduler = Callable[[Callable[[], None]], None]
@@ -110,6 +111,25 @@ def create_app(
 ) -> FastAPI:
     """Create an isolated proxy app; injected seams keep tests network-free."""
     resolved = settings or ProxySettings.from_env()
+    database: RepositoryGateway | None = None
+    database_attempted = False
+    database_lock = threading.Lock()
+
+    def get_database() -> RepositoryGateway | None:
+        nonlocal database, database_attempted
+        if not database_attempted:
+            with database_lock:
+                if not database_attempted:
+                    database_attempted = True
+                    try:
+                        database = repository_gateway(
+                            DatabaseSettings.sqlite(resolved.db_path)
+                            if settings is not None
+                            else DatabaseSettings.from_env()
+                        )
+                    except (OSError, RuntimeError, ValueError):
+                        database = None
+        return database
     schedule_guardian = guardian_scheduler or _schedule_background
     proxy = FastAPI(title="VerifierForge Proxy")
 
@@ -118,7 +138,13 @@ def create_app(
         _validate_request(request)
         started = time.perf_counter()
         system_prompt = _system_prompt(request)
-        decision = _route_decision(system_prompt, resolved.db_path, canary_draw)
+        active_database = (
+            get_database()
+            if recorder is record_traffic
+            or cluster_id_for_system_prompt(system_prompt) is not None
+            else None
+        )
+        decision = _route_decision(system_prompt, active_database, canary_draw)
         try:
             forwarded = _forward(
                 request,
@@ -140,6 +166,7 @@ def create_app(
             latency_ms=(time.perf_counter() - started) * 1_000,
             system_prompt=system_prompt,
             route_path=decision.route_path,
+            gateway=active_database,
         )
         _schedule_guardian_best_effort(
             schedule_guardian,
@@ -149,6 +176,7 @@ def create_app(
             status_code=forwarded.status_code,
             settings=resolved,
             draw=guardian_draw,
+            gateway=active_database,
         )
         return JSONResponse(content=forwarded.payload, status_code=forwarded.status_code)
 
@@ -176,13 +204,17 @@ def _forward(
     raise UpstreamRequestError("configured upstream must be fake, fake-tuned, real, or an HTTP URL")
 
 
-def _route_decision(system_prompt: str, db_path: Path, draw: RandomDraw) -> RouteDecision:
+def _route_decision(
+    system_prompt: str, gateway: RepositoryGateway | None, draw: RandomDraw
+) -> RouteDecision:
     cluster_id = cluster_id_for_system_prompt(system_prompt)
     if cluster_id is None:
         return RouteDecision(None, "default", None)
+    if gateway is None:
+        return RouteDecision(cluster_id, "default", None)
     try:
-        route = get_route(cluster_id, db_path=db_path)
-    except (OSError, sqlite3.Error, ValueError):
+        route = get_route(cluster_id, gateway=gateway)
+    except (OSError, RuntimeError, ValueError):
         return RouteDecision(cluster_id, "default", None)
     if route.enabled and draw() < route.canary_percent / 100:
         return RouteDecision(cluster_id, "tuned", route.target_upstream)
@@ -213,7 +245,10 @@ def _record_best_effort(
     latency_ms: float,
     system_prompt: str,
     route_path: str,
+    gateway: RepositoryGateway | None,
 ) -> None:
+    if gateway is None:
+        return
     messages = [message for message in request.get("messages", []) if isinstance(message, Mapping)]
     input_tokens, output_tokens = _token_counts(messages, response)
     model = str(request["model"])
@@ -230,7 +265,7 @@ def _record_best_effort(
         route_path=route_path,
     )
     try:
-        recorder(record, db_path=settings.db_path)
+        recorder(record, gateway=gateway)
     except Exception:
         # A locked or unavailable observability database is never a customer-facing failure.
         pass
@@ -245,7 +280,10 @@ def _schedule_guardian_best_effort(
     status_code: int,
     settings: ProxySettings,
     draw: RandomDraw,
+    gateway: RepositoryGateway | None,
 ) -> None:
+    if gateway is None:
+        return
     if decision.cluster_id != "data-pull-sql" or decision.route_path != "tuned":
         return
     if not 200 <= status_code < 300 or draw() >= settings.guardian_sample_rate:
@@ -260,7 +298,7 @@ def _schedule_guardian_best_effort(
                 cluster_id=decision.cluster_id,
                 prompt=prompt,
                 completion=completion,
-                db_path=settings.db_path,
+                gateway=gateway,
                 pool_path=settings.guardian_pool_path,
                 rolling_window=settings.guardian_rolling_window,
             )

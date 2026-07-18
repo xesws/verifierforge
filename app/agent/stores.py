@@ -1,4 +1,4 @@
-"""SQLite decision summaries and S3 full traces for Forge Agent."""
+"""Relational decision summaries and S3 full traces for Forge Agent."""
 
 from __future__ import annotations
 
@@ -7,10 +7,15 @@ from hashlib import sha256
 import json
 import os
 from pathlib import Path
-import sqlite3
 from typing import Any, Protocol
 from uuid import uuid4
 
+from app.db import RepositoryGateway, repository_gateway
+from app.db.records import (
+    AgentDecisionRecord as DatabaseAgentDecisionRecord,
+    ApprovalRecord as DatabaseApprovalRecord,
+)
+from app.db.settings import DatabaseSettings
 from core.agent_contracts import ApprovalRecord, AgentDecisionSummary, AgentTrace
 
 
@@ -34,83 +39,56 @@ class ApprovalStore(Protocol):
     def get_by_decision(self, decision_id: str) -> ApprovalRecord | None: ...
 
 
-class SQLiteAgentDecisionStore:
-    """Tonight's queryable implementation, isolated behind the design interface."""
+class RelationalAgentDecisionStore:
+    """Synchronous Agent boundary backed by the shared async repository."""
 
-    def __init__(self, db_path: Path | str) -> None:
-        self.db_path = Path(db_path)
+    def __init__(
+        self,
+        db_path: Path | str | None = None,
+        *,
+        gateway: RepositoryGateway | None = None,
+    ) -> None:
+        self.gateway = gateway or repository_gateway(
+            DatabaseSettings.sqlite(db_path) if db_path is not None else None
+        )
 
     def put(self, summary: AgentDecisionSummary) -> AgentDecisionSummary:
-        payload = summary.model_dump_json()
-        self.db_path.parent.mkdir(parents=True, exist_ok=True)
-        with sqlite3.connect(self.db_path) as connection:
-            _ensure_schema(connection)
-            try:
-                connection.execute(
-                    """
-                    INSERT INTO agent_decisions (
-                        id, cluster_id, evidence_fingerprint, run_status,
-                        decision_json, trace_id, trace_s3_key, provider,
-                        model_name, created_at, tokens_in, tokens_out, summary_json
-                    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-                    """,
-                    (
-                        summary.decision_id,
-                        summary.cluster_id,
-                        summary.evidence_fingerprint,
-                        summary.run_status.value,
-                        summary.decision.model_dump_json() if summary.decision else None,
-                        summary.trace_id,
-                        summary.trace_s3_key,
-                        summary.provider,
-                        summary.model,
-                        summary.created_at.isoformat(),
-                        summary.total_input_tokens,
-                        summary.total_output_tokens,
-                        payload,
-                    ),
-                )
-            except sqlite3.IntegrityError:
-                existing = self.get(summary.decision_id)
-                if existing != summary:
-                    raise ValueError("decision_id already exists with different content")
-        return summary
+        saved = self.gateway.call(
+            lambda repositories: repositories.agent_decisions.put(
+                _decision_to_database(summary)
+            )
+        )
+        return _decision_from_database(saved)
 
     def get(self, decision_id: str) -> AgentDecisionSummary | None:
-        if not self.db_path.is_file():
-            return None
-        with sqlite3.connect(self.db_path) as connection:
-            _ensure_schema(connection)
-            row = connection.execute(
-                "SELECT summary_json FROM agent_decisions WHERE id = ?", (decision_id,)
-            ).fetchone()
-        return AgentDecisionSummary.model_validate_json(row[0]) if row else None
+        saved = self.gateway.call(
+            lambda repositories: repositories.agent_decisions.get(decision_id)
+        )
+        return _decision_from_database(saved) if saved else None
 
     def latest_for_cluster(
         self, cluster_id: str, evidence_fingerprint: str | None = None
     ) -> AgentDecisionSummary | None:
-        if not self.db_path.is_file():
-            return None
-        query = (
-            "SELECT summary_json FROM agent_decisions "
-            "WHERE cluster_id = ? AND run_status = 'completed'"
+        saved = self.gateway.call(
+            lambda repositories: repositories.agent_decisions.latest_for_cluster(
+                cluster_id, evidence_fingerprint
+            )
         )
-        parameters: list[Any] = [cluster_id]
-        if evidence_fingerprint is not None:
-            query += " AND evidence_fingerprint = ?"
-            parameters.append(evidence_fingerprint)
-        query += " ORDER BY created_at DESC, rowid DESC LIMIT 1"
-        with sqlite3.connect(self.db_path) as connection:
-            _ensure_schema(connection)
-            row = connection.execute(query, parameters).fetchone()
-        return AgentDecisionSummary.model_validate_json(row[0]) if row else None
+        return _decision_from_database(saved) if saved else None
 
 
-class SQLiteApprovalStore:
+class RelationalApprovalStore:
     """Idempotent approval writer; no execution handle is represented."""
 
-    def __init__(self, db_path: Path | str) -> None:
-        self.db_path = Path(db_path)
+    def __init__(
+        self,
+        db_path: Path | str | None = None,
+        *,
+        gateway: RepositoryGateway | None = None,
+    ) -> None:
+        self.gateway = gateway or repository_gateway(
+            DatabaseSettings.sqlite(db_path) if db_path is not None else None
+        )
 
     def put(self, decision_id: str, approved_by: str) -> ApprovalRecord:
         existing = self.get_by_decision(decision_id)
@@ -122,41 +100,28 @@ class SQLiteApprovalStore:
             approved_by=approved_by,
             approved_at=datetime.now(timezone.utc),
         )
-        self.db_path.parent.mkdir(parents=True, exist_ok=True)
-        with sqlite3.connect(self.db_path) as connection:
-            _ensure_schema(connection)
-            try:
-                connection.execute(
-                    """
-                    INSERT INTO approvals (
-                        id, decision_id, approved_by, approved_at, approval_json
-                    ) VALUES (?, ?, ?, ?, ?)
-                    """,
-                    (
-                        record.approval_id,
-                        record.decision_id,
-                        record.approved_by,
-                        record.approved_at.isoformat(),
-                        record.model_dump_json(),
-                    ),
+        saved = self.gateway.call(
+            lambda repositories: repositories.approvals.put(
+                DatabaseApprovalRecord(
+                    id=record.approval_id,
+                    decision_id=record.decision_id,
+                    approved_by=record.approved_by,
+                    approved_at=record.approved_at,
                 )
-            except sqlite3.IntegrityError:
-                concurrent = self.get_by_decision(decision_id)
-                if concurrent is None:
-                    raise
-                return concurrent
-        return record
+            )
+        )
+        return _approval_from_database(saved)
 
     def get_by_decision(self, decision_id: str) -> ApprovalRecord | None:
-        if not self.db_path.is_file():
-            return None
-        with sqlite3.connect(self.db_path) as connection:
-            _ensure_schema(connection)
-            row = connection.execute(
-                "SELECT approval_json FROM approvals WHERE decision_id = ?",
-                (decision_id,),
-            ).fetchone()
-        return ApprovalRecord.model_validate_json(row[0]) if row else None
+        saved = self.gateway.call(
+            lambda repositories: repositories.approvals.get_by_decision(decision_id)
+        )
+        return _approval_from_database(saved) if saved else None
+
+
+# Compatibility names for existing extension points. They no longer open SQLite.
+SQLiteAgentDecisionStore = RelationalAgentDecisionStore
+SQLiteApprovalStore = RelationalApprovalStore
 
 
 class S3AgentTraceStore:
@@ -193,42 +158,44 @@ class S3AgentTraceStore:
         return AgentTrace.model_validate_json(payload)
 
 
-def _ensure_schema(connection: sqlite3.Connection) -> None:
-    connection.execute(
-        """
-        CREATE TABLE IF NOT EXISTS agent_decisions (
-            id TEXT PRIMARY KEY,
-            cluster_id TEXT NOT NULL,
-            evidence_fingerprint TEXT,
-            run_status TEXT NOT NULL,
-            decision_json TEXT,
-            trace_id TEXT NOT NULL,
-            trace_s3_key TEXT,
-            provider TEXT NOT NULL,
-            model_name TEXT NOT NULL,
-            created_at TEXT NOT NULL,
-            tokens_in INTEGER NOT NULL,
-            tokens_out INTEGER NOT NULL,
-            summary_json TEXT NOT NULL
-        )
-        """
+def _decision_to_database(summary: AgentDecisionSummary) -> DatabaseAgentDecisionRecord:
+    decision = summary.decision
+    return DatabaseAgentDecisionRecord(
+        id=summary.decision_id,
+        cluster_id=summary.cluster_id,
+        decision=decision.decision.value if decision else None,
+        rationale=decision.rationale if decision else None,
+        confidence=decision.confidence if decision else None,
+        config_json=(
+            decision.config.model_dump(mode="json")
+            if decision is not None and decision.config is not None
+            else None
+        ),
+        trace_s3_key=summary.trace_s3_key,
+        model_name=summary.model,
+        created_at=summary.created_at,
+        evidence_fingerprint=summary.evidence_fingerprint,
+        run_status=summary.run_status.value,
+        trace_id=summary.trace_id,
+        provider=summary.provider,
+        tokens_in=summary.total_input_tokens,
+        tokens_out=summary.total_output_tokens,
+        summary_json=summary.model_dump(mode="json"),
     )
-    connection.execute(
-        """
-        CREATE TABLE IF NOT EXISTS approvals (
-            id TEXT PRIMARY KEY,
-            decision_id TEXT NOT NULL UNIQUE,
-            approved_by TEXT NOT NULL,
-            approved_at TEXT NOT NULL,
-            approval_json TEXT NOT NULL
-        )
-        """
-    )
-    connection.execute(
-        """
-        CREATE INDEX IF NOT EXISTS idx_agent_decisions_cluster_created
-        ON agent_decisions(cluster_id, created_at)
-        """
+
+
+def _decision_from_database(
+    record: DatabaseAgentDecisionRecord,
+) -> AgentDecisionSummary:
+    return AgentDecisionSummary.model_validate(record.summary_json)
+
+
+def _approval_from_database(record: DatabaseApprovalRecord) -> ApprovalRecord:
+    return ApprovalRecord(
+        approval_id=record.id,
+        decision_id=record.decision_id,
+        approved_by=record.approved_by,
+        approved_at=record.approved_at,
     )
 
 

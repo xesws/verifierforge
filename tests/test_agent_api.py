@@ -139,31 +139,38 @@ def test_non_forge_decision_cannot_be_approved(tmp_path: Path, monkeypatch) -> N
 def test_changed_traffic_fingerprint_invalidates_cache(tmp_path: Path, monkeypatch) -> None:
     monkeypatch.setenv("VF_AGENT_ENABLED", "true")
     db_path = tmp_path / "traffic.db"
-    with sqlite3.connect(db_path) as connection:
-        connection.execute(
-            """
-            CREATE TABLE traffic (
-                id INTEGER PRIMARY KEY, timestamp TEXT NOT NULL,
-                system_prompt_hash TEXT NOT NULL, model TEXT NOT NULL,
-                input_tokens INTEGER NOT NULL, output_tokens INTEGER NOT NULL,
-                latency_ms REAL NOT NULL, estimated_cost_usd REAL NOT NULL,
-                route_path TEXT NOT NULL
-            )
-            """
-        )
-        connection.execute(
-            "INSERT INTO traffic VALUES (1, '2026-07-17T00:00:00Z', ?, 'm', 1, 1, 10, 0.1, 'default')",
-            (system_prompt_hash(SYSTEM_PROMPTS_BY_CLUSTER["data-pull-sql"]),),
-        )
+    from app.proxy.traffic import TrafficRecord, record_traffic
+
+    assert record_traffic(
+        TrafficRecord(
+            "2026-07-17T00:00:00Z",
+            system_prompt_hash(SYSTEM_PROMPTS_BY_CLUSTER["data-pull-sql"]),
+            "m",
+            1,
+            1,
+            10,
+            0.1,
+            "default",
+        ),
+        db_path=db_path,
+    )
     traces = MemoryTraceStore()
     _install_services(monkeypatch, db_path, traces, binding="real")
     client = TestClient(app)
     first = client.post("/clusters/data-pull-sql/agent/analyze")
-    with sqlite3.connect(db_path) as connection:
-        connection.execute(
-            "INSERT INTO traffic VALUES (2, '2026-07-17T00:01:00Z', ?, 'm', 1, 1, 11, 0.2, 'default')",
-            (system_prompt_hash(SYSTEM_PROMPTS_BY_CLUSTER["data-pull-sql"]),),
-        )
+    assert record_traffic(
+        TrafficRecord(
+            "2026-07-17T00:01:00Z",
+            system_prompt_hash(SYSTEM_PROMPTS_BY_CLUSTER["data-pull-sql"]),
+            "m",
+            1,
+            1,
+            11,
+            0.2,
+            "default",
+        ),
+        db_path=db_path,
+    )
     second = client.post("/clusters/data-pull-sql/agent/analyze")
 
     assert first.status_code == second.status_code == 200

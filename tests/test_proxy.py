@@ -50,7 +50,7 @@ def test_fake_proxy_is_deterministic_and_records_openai_metadata(tmp_path: Path)
 
     with sqlite3.connect(settings.db_path) as connection:
         rows = connection.execute(
-            "SELECT system_prompt_hash, model, input_tokens, output_tokens, latency_ms, estimated_cost_usd FROM traffic"
+            "SELECT prompt_hash, model, tokens_in, tokens_out, latency_ms, cost_usd FROM traffic_requests"
         ).fetchall()
     assert len(rows) == 2
     expected_hash = hashlib.sha256(b"Extract support fields.").hexdigest()

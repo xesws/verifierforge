@@ -1,12 +1,12 @@
 from __future__ import annotations
 
 from pathlib import Path
-import sqlite3
 
 import pytest
 
 from app.agent.tools import ToolDependencyError, ToolRegistry
 from app.proxy.clusters import SYSTEM_PROMPTS_BY_CLUSTER, system_prompt_hash
+from app.proxy.traffic import TrafficRecord, record_traffic
 from core.agent_contracts import (
     AnalyzeTrafficOutput,
     CheckVerifiabilityOutput,
@@ -61,22 +61,19 @@ def test_registry_rejects_fabricated_dependency_ids() -> None:
 
 def test_real_binding_reads_metadata_without_mutating_database(tmp_path: Path) -> None:
     db_path = tmp_path / "traffic.db"
-    with sqlite3.connect(db_path) as connection:
-        connection.execute(
-            """
-            CREATE TABLE traffic (
-                id INTEGER PRIMARY KEY, timestamp TEXT NOT NULL,
-                system_prompt_hash TEXT NOT NULL, model TEXT NOT NULL,
-                input_tokens INTEGER NOT NULL, output_tokens INTEGER NOT NULL,
-                latency_ms REAL NOT NULL, estimated_cost_usd REAL NOT NULL,
-                route_path TEXT NOT NULL
-            )
-            """
-        )
-        connection.execute(
-            "INSERT INTO traffic VALUES (1, ?, ?, 'model', 10, 5, 100.0, 1.5, 'default')",
-            ("2026-07-17T00:00:00+00:00", system_prompt_hash(SYSTEM_PROMPTS_BY_CLUSTER["data-pull-sql"])),
-        )
+    assert record_traffic(
+        TrafficRecord(
+            "2026-07-17T00:00:00+00:00",
+            system_prompt_hash(SYSTEM_PROMPTS_BY_CLUSTER["data-pull-sql"]),
+            "model",
+            10,
+            5,
+            100.0,
+            1.5,
+            "default",
+        ),
+        db_path=db_path,
+    )
     before = db_path.read_bytes()
 
     analysis, samples, economics, verifiability = _run_chain(ToolRegistry("real", db_path=db_path))

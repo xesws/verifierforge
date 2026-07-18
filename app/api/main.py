@@ -6,7 +6,6 @@ import json
 import os
 from datetime import datetime, timezone
 from pathlib import Path
-import sqlite3
 
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
@@ -14,9 +13,11 @@ from fastapi.middleware.cors import CORSMiddleware
 from app.api.artifacts import ArtifactDataError, ArtifactStore
 from app.api.agent import router as agent_router
 from app.api.copilot import router as copilot_router
+from app.db import repository_gateway
+from app.db.records import ClusterRecord as DatabaseClusterRecord
+from app.db.records import JobRecord as DatabaseJobRecord
 from app.proxy.clusters import cluster_profile, list_cluster_profiles
 from app.proxy.routing import LivePassRateRecord, RouteRecord, get_route, list_live_pass_rate, put_route
-from app.proxy.traffic import DEFAULT_DB_PATH
 from core.contracts import (
     Cluster,
     Control,
@@ -64,11 +65,6 @@ def _artifact_store() -> ArtifactStore:
         return ArtifactStore(root)
     except ArtifactDataError as error:
         raise HTTPException(status_code=503, detail="Demo artifacts are unavailable") from error
-
-
-def _proxy_db_path() -> Path:
-    """Use the same local SQLite file as the independently runnable proxy."""
-    return Path(os.environ.get("VF_PROXY_DB_PATH", str(DEFAULT_DB_PATH))).expanduser()
 
 
 def _job_dir(job_id: str) -> Path:
@@ -121,11 +117,25 @@ def list_jobs() -> list[dict[str, str]]:
     root = _runs_dir()
     if not root.is_dir():
         return []
-    return [
+    jobs = [
         {"job_id": path.name, "status": _status_for(path)}
         for path in sorted(root.iterdir())
         if path.is_dir() and not path.name.startswith(".")
     ]
+    for item in jobs:
+        _materialize_job_best_effort(
+            DatabaseJobRecord(
+                job_id=item["job_id"],
+                template="unknown",
+                status=item["status"],
+                config_json={},
+                created_at=datetime.fromtimestamp(
+                    (root / item["job_id"]).stat().st_mtime, tz=timezone.utc
+                ),
+                summary_json={"source": "local-runs"},
+            )
+        )
+    return jobs
 
 
 @app.get("/jobs/{job_id}", response_model=Job)
@@ -138,7 +148,7 @@ def get_job(job_id: str) -> Job:
             raise HTTPException(status_code=404, detail="Job not found") from error
     job_dir = _job_dir(job_id)
     created = datetime.fromtimestamp(job_dir.stat().st_mtime, tz=timezone.utc)
-    return Job(
+    job = Job(
         job_id=job_id,
         template="unknown",
         status=JobStatus(_status_for(job_dir)),
@@ -149,6 +159,25 @@ def get_job(job_id: str) -> Job:
         report=None,
         endpoint=None,
     )
+    metrics = job.metrics
+    _materialize_job_best_effort(
+        DatabaseJobRecord(
+            job_id=job.job_id,
+            template=job.template,
+            status=job.status.value,
+            config_json={"model": job.model},
+            created_at=job.created_at,
+            summary_json={
+                "metrics": {
+                    "steps": metrics.steps[-100:],
+                    "reward_mean": metrics.reward_mean[-100:],
+                    "pass_at_1": metrics.pass_at_1[-100:],
+                    "entropy": metrics.entropy[-100:],
+                }
+            },
+        )
+    )
+    return job
 
 
 @app.get("/jobs/{job_id}/metrics", response_model=Metrics)
@@ -165,14 +194,18 @@ def job_metrics(job_id: str) -> Metrics:
 @app.get("/clusters", response_model=list[Cluster])
 def list_clusters() -> list[Cluster]:
     """Return the stable product profiles used by Discover and the mock API."""
-    return list_cluster_profiles()
+    profiles = list_cluster_profiles()
+    _materialize_clusters_best_effort(profiles)
+    return profiles
 
 
 @app.get("/clusters/{cluster_id}", response_model=Cluster)
 def get_cluster(cluster_id: str) -> Cluster:
     """Return one stable product profile without deriving monthly facts from a short sample."""
     try:
-        return cluster_profile(cluster_id)
+        profile = cluster_profile(cluster_id)
+        _materialize_clusters_best_effort([profile])
+        return profile
     except KeyError as error:
         raise HTTPException(status_code=404, detail="Cluster not found") from error
 
@@ -186,8 +219,8 @@ def get_cluster_routing(cluster_id: str) -> RoutingState:
         except KeyError as error:
             raise HTTPException(status_code=404, detail="Cluster not found") from error
     try:
-        return _routing_state(get_route(cluster_id, db_path=_proxy_db_path()))
-    except (OSError, sqlite3.Error, ValueError) as error:
+        return _routing_state(get_route(cluster_id, gateway=repository_gateway()))
+    except (OSError, RuntimeError, ValueError) as error:
         raise HTTPException(status_code=503, detail="Routing state is unavailable") from error
 
 
@@ -206,9 +239,9 @@ def put_cluster_routing(cluster_id: str, state: RoutingState) -> RoutingState:
                 canary_percent=state.canary_percent,
                 target_upstream=state.target_model,
             ),
-            db_path=_proxy_db_path(),
+            gateway=repository_gateway(),
         )
-    except (OSError, sqlite3.Error, ValueError) as error:
+    except (OSError, RuntimeError, ValueError) as error:
         raise HTTPException(status_code=503, detail="Routing state is unavailable") from error
     return _routing_state(route)
 
@@ -222,8 +255,8 @@ def get_live_pass_rate(cluster_id: str) -> LivePassRate:
         except KeyError as error:
             raise HTTPException(status_code=404, detail="Cluster not found") from error
     try:
-        points = list_live_pass_rate(cluster_id, db_path=_proxy_db_path())
-    except (OSError, sqlite3.Error, ValueError) as error:
+        points = list_live_pass_rate(cluster_id, gateway=repository_gateway())
+    except (OSError, RuntimeError, ValueError) as error:
         raise HTTPException(status_code=503, detail="Live pass rate is unavailable") from error
     return LivePassRate(cluster_id=cluster_id, points=[_live_point(point) for point in points])
 
@@ -239,3 +272,37 @@ def _routing_state(route: RouteRecord) -> RoutingState:
 
 def _live_point(point: LivePassRateRecord) -> LivePassRatePoint:
     return LivePassRatePoint(timestamp=point.timestamp, pass_rate=point.pass_rate)
+
+
+def _materialize_clusters_best_effort(profiles: list[Cluster]) -> None:
+    timestamp = datetime.now(timezone.utc)
+
+    async def write(repositories) -> None:
+        for profile in profiles:
+            await repositories.clusters.put(
+                DatabaseClusterRecord(
+                    cluster_id=profile.cluster_id,
+                    name=profile.name,
+                    status=profile.status.value,
+                    monthly_calls=profile.monthly_calls,
+                    monthly_cost_usd=profile.monthly_cost_usd,
+                    trainable=profile.trainable,
+                    job_id=profile.job_id,
+                    analyzer_summary=None,
+                    updated_at=timestamp,
+                )
+            )
+
+    try:
+        repository_gateway().call(write)
+    except (OSError, RuntimeError, ValueError):
+        # Static product profiles remain available if observability storage is down.
+        pass
+
+
+def _materialize_job_best_effort(record: DatabaseJobRecord) -> None:
+    try:
+        repository_gateway().call(lambda repositories: repositories.jobs.put(record))
+    except (OSError, RuntimeError, ValueError):
+        # File-backed development inspection remains available during DB outages.
+        pass

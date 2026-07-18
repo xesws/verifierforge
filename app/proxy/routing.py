@@ -1,11 +1,20 @@
-"""SQLite route state and rolling guardian aggregates for the product proxy."""
+"""Repository-backed route state and rolling guardian aggregates."""
 
 from __future__ import annotations
 
 from dataclasses import dataclass
 from datetime import datetime, timezone
 from pathlib import Path
-import sqlite3
+
+from app.db import RepositoryGateway, repository_gateway
+from app.db.records import (
+    ClusterRecord,
+    GuardianScoreRecord,
+    RoutingRecord,
+)
+from app.db.settings import DatabaseSettings
+from app.proxy.clusters import cluster_profile
+from app.proxy.traffic import DEFAULT_DB_PATH
 
 
 DEFAULT_TARGET_UPSTREAM = "tuned"
@@ -27,44 +36,59 @@ class LivePassRateRecord:
     pass_rate: float
 
 
-def get_route(cluster_id: str, *, db_path: Path) -> RouteRecord:
-    """Read one route, treating an absent row as a safely disabled route."""
+def get_route(
+    cluster_id: str,
+    *,
+    db_path: Path | None = None,
+    gateway: RepositoryGateway | None = None,
+) -> RouteRecord:
+    """Read one route, treating an absent row as safely disabled."""
     _validate_cluster_id(cluster_id)
-    with _connect(db_path) as connection:
-        _ensure_schema(connection)
-        row = connection.execute(
-            "SELECT enabled, canary_percent, target_upstream FROM routing WHERE cluster_id = ?",
-            (cluster_id,),
-        ).fetchone()
-    if row is None:
+    saved = _gateway(db_path, gateway).call(
+        lambda repositories: repositories.routing.get(cluster_id)
+    )
+    if saved is None:
         return RouteRecord(cluster_id, False, 0, DEFAULT_TARGET_UPSTREAM)
-    return RouteRecord(cluster_id, bool(row[0]), int(row[1]), str(row[2]))
+    return RouteRecord(
+        saved.cluster_id, saved.enabled, saved.canary_percent, saved.target_model
+    )
 
 
-def put_route(route: RouteRecord, *, db_path: Path) -> RouteRecord:
+def put_route(
+    route: RouteRecord,
+    *,
+    db_path: Path | None = None,
+    gateway: RepositoryGateway | None = None,
+) -> RouteRecord:
     """Upsert validated control-plane route state."""
     _validate_route(route)
-    with _connect(db_path) as connection:
-        _ensure_schema(connection)
-        connection.execute(
-            """
-            INSERT INTO routing (cluster_id, enabled, canary_percent, target_upstream)
-            VALUES (?, ?, ?, ?)
-            ON CONFLICT(cluster_id) DO UPDATE SET
-                enabled = excluded.enabled,
-                canary_percent = excluded.canary_percent,
-                target_upstream = excluded.target_upstream
-            """,
-            (route.cluster_id, int(route.enabled), route.canary_percent, route.target_upstream),
+    observed_at = datetime.now(timezone.utc)
+    resolved = _gateway(db_path, gateway)
+
+    async def write(repositories):
+        await _seed_cluster(repositories, route.cluster_id, observed_at)
+        return await repositories.routing.put(
+            RoutingRecord(
+                cluster_id=route.cluster_id,
+                enabled=route.enabled,
+                canary_percent=route.canary_percent,
+                target_model=route.target_upstream,
+                updated_at=observed_at,
+            )
         )
-    return route
+
+    saved = resolved.call(write)
+    return RouteRecord(
+        saved.cluster_id, saved.enabled, saved.canary_percent, saved.target_model
+    )
 
 
 def record_guardian_score(
     cluster_id: str,
     score: float,
     *,
-    db_path: Path,
+    db_path: Path | None = None,
+    gateway: RepositoryGateway | None = None,
     rolling_window: int = DEFAULT_ROLLING_WINDOW,
     timestamp: str | None = None,
 ) -> LivePassRateRecord:
@@ -74,83 +98,85 @@ def record_guardian_score(
         raise ValueError("guardian score must be in [0, 1]")
     if rolling_window < 1:
         raise ValueError("rolling window must be positive")
-    observed_at = timestamp or datetime.now(timezone.utc).isoformat()
-    with _connect(db_path) as connection:
-        _ensure_schema(connection)
-        connection.execute(
-            "INSERT INTO guardian_scores (cluster_id, timestamp, score) VALUES (?, ?, ?)",
-            (cluster_id, observed_at, score),
+    observed_at = _parse_timestamp(timestamp)
+    resolved = _gateway(db_path, gateway)
+
+    async def write(repositories):
+        await _seed_cluster(repositories, cluster_id, observed_at)
+        return await repositories.live_pass_rate.record_score(
+            GuardianScoreRecord(
+                cluster_id=cluster_id,
+                ts=observed_at,
+                score=score,
+            ),
+            rolling_window=rolling_window,
         )
-        scores = connection.execute(
-            """
-            SELECT score FROM guardian_scores
-            WHERE cluster_id = ?
-            ORDER BY id DESC
-            LIMIT ?
-            """,
-            (cluster_id, rolling_window),
-        ).fetchall()
-        pass_rate = sum(1 for (value,) in scores if float(value) == 1.0) / len(scores)
-        connection.execute(
-            "INSERT INTO live_pass_rate (cluster_id, timestamp, pass_rate) VALUES (?, ?, ?)",
-            (cluster_id, observed_at, pass_rate),
-        )
-    return LivePassRateRecord(cluster_id, observed_at, pass_rate)
+
+    saved = resolved.call(write)
+    return LivePassRateRecord(
+        cluster_id=saved.cluster_id,
+        timestamp=saved.ts.isoformat(),
+        pass_rate=saved.pass_rate,
+    )
 
 
-def list_live_pass_rate(cluster_id: str, *, db_path: Path) -> list[LivePassRateRecord]:
+def list_live_pass_rate(
+    cluster_id: str,
+    *,
+    db_path: Path | None = None,
+    gateway: RepositoryGateway | None = None,
+) -> list[LivePassRateRecord]:
     """Return recorded rolling points in insertion order."""
     _validate_cluster_id(cluster_id)
-    with _connect(db_path) as connection:
-        _ensure_schema(connection)
-        rows = connection.execute(
-            """
-            SELECT timestamp, pass_rate FROM live_pass_rate
-            WHERE cluster_id = ?
-            ORDER BY id ASC
-            """,
-            (cluster_id,),
-        ).fetchall()
-    return [LivePassRateRecord(cluster_id, str(timestamp), float(pass_rate)) for timestamp, pass_rate in rows]
-
-
-def _connect(db_path: Path) -> sqlite3.Connection:
-    path = Path(db_path)
-    path.parent.mkdir(parents=True, exist_ok=True)
-    return sqlite3.connect(path)
-
-
-def _ensure_schema(connection: sqlite3.Connection) -> None:
-    connection.execute(
-        """
-        CREATE TABLE IF NOT EXISTS routing (
-            cluster_id TEXT PRIMARY KEY,
-            enabled INTEGER NOT NULL CHECK (enabled IN (0, 1)),
-            canary_percent INTEGER NOT NULL CHECK (canary_percent >= 0 AND canary_percent <= 100),
-            target_upstream TEXT NOT NULL
-        )
-        """
+    rows = _gateway(db_path, gateway).call(
+        lambda repositories: repositories.live_pass_rate.list_points(cluster_id)
     )
-    connection.execute(
-        """
-        CREATE TABLE IF NOT EXISTS guardian_scores (
-            id INTEGER PRIMARY KEY,
-            cluster_id TEXT NOT NULL,
-            timestamp TEXT NOT NULL,
-            score REAL NOT NULL CHECK (score >= 0 AND score <= 1)
-        )
-        """
+    return [
+        LivePassRateRecord(row.cluster_id, row.ts.isoformat(), row.pass_rate)
+        for row in rows
+    ]
+
+
+def _gateway(
+    db_path: Path | None, gateway: RepositoryGateway | None
+) -> RepositoryGateway:
+    return gateway or repository_gateway(
+        DatabaseSettings.sqlite(db_path or DEFAULT_DB_PATH)
     )
-    connection.execute(
-        """
-        CREATE TABLE IF NOT EXISTS live_pass_rate (
-            id INTEGER PRIMARY KEY,
-            cluster_id TEXT NOT NULL,
-            timestamp TEXT NOT NULL,
-            pass_rate REAL NOT NULL CHECK (pass_rate >= 0 AND pass_rate <= 1)
+
+
+async def _seed_cluster(repositories, cluster_id: str, timestamp: datetime) -> None:
+    if await repositories.clusters.get(cluster_id) is not None:
+        return
+    try:
+        profile = cluster_profile(cluster_id)
+    except KeyError:
+        raise ValueError("cluster_id is not in the product catalog") from None
+    await repositories.clusters.put(
+        ClusterRecord(
+            cluster_id=profile.cluster_id,
+            name=profile.name,
+            status=profile.status.value,
+            monthly_calls=profile.monthly_calls,
+            monthly_cost_usd=profile.monthly_cost_usd,
+            trainable=profile.trainable,
+            job_id=profile.job_id,
+            analyzer_summary=None,
+            updated_at=timestamp,
         )
-        """
     )
+
+
+def _parse_timestamp(value: str | None) -> datetime:
+    if value is None:
+        return datetime.now(timezone.utc)
+    try:
+        parsed = datetime.fromisoformat(value.replace("Z", "+00:00"))
+    except ValueError:
+        raise ValueError("guardian timestamp must be ISO-8601") from None
+    if parsed.tzinfo is None:
+        raise ValueError("guardian timestamp must include a timezone")
+    return parsed
 
 
 def _validate_route(route: RouteRecord) -> None:

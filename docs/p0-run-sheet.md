@@ -2261,8 +2261,8 @@ data, GPU, paid LLM, or real provider-provisioning call.
   never changed. The serving SSH/public mapping must be restored before retry.
 - [x] **LA-2:** replaced the legacy freezer with a safe compatibility wrapper,
   disposition `tq/` and the superseded vLLM runbook, and leave Git clean.
-- [ ] **DB-1 — v0.23.0 reserved:** unify relational persistence behind async SQLAlchemy stores and
-  tag `db-1-complete` only after SQLite/Alembic/full-suite gates.
+- [x] **DB-1 — v0.23.0 complete:** unified relational persistence behind async SQLAlchemy stores;
+  tag `db-1-complete` follows the recorded SQLite/Alembic/full-suite gates.
 - [ ] **P-1 — v0.24.0 reserved:** implement mock-only provisioning contracts, state machine, six
   fuses, and audit persistence; keep `VF_AUTOPROVISION=false`.
 - [ ] **DB-2 — v0.25.0 reserved:** migrate and reconcile the legacy SQLite/runs history against
@@ -2293,3 +2293,21 @@ the only untracked paths were `docs/vllm-debug/`, `scripts/freeze_nl2sql.py`,
 - Validation: focused `19 passed`; full `313 passed, 1 skipped`; `bash -n
   scripts/vf` passed. The semantic Lane A tag is withheld because public
   serving did not close.
+
+### v0.23.0 DB-1 result
+
+- Added async SQLAlchemy repositories for traffic, clusters, routing,
+  guardian/live points, jobs, Agent decisions, credentials, approvals, and
+  provision audit events; SQLite and Postgres share the same implementation.
+- Alembic revision `20260718_0001` owns the ten-table schema. A preflight
+  rejects unmanaged legacy SQLite before any DDL, preserving the source for
+  the DB-2 importer.
+- Existing sync proxy/Agent seams use one long-lived async repository gateway.
+  Proxy accounting and guardian failures remain non-blocking; API errors are
+  sanitized and do not contain a URL.
+- Production-source grep found no `sqlite3` outside
+  `core/rewards/nl2sql.py` (in-memory verifier) and
+  `scripts/import_legacy_database.py` (one-shot read-only legacy source).
+- Validation: DB focus `13 passed`; proxy/Agent focus `41 passed`; API/mock
+  shape focus `26 passed`; isolated DB-1 full suite `326 passed, 1 skipped`; `git diff
+  --check` passed.

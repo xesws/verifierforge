@@ -23,11 +23,12 @@ from app.agent.stores import (
     AgentTraceStore,
     ApprovalStore,
     S3AgentTraceStore,
-    SQLiteAgentDecisionStore,
-    SQLiteApprovalStore,
+    RelationalAgentDecisionStore,
+    RelationalApprovalStore,
 )
 from app.agent.tools import ToolRegistry
 from app.gpt import LLMClient, LLMConfigurationError, LLMSettings
+from app.db import repository_gateway
 from app.proxy.traffic import DEFAULT_DB_PATH
 from core.agent_contracts import (
     AgentAnalysisResponse,
@@ -79,10 +80,10 @@ def _configured_source_label() -> str:
 
 
 def _stores() -> AgentStores:
-    db_path = _configured_db_path()
+    gateway = repository_gateway()
     return AgentStores(
-        decisions=SQLiteAgentDecisionStore(db_path),
-        approvals=SQLiteApprovalStore(db_path),
+        decisions=RelationalAgentDecisionStore(gateway=gateway),
+        approvals=RelationalApprovalStore(gateway=gateway),
     )
 
 
@@ -92,7 +93,11 @@ def _services(cluster_id: str) -> AgentServices:
         raise RuntimeError("VF_AGENT_BINDING must be real or mock")
     db_path = _configured_db_path()
     stores = _stores()
-    registry = ToolRegistry(binding, db_path=db_path)
+    registry = ToolRegistry(
+        binding,
+        db_path=db_path,
+        gateway=stores.decisions.gateway,
+    )
     if binding == "mock":
         client: object = MockAgentClient(cluster_id)
         provider = "mock"
