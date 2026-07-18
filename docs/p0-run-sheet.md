@@ -2265,8 +2265,8 @@ data, GPU, paid LLM, or real provider-provisioning call.
   tag `db-1-complete` follows the recorded SQLite/Alembic/full-suite gates.
 - [x] **P-1 — v0.24.0 complete:** implemented mock-only provisioning contracts, state machine,
   six fuses, and DB-1 audit persistence; `VF_AUTOPROVISION=false` remains the default.
-- [ ] **DB-2 — v0.25.0 reserved:** migrate and reconcile the legacy SQLite/runs history against
-  Supabase without logging a DSN. Owner performs the persistent default flip.
+- [ ] **DB-2 — OWNER-ACTION:** importer is complete, but Supabase DNS failed before DDL;
+  owner must provide a resolvable transaction-pooler DSN, then perform the persistent flip.
 - [ ] **DB-3 — v0.26.0 reserved:** add Fernet credential protection, secret scanning, explicit
   disconnect behavior, and operational documentation if the timebox permits.
 
@@ -2326,3 +2326,27 @@ the only untracked paths were `docs/vllm-debug/`, `scripts/freeze_nl2sql.py`,
   `active_handles=[]`; package scan found no vendor SDK, network, subprocess,
   trainer, `scripts/vf`, or real provisioning path. Isolated P-1 full suite:
   `351 passed, 1 skipped`.
+
+### v0.25.0 DB-2 partial result — OWNER-ACTION
+
+- Read-only source plan: `traffic_requests=220`, `clusters=3`,
+  `routing_state=1`, `guardian_scores=113`, `live_pass_rate=113`, `jobs=16`,
+  `agent_decisions=48`, `approvals=1`.
+- Source SHA-256:
+  `2651678c1fa5d4b3e42bae3af824c1715a1d498ac9ebad9c28e851603331c9a6`.
+  Table digests: traffic `9305cd2da56863cb164be3950c50fa1581293d4f1790f86ec78d9fae796bf6e8`;
+  clusters `d2b1f3d37246d784d73f5b5a32512c8f245507f6742bcb7ca8da4a093ef91efb`;
+  routing `848313010a92ddaf16b05bd1a5ec75dc33b27d5689aaea13fc3c892f307def51`;
+  guardian `5dc02b37a7b65c224f12a35c2f78c53bf934223b22d9c1b7a4d1ffcb31ef2c02`;
+  live `5788b7d15d39d8ead26666cd0eafa49627a2c881781a489e0cff372290f5e06c`;
+  jobs `bcf4e7b1b7a06223108a6d1469dff1c3c9dbdaafc6b9440d73cc3c38aa6d7c27`;
+  decisions `0f001b53a0e794ac107d9c14677ab1e84de8004b2d5ee5be57374e4bb5ce7032`;
+  approvals `ad900187955407dc70772ef572ed1a92431e3af5c3d182cb7f5e49b4f4de1251`.
+- Importer validation: `6 passed`; dry-run completed without mutating the
+  source. The one real migration attempt stopped before DDL with exact error
+  `[Errno 8] nodename nor servname provided, or not known`. No URL or password
+  appeared in output.
+- OWNER-ACTION: Supabase Dashboard → Connect → copy the transaction-pooler
+  PostgreSQL DSN into `SUPABASE_DB_URL`; then run the three resume commands in
+  `docs/infrastructure/v0.25.0-supabase-migration.md`. Do not tag DB-2 until
+  counts/digests, Postgres tests, and the owner backend-switch smoke pass.
