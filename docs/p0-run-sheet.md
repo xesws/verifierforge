@@ -1853,3 +1853,19 @@ window, rather than an unannounced restart of the live vLLM process.
 - Validation: focused `17 passed`; full suite `272 passed, 1 skipped`.
 - No HTTP route, trainer/provisioner import, GPU action, traffic-schema write,
   paid LLM call, or existing Job/Cluster contract change occurred.
+
+## Forge Agent A-2 — v0.20.0
+
+- [x] Bounded one-tool-per-turn Runner: max 8 steps, 12,000 combined tokens,
+  90 seconds, and `submit_decision` as the only terminal action.
+- [x] Unknown/bad/fabricated/early/over-budget actions reject the complete run;
+  no silent repair or execution-side handle exists.
+- [x] Codex implementation decision for the design-doc interface gap:
+  `AgentDecisionStore.put/get/latest_for_cluster`; tonight's implementation is
+  SQLite at the existing product DB path.
+- [x] Full sanitized trace publishes first to
+  `<prefix>/agent-traces/<trace_id>.json`, then the summary is written. S3
+  failure is fail-closed and records `trace_persist_failed` without a decision.
+- Validation: focused Agent suite `25 passed`; full suite
+  `280 passed, 1 skipped`; no paid provider, GPU, trainer, provisioner,
+  subprocess, RunPod, or Nebius operation occurred.

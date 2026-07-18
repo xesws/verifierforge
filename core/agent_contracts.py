@@ -171,3 +171,18 @@ class AgentTrace(AgentModel):
     status: AgentRunStatus
     guard_events: list[str] = Field(default_factory=list)
     terminal_decision: AgentDecision | None = None
+
+
+class AgentDecisionSummary(AgentModel):
+    decision_id: str
+    trace_id: str
+    cluster_id: str
+    evidence_fingerprint: str | None = None
+    run_status: AgentRunStatus
+    decision: AgentDecision | None = None
+    trace_s3_key: str | None = None
+    provider: str
+    model: str
+    created_at: datetime
+    total_input_tokens: int = Field(ge=0)
+    total_output_tokens: int = Field(ge=0)
