@@ -64,8 +64,10 @@ development uses a deterministic fake upstream so tests incur no model cost.
 - A serving export could exist on disk but fail vLLM loading. The publication
   gate now requires a loopback vLLM load and completion before it calls an
   export publishable.
-- The public RunPod proxy route timed out with zero response bytes. Local
-  vLLM passed, but we do not claim public canary or guardian results.
+- A replacement pod's native RunPod port-8000 URL returned 404 because only
+  port 8888 was registered. We preserved that failure, used an outbound
+  Cloudflare quick tunnel, and then completed a public proof plus a 200-request
+  canary at 120 default / 80 tuned and Guardian LivePassRate 0.85.
 
 ## Accomplishments we are proud of
 
@@ -78,9 +80,9 @@ development uses a deterministic fake upstream so tests incur no model cost.
 
 ## What is next
 
-Finish the GPU node-loss S3 resume proof, expose the serving port reliably,
-then run the existing proxy's 50% canary and guardian on a real endpoint.
-After that: verifier templates beyond NL→SQL, a product report view, and a
+Finish the GPU node-loss S3 resume proof and replace the ephemeral quick tunnel
+with a durable authenticated endpoint. After that: verifier templates beyond
+NL→SQL, a product report view, and a
 production model registry. Automatic multi-node recovery and broad evaluation
 remain out of scope for v0.
 
@@ -99,7 +101,6 @@ credential, model download, or paid model request.
 ## Availability and limitations
 
 The repository is private. The reproducible artifact path is the supported
-review surface. A local vLLM service did successfully load the selected
-step-350 export and produce NL→SQL output, but the public RunPod gateway timed
-out during delivery verification; there is no public hosted endpoint claim in
-this draft.
+review surface. The selected step-350 export passed local and public NL→SQL
+proofs; 200 canary requests passed with final Guardian LivePassRate 0.85. The
+quick-tunnel hostname is ephemeral and is not presented as a production SLA.

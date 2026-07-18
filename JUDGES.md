@@ -71,7 +71,8 @@ The 0.5B random-reward control JSONL is included next to it.
 ## Honest boundary
 
 The repository intentionally does not include weights, credentials, or a paid
-provider dependency. Local vLLM loading of the selected export passed; the
-public RunPod proxy timed out during delivery verification, so no public
-canary/guardian result is claimed. The artifact route above is the supported
-review surface.
+provider dependency. The selected export passed local and public vLLM proofs;
+a 200-request canary produced 120 default / 80 tuned with final Guardian
+LivePassRate 0.85, then a zero-canary proof produced 20 default / 0 tuned. The
+public quick-tunnel URL is ephemeral, so the artifact route above remains the
+stable review surface.

@@ -9,7 +9,7 @@ import os
 from typing import Any, Mapping
 
 from pydantic import BaseModel, ConfigDict, Field
-from dotenv import find_dotenv, load_dotenv
+from dotenv import dotenv_values, find_dotenv
 
 from app.gpt import (
     DEFAULT_OPENAI_MODEL,
@@ -181,9 +181,16 @@ def live_settings_from_env(
     """Resolve Gate C through the shared client with a dedicated model input."""
     if environ is None:
         dotenv_path = find_dotenv(usecwd=True)
-        if dotenv_path:
-            load_dotenv(dotenv_path, override=False)
-        values = os.environ
+        dotenv_defaults = (
+            {
+                key: value
+                for key, value in dotenv_values(dotenv_path).items()
+                if value is not None
+            }
+            if dotenv_path
+            else {}
+        )
+        values = {**dotenv_defaults, **os.environ}
     else:
         values = environ
     if values.get("VF_LLM_PROVIDER", "").strip().lower() != "openai":

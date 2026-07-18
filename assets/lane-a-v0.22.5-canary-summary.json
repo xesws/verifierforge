@@ -1,0 +1,15 @@
+{
+  "canary_percent_configured": 50,
+  "canary_requests": 200,
+  "default_requests": 120,
+  "failed_requests": 0,
+  "guardian_final_live_pass_rate": 0.85,
+  "guardian_max_live_pass_rate": 1.0,
+  "guardian_min_live_pass_rate": 0.85,
+  "guardian_new_points": 13,
+  "post_reset_default_requests": 20,
+  "post_reset_tuned_requests": 0,
+  "successful_requests": 200,
+  "tuned_fraction": 0.4,
+  "tuned_requests": 80
+}

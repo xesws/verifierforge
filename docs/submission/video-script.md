@@ -14,7 +14,7 @@ weights, provider dashboards, or an unverified public endpoint.
 | 1:37–1:58 | `vf train`, tmux, Storage diagram, checkpoint publication. | “Training happens on a disposable GPU worker. The laptop owns the control plane; metrics and checkpoints go through a Storage contract. The worker can be replaced without treating it as the source of truth.” |
 | 1:58–2:18 | S3 manifest-last animation and real-bucket evidence JSON. | “S3 publishing is manifest-last, so an interrupted upload is not a checkpoint. A real-bucket proof restored a checkpoint by SHA, recovered fifty ordered metrics, and left an interrupted upload unpublished.” |
 | 2:18–2:39 | Proxy fake upstream, route switch and guardian overlay. | “The delivery side is OpenAI-compatible. A routing switch can send a canary to a tuned model, while a sampled verifier guardian scores SQL traffic off the request path. Development uses a zero-cost deterministic fake upstream.” |
-| 2:39–2:52 | Limitations card. | “The public serving gateway timed out during this build, so we do not claim an internet-facing canary. Local vLLM serving passed; the honest reviewer path is this tracked artifact API.” |
+| 2:39–2:52 | Public proof and canary summary: 120 default / 80 tuned, Guardian 0.85, then zero tuned after reset. | “The native pod port was not exposed, so we recorded the 404 and used an outbound tunnel. Two hundred requests passed; the guardian ended at point eight five, and switching canary off sent zero traffic to tuned.” |
 | 2:52–3:00 | `JUDGES.md`, test command, closing title. | “Clone, run the artifact API, and inspect the evidence in under ten minutes. VerifierForge: train small models, but ship proof.” |
 
 ## Recording checklist

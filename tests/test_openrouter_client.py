@@ -1,3 +1,4 @@
+import os
 from types import SimpleNamespace
 
 import pytest
@@ -134,17 +135,20 @@ def test_settings_loads_local_dotenv_without_overriding_shell(tmp_path, monkeypa
         "VF_LLM_API_KEY=dotenv-key\n"
         "VF_LLM_BASE_URL=https://dotenv.example/v1\n"
         "VF_AUGMENT_MODEL=provider/dotenv-model\n"
+        "VF_DB_BACKEND=postgres\n"
     )
     monkeypatch.chdir(tmp_path)
     monkeypatch.setenv("VF_LLM_API_KEY", "shell-key")
     monkeypatch.delenv("VF_LLM_BASE_URL", raising=False)
     monkeypatch.delenv("VF_AUGMENT_MODEL", raising=False)
+    monkeypatch.delenv("VF_DB_BACKEND", raising=False)
 
     settings = LLMSettings.from_env()
 
     assert settings.api_key == "shell-key"
     assert settings.base_url == "https://dotenv.example/v1"
     assert settings.model == "provider/dotenv-model"
+    assert "VF_DB_BACKEND" not in os.environ
 
 
 def test_settings_hide_api_key_in_repr() -> None:

@@ -1,0 +1,11 @@
+{
+  "completion": "SELECT name FROM users;",
+  "model": "vf-demo",
+  "native_runpod_proxy_status": 404,
+  "public_transport": "cloudflared-quick-tunnel",
+  "usage": {
+    "completion_tokens": 6,
+    "prompt_tokens": 35,
+    "total_tokens": 41
+  }
+}

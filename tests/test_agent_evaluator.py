@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import os
 from pathlib import Path
 
 import pytest
@@ -126,6 +127,32 @@ def test_live_settings_requires_dedicated_discovered_model() -> None:
     assert settings.model == "gpt-5.6-luna"
     assert settings.api_key == "openai-key"
     assert settings.base_url == "https://api.openai.com/v1"
+
+
+def test_live_settings_reads_dotenv_without_mutating_environment(
+    tmp_path: Path, monkeypatch
+) -> None:
+    (tmp_path / ".env").write_text(
+        "VF_LLM_PROVIDER=openai\n"
+        "OPENAI_API_KEY=dotenv-key\n"
+        "VF_AGENT_EVAL_MODEL=gpt-5.6-luna\n"
+        "VF_DB_BACKEND=postgres\n",
+        encoding="utf-8",
+    )
+    monkeypatch.chdir(tmp_path)
+    for name in (
+        "VF_LLM_PROVIDER",
+        "OPENAI_API_KEY",
+        "VF_AGENT_EVAL_MODEL",
+        "VF_DB_BACKEND",
+    ):
+        monkeypatch.delenv(name, raising=False)
+
+    settings = live_settings_from_env()
+
+    assert settings.model == "gpt-5.6-luna"
+    assert settings.api_key == "dotenv-key"
+    assert "VF_DB_BACKEND" not in os.environ
 
 
 @pytest.mark.parametrize(

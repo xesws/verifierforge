@@ -7,5 +7,6 @@ node_modules/
 assets/*
 !assets/forge-agent/
 !assets/forge-agent/**
+!assets/lane-a-v0.22.5-*
 app/proxy/traffic.db*
 /tq/

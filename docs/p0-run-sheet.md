@@ -2251,14 +2251,15 @@ a92b5fbbf763f05736b7e848f788a3d7c18fcac178ea8bf903f1b53cdc0e0a8f  assets/forge-a
 
 ## 2026-07-18 Afternoon wave — v0.22.5 through v0.26.1
 
-**Status:** in progress. This section is the sole execution record for Lane A
+**Status:** complete. This section is the sole execution record for Lane A
 closeout, DB-1/DB-2/DB-3, and Provisioner P-1. The wave makes no trainer, frozen
-data, GPU, paid LLM, or real provider-provisioning call.
+data, paid LLM, or real provider-provisioning API call; the owner-started L4 is
+used only for the serving proof.
 
-- [ ] **LA-1 — OWNER-ACTION:** the mandatory local SSH preflight failed with
-  `ssh: connect to host 157.157.221.29 port 43314: Operation timed out`.
-  No endpoint model request, public request, or S6 traffic was sent. Canary was
-  never changed. The serving SSH/public mapping must be restored before retry.
+- [x] **LA-1 — v0.22.5 complete:** a replacement L4 served the canonical
+  step-350 export; a Cloudflare quick tunnel replaced the undeclared RunPod
+  port-8000 route, and public proof, 200-request canary, Guardian, and reset
+  gates all passed.
 - [x] **LA-2:** replaced the legacy freezer with a safe compatibility wrapper,
   disposition `tq/` and the superseded vLLM runbook, and leave Git clean.
 - [x] **DB-1 — v0.23.0 complete:** unified relational persistence behind async SQLAlchemy stores;
@@ -2291,9 +2292,35 @@ the only untracked paths were `docs/vllm-debug/`, `scripts/freeze_nl2sql.py`,
   in the tracked model-trainer/infrastructure records and this run-sheet.
 - Added a zero-retry bounded endpoint proof, endpoint-specific tuned key, and
   SQL-only traffic generation path. No paid/provider request was made.
-- Validation: focused `19 passed`; full `313 passed, 1 skipped`; `bash -n
-  scripts/vf` passed. The semantic Lane A tag is withheld because public
-  serving did not close.
+- The replacement L4 used torch `2.8.0+cu128`, vLLM `0.10.2`, transformers
+  `4.57.6`, tokenizers `0.22.2`, and huggingface_hub `0.36.2`. The 13-file
+  model tree matched canonical SHA-256
+  `7bde853af7c82405fd1356de9bad9b6c421de45a45ce747f63ea2f8a27eda658`.
+- vLLM bound `0.0.0.0:8000`, but the pod's native RunPod URL returned HTTP 404
+  because only port 8888 was registered. Codex chose an outbound Cloudflare
+  quick tunnel as the non-control-plane fallback and recorded the deviation.
+  The official SDK public proof returned `SELECT name FROM users;`.
+- The initial Supabase route unexpectedly remained at 50 despite the old
+  run-sheet claim; it was set to zero before service readiness. The formal
+  200-request run then completed `200 success / 0 failed`, split 120 default /
+  80 tuned. Thirteen new Guardian points ended at LivePassRate 0.85. After API
+  reset to zero, 20 more requests produced 20 default / 0 tuned.
+- The first complete closeout suite unexpectedly restored the real Supabase
+  route to 50. Diagnosis traced this to `load_dotenv()` mutating `os.environ`
+  during an earlier LLM test, after which the real-API shape test inherited
+  `VF_DB_BACKEND=postgres`. Both settings loaders now merge dotenv values into
+  a local mapping. Focused regression passed `48 passed`; the final suite
+  passed `366 passed, 1 skipped`, and direct Supabase plus API readback both
+  remained at `canary_percent=0` afterward.
+- Committed evidence SHA-256: public proof script
+  `5d9d20b7ad1a320b72fcaec9bcc2aa492f044faa851d05c5e7f31a5ec2cf7214`;
+  public proof JSON
+  `24d9279ad3e44435b8d3d072b92e10fd05cf46bf25b130e6900fb8363f3f2eaa`;
+  canary summary
+  `467df1481029dcee76e91125e14f258854608e38b944ea9215adbdad7eff80f0`.
+- Validation: focused serving `19 passed`, dotenv isolation `48 passed`, and
+  final full suite `366 passed, 1 skipped`. These gates permit
+  `lane-a-closeout`.
 
 ### v0.23.0 DB-1 result
 
@@ -2395,17 +2422,14 @@ the only untracked paths were `docs/vllm-debug/`, `scripts/freeze_nl2sql.py`,
    The owner then authorized persistent `VF_DB_BACKEND=postgres`; the full
    regression and six-step product smoke passed, permitting `db-2-complete`.
 
-2. **Serving public mapping — about 5 minutes if the pod still exists.** Restore
-   `vfserve` SSH/public port 8000 exposure, update the ignored endpoint URL/key
-   values, then run `dotenv run -- python -m scripts.public_endpoint_proof`.
-   A pass reopens the already documented S6 50% canary/200-request guardian
-   closeout; a failure remains OWNER-ACTION and must not be retried blindly.
+2. **Serving public mapping — completed.** The native RunPod port-8000 URL
+   returned 404; a detached Cloudflare quick tunnel passed the official SDK
+   proof. The 200-request canary/Guardian gate and canary-zero proof passed.
 
 ### Stage ledger
 
-- **LA-1:** blocked, OWNER-ACTION. Exact local preflight error:
-  `ssh: connect to host 157.157.221.29 port 43314: Operation timed out`.
-  No public completion or S6 traffic was sent and canary stayed at zero.
+- **LA-1:** complete; canonical L4 serving, public proof, 120/80 canary,
+  Guardian final 0.85, and 20/0 reset proof passed. Tag `lane-a-closeout`.
 - **LA-2:** complete in `3a7e3db`; legacy freezer delegated, redundant wheel
   ignored, destructive obsolete runbook removed, repository debt clean.
 - **DB-1:** complete in `b752c65`; tag `db-1-complete`.

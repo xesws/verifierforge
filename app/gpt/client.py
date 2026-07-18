@@ -9,7 +9,7 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any, Mapping, Sequence
 
-from dotenv import find_dotenv, load_dotenv
+from dotenv import dotenv_values, find_dotenv
 from openai import OpenAI
 
 
@@ -90,9 +90,16 @@ class LLMSettings:
             resolved_dotenv_path = (
                 str(dotenv_path) if dotenv_path is not None else find_dotenv(usecwd=True)
             )
-            if resolved_dotenv_path:
-                load_dotenv(resolved_dotenv_path, override=False)
-            values = os.environ
+            dotenv_defaults = (
+                {
+                    key: value
+                    for key, value in dotenv_values(resolved_dotenv_path).items()
+                    if value is not None
+                }
+                if resolved_dotenv_path
+                else {}
+            )
+            values = {**dotenv_defaults, **os.environ}
         else:
             values = environ
         provider = values.get("VF_LLM_PROVIDER", DEFAULT_LLM_PROVIDER).strip().lower()
