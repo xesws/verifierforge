@@ -122,10 +122,14 @@ def replay_requests(
     """Send a weighted cyclic stream; total=0 deliberately means run until interrupted."""
     if rate < 0 or total < 0:
         raise ValueError("rate and total must be non-negative")
-    if any(not requests_by_family[name] for name in FAMILIES):
-        raise ValueError("each traffic family needs at least one request")
+    unknown = set(mix) - set(FAMILIES)
+    active = [name for name in FAMILIES if mix.get(name, 0) > 0]
+    if unknown or not active:
+        raise ValueError("mix must select at least one known traffic family")
+    if any(not requests_by_family[name] for name in active):
+        raise ValueError("each selected traffic family needs at least one request")
     send = sender or _send
-    sequence = list(itertools.chain.from_iterable(([name] * mix[name] for name in FAMILIES)))
+    sequence = list(itertools.chain.from_iterable(([name] * mix[name] for name in active)))
     positions = {name: 0 for name in FAMILIES}
     sent = success = failed = 0
     started = clock()
@@ -155,7 +159,9 @@ def main() -> None:
     parser.add_argument("--base-url", default="http://127.0.0.1:8002")
     parser.add_argument("--rate", type=float, default=5.0, help="requests per second; zero is unpaced")
     parser.add_argument("--total", type=int, default=300, help="request count; zero runs until interrupted")
-    parser.add_argument("--mix", default="support-ticket=1,invoice=1,data-pull-sql=1")
+    selection = parser.add_mutually_exclusive_group()
+    selection.add_argument("--mix")
+    selection.add_argument("--family", choices=FAMILIES)
     args = parser.parse_args()
     try:
         stats = replay_requests(
@@ -163,7 +169,11 @@ def main() -> None:
             base_url=args.base_url,
             rate=args.rate,
             total=args.total,
-            mix=parse_mix(args.mix),
+            mix=(
+                {args.family: 1}
+                if args.family
+                else parse_mix(args.mix or "support-ticket=1,invoice=1,data-pull-sql=1")
+            ),
         )
     except ValueError as error:
         parser.error(str(error))

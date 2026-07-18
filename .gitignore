@@ -8,3 +8,4 @@ assets/*
 !assets/forge-agent/
 !assets/forge-agent/**
 app/proxy/traffic.db*
+/tq/

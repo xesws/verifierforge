@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from collections.abc import Callable, Mapping
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from datetime import datetime, timezone
 import json
 import os
@@ -43,6 +43,7 @@ from app.proxy.upstream import (
 class ProxySettings:
     upstream: str = "fake"
     tuned_upstream: str = "fake-tuned"
+    tuned_api_key: str | None = field(default=None, repr=False)
     db_path: Path = DEFAULT_DB_PATH
     pricing_path: Path = DEFAULT_PRICING_PATH
     guardian_sample_rate: float = 0.20
@@ -56,6 +57,9 @@ class ProxySettings:
         if upstream not in {"fake", "real"}:
             raise ValueError("VF_PROXY_UPSTREAM must be fake or real")
         tuned_upstream = values.get("VF_PROXY_TUNED_UPSTREAM", "fake-tuned").strip() or "fake-tuned"
+        tuned_api_key = values.get("VF_PROXY_TUNED_API_KEY", "").strip() or None
+        if tuned_upstream.startswith(("http://", "https://")) and tuned_api_key is None:
+            raise ValueError("VF_PROXY_TUNED_API_KEY is required for an HTTP tuned upstream")
         try:
             guardian_sample_rate = float(values.get("VF_PROXY_GUARDIAN_SAMPLE_RATE", "0.20"))
         except ValueError as error:
@@ -71,6 +75,7 @@ class ProxySettings:
         return cls(
             upstream=upstream,
             tuned_upstream=tuned_upstream,
+            tuned_api_key=tuned_api_key,
             db_path=Path(values.get("VF_PROXY_DB_PATH", str(DEFAULT_DB_PATH))).expanduser(),
             pricing_path=Path(values.get("VF_PROXY_PRICING_PATH", str(DEFAULT_PRICING_PATH))).expanduser(),
             guardian_sample_rate=guardian_sample_rate,
@@ -165,8 +170,9 @@ def _forward(
         llm = LLMSettings.from_env()
         return real_forwarder(request, base_url=llm.base_url, api_key=llm.api_key)
     if upstream.startswith(("http://", "https://")):
-        llm = LLMSettings.from_env()
-        return real_forwarder(request, base_url=upstream, api_key=llm.api_key)
+        if settings.tuned_api_key is None:
+            raise UpstreamRequestError("HTTP tuned upstream requires VF_PROXY_TUNED_API_KEY")
+        return real_forwarder(request, base_url=upstream, api_key=settings.tuned_api_key)
     raise UpstreamRequestError("configured upstream must be fake, fake-tuned, real, or an HTTP URL")
 
 

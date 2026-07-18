@@ -51,6 +51,21 @@ def test_mix_parser_and_replay_are_weighted_cyclic_and_report_failures() -> None
         traffic_gen.parse_mix("support-ticket=1,invoice=1")
 
 
+def test_replay_accepts_one_family_for_the_sql_canary() -> None:
+    systems: list[str] = []
+    stats = traffic_gen.replay_requests(
+        traffic_gen.build_requests(),
+        base_url="http://proxy.test",
+        rate=0,
+        total=5,
+        mix={"data-pull-sql": 1},
+        sender=lambda _url, request: not systems.append(request["messages"][0]["content"]),
+    )
+
+    assert (stats.sent, stats.success, stats.failed) == (5, 5, 0)
+    assert set(systems) == {traffic_gen.SYSTEM_PROMPTS["data-pull-sql"]}
+
+
 def test_summary_groups_metadata_by_system_prompt_hash(tmp_path: Path) -> None:
     db = tmp_path / "traffic.db"
     assert record_traffic(

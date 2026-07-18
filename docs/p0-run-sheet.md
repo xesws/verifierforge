@@ -2255,9 +2255,11 @@ a92b5fbbf763f05736b7e848f788a3d7c18fcac178ea8bf903f1b53cdc0e0a8f  assets/forge-a
 closeout, DB-1/DB-2/DB-3, and Provisioner P-1. The wave makes no trainer, frozen
 data, GPU, paid LLM, or real provider-provisioning call.
 
-- [ ] **LA-1:** verify `vfserve` locally, attempt the public endpoint once, and
-  run/reset a 200-request SQL canary only after a public success.
-- [ ] **LA-2:** replace the legacy freezer with a safe compatibility wrapper,
+- [ ] **LA-1 — OWNER-ACTION:** the mandatory local SSH preflight failed with
+  `ssh: connect to host 157.157.221.29 port 43314: Operation timed out`.
+  No endpoint model request, public request, or S6 traffic was sent. Canary was
+  never changed. The serving SSH/public mapping must be restored before retry.
+- [x] **LA-2:** replaced the legacy freezer with a safe compatibility wrapper,
   disposition `tq/` and the superseded vLLM runbook, and leave Git clean.
 - [ ] **DB-1:** unify relational persistence behind async SQLAlchemy stores and
   tag `db-1-complete` only after SQLite/Alembic/full-suite gates.
@@ -2272,3 +2274,22 @@ Initial evidence: `main == origin/main == b819187`; tracked files were clean;
 the only untracked paths were `docs/vllm-debug/`, `scripts/freeze_nl2sql.py`,
 `tests/test_freeze_nl2sql.py`, and `tq/`. Baseline validation was `311 passed,
 1 skipped`.
+
+### v0.22.5 Lane A result
+
+- `AGENTS.md` had no pending diff; its latest discipline was already committed,
+  so no empty or fabricated change was created.
+- `scripts/freeze_nl2sql.py` now delegates to the authoritative U3
+  `freeze_three_piece` command. It contains neither `SELECTION_RULE` nor a
+  second `build_manifest` implementation.
+- `tq/transferqueue-0.1.7-py3-none-any.whl` was a redundant downloaded binary;
+  it was removed and `/tq/` was ignored. Runtime installation remains the
+  pinned trainer requirement.
+- `docs/vllm-debug/2026-07-16-grpo-init-stall-diagnosis.md` was removed because
+  it was a superseded, destructive execution sheet. The v0.12.4 result remains
+  in the tracked model-trainer/infrastructure records and this run-sheet.
+- Added a zero-retry bounded endpoint proof, endpoint-specific tuned key, and
+  SQL-only traffic generation path. No paid/provider request was made.
+- Validation: focused `19 passed`; full `313 passed, 1 skipped`; `bash -n
+  scripts/vf` passed. The semantic Lane A tag is withheld because public
+  serving did not close.

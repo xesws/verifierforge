@@ -7,6 +7,7 @@ from pathlib import Path
 from fastapi.testclient import TestClient
 import pytest
 
+from app.proxy.clusters import SYSTEM_PROMPTS_BY_CLUSTER
 from app.proxy.main import ProxySettings, create_app
 from app.proxy.traffic import estimate_cost
 from app.proxy.upstream import ForwardedResponse
@@ -83,6 +84,44 @@ def test_real_mode_uses_canonical_llm_environment_and_returns_upstream_shape(mon
         "base_url": "https://compatible.example/v1",
         "api_key": "proxy-test-key",
     }
+
+
+def test_http_tuned_upstream_uses_only_its_dedicated_key(monkeypatch, tmp_path: Path) -> None:
+    captured: dict[str, object] = {}
+
+    def real_forwarder(request, *, base_url: str, api_key: str) -> ForwardedResponse:
+        captured.update({"base_url": base_url, "api_key": api_key})
+        return ForwardedResponse(200, {"object": "chat.completion"})
+
+    settings = ProxySettings(
+        upstream="fake",
+        tuned_upstream="https://tuned.example/v1",
+        tuned_api_key="endpoint-only-key",
+        db_path=tmp_path / "traffic.db",
+    )
+    monkeypatch.setattr("app.proxy.main.get_route", lambda *_args, **_kwargs: __import__("app.proxy.routing", fromlist=["RouteRecord"]).RouteRecord("support-ticket-extraction", True, 100, "tuned"))
+    client = TestClient(
+        create_app(settings=settings, real_forwarder=real_forwarder, canary_draw=lambda: 0.0)
+    )
+
+    assert client.post(
+        "/v1/chat/completions",
+        json=_request(system=SYSTEM_PROMPTS_BY_CLUSTER["support-ticket-extraction"]),
+    ).status_code == 200
+    assert captured == {
+        "base_url": "https://tuned.example/v1",
+        "api_key": "endpoint-only-key",
+    }
+    assert "endpoint-only-key" not in repr(settings)
+
+
+def test_http_tuned_upstream_never_falls_back_to_llm_key(monkeypatch) -> None:
+    monkeypatch.setenv("VF_PROXY_TUNED_UPSTREAM", "https://tuned.example/v1")
+    monkeypatch.setenv("VF_LLM_API_KEY", "wrong-key")
+    monkeypatch.delenv("VF_PROXY_TUNED_API_KEY", raising=False)
+
+    with pytest.raises(ValueError, match="VF_PROXY_TUNED_API_KEY"):
+        ProxySettings.from_env()
 
 
 def test_database_failure_never_blocks_fake_completion(tmp_path: Path) -> None:
