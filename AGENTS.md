@@ -62,6 +62,14 @@ Use pytest and name tests `test_*.py`. Add focused failure and boundary coverage
 
 If you need to use the API to do the model testing, only use OpenRouter (and prefer the model GLM 5.2 - xhigh effort to do so). We want to save money during the tests. You should only use the real OpenAI models during production.
 
+## Model ID Discovery
+
+Model IDs may only come from an authenticated `GET /v1/models` response from
+the provider endpoint that will execute the request. Never guess a model slug,
+add a provider prefix that was not returned, or reuse an ID from memory or old
+documentation. Record the relevant returned IDs in the active version document
+or run-sheet before adding the model to configuration.
+
 ## Commit & Pull Request Guidelines
 
 Keep commits focused and use the versioned prefix above. PRs state affected modules, validation results, contract/mock impact, and screenshots only for UI-visible changes. Do not stage generated `runs/`, `models/`, or cache files.

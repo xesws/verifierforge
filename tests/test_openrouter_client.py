@@ -42,13 +42,13 @@ def test_openrouter_preset_uses_provider_key() -> None:
     assert settings.model == DEFAULT_AUGMENT_MODEL
 
 
-def test_openai_preset_resolves_luna_xhigh() -> None:
+def test_openai_preset_resolves_discovered_luna_base() -> None:
     settings = LLMSettings.from_env(
         {"VF_LLM_PROVIDER": "openai", "OPENAI_API_KEY": "openai-secret"}
     )
 
     assert settings.provider == "openai"
-    assert settings.model == DEFAULT_OPENAI_MODEL == "gpt-5.6-luna-xhigh"
+    assert settings.model == DEFAULT_OPENAI_MODEL == "gpt-5.6-luna"
     assert settings.base_url == "https://api.openai.com/v1"
 
 
@@ -436,7 +436,7 @@ def test_runtime_openai_model_override_still_rejects_sol_before_request() -> Non
         LLMSettings(
             api_key="test-key",
             provider="openai",
-            model="gpt-5.6-luna-xhigh",
+            model="gpt-5.6-luna",
             base_url="https://api.openai.com/v1",
         ),
         client=SimpleNamespace(

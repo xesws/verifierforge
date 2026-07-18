@@ -7,7 +7,13 @@ import json
 from pathlib import Path
 import tempfile
 
-from app.agent.evaluator import ReplayRecord, evaluate_traces, load_replay, load_scenarios, validate_live_settings
+from app.agent.evaluator import (
+    ReplayRecord,
+    evaluate_traces,
+    live_settings_from_env,
+    load_replay,
+    load_scenarios,
+)
 from app.agent.runner import AgentRunError, ForgeAgentRunner
 from app.agent.stores import S3AgentTraceStore, SQLiteAgentDecisionStore
 from app.agent.tools import ToolRegistry
@@ -28,8 +34,7 @@ def main() -> int:
     args = parser.parse_args()
 
     if args.mode == "live":
-        settings = LLMSettings.from_env()
-        validate_live_settings(settings)
+        settings = live_settings_from_env()
         scenarios = load_scenarios(args.scenarios)
         records = _run_live(scenarios, settings, args.ledger)
         trace_output = args.trace_output or args.report.with_suffix(".traces.jsonl")

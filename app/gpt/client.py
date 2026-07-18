@@ -17,7 +17,7 @@ DEFAULT_LLM_PROVIDER = "openrouter"
 DEFAULT_LLM_BASE_URL = "https://openrouter.ai/api/v1"
 DEFAULT_AUGMENT_MODEL = "z-ai/glm-5.2"
 OPENAI_BASE_URL = "https://api.openai.com/v1"
-DEFAULT_OPENAI_MODEL = "gpt-5.6-luna-xhigh"
+DEFAULT_OPENAI_MODEL = "gpt-5.6-luna"
 FORBIDDEN_OPENAI_MODEL_MARKERS = ("sol", "terra")
 
 

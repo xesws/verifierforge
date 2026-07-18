@@ -11,6 +11,7 @@ from app.agent.evaluator import (
     ILLEGAL_ACTION_LIMIT,
     ReplayRecord,
     evaluate_traces,
+    live_settings_from_env,
     load_replay,
     load_scenarios,
     validate_live_settings,
@@ -94,5 +95,40 @@ def test_live_preflight_requires_exact_luna_openai_model() -> None:
         )
 
     validate_live_settings(
-        LLMSettings(api_key="test", provider="openai", model="gpt-5.6-luna-xhigh")
+        LLMSettings(api_key="test", provider="openai", model="gpt-5.6-luna")
     )
+
+
+def test_live_settings_requires_dedicated_discovered_model() -> None:
+    base = {
+        "VF_LLM_PROVIDER": "openai",
+        "OPENAI_API_KEY": "openai-key",
+        "VF_LLM_API_KEY": "must-not-be-used",
+        "VF_LLM_BASE_URL": "https://openrouter.example/v1",
+        "VF_LLM_MODEL": "stale-model",
+    }
+    with pytest.raises(LLMConfigurationError, match="VF_AGENT_EVAL_MODEL"):
+        live_settings_from_env(base)
+
+    settings = live_settings_from_env(
+        {**base, "VF_AGENT_EVAL_MODEL": "gpt-5.6-luna"}
+    )
+
+    assert settings.provider == "openai"
+    assert settings.model == "gpt-5.6-luna"
+    assert settings.api_key == "openai-key"
+    assert settings.base_url == "https://api.openai.com/v1"
+
+
+@pytest.mark.parametrize(
+    "model", ["openai/gpt-5.6-luna", "gpt-5.6-luna-xhigh", "gpt-5.6-sol"]
+)
+def test_live_settings_rejects_unlisted_or_forbidden_model(model: str) -> None:
+    with pytest.raises(LLMConfigurationError):
+        live_settings_from_env(
+            {
+                "VF_LLM_PROVIDER": "openai",
+                "OPENAI_API_KEY": "test",
+                "VF_AGENT_EVAL_MODEL": model,
+            }
+        )

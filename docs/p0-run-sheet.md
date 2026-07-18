@@ -1955,3 +1955,55 @@ window, rather than an unannounced restart of the live vLLM process.
 3. The pre-existing owner actions in the earlier S10 morning checklist remain
    unchanged, including endpoint-key rotation and disposition of the four
    unrelated untracked paths.
+
+## 2026-07-18 Live Gate C 补考 — v0.22.1
+
+### `/v1/models` 实查
+
+Authenticated `GET https://api.openai.com/v1/models` returned HTTP 200. The
+complete `gpt-5.6` subset, copied verbatim and sorted only for readability, was:
+
+```text
+gpt-5.6-luna
+gpt-5.6-sol
+gpt-5.6-terra
+```
+
+The selected base Luna ID is therefore exactly `gpt-5.6-luna`.
+`openai/gpt-5.6-luna` was not returned and is not a valid official-endpoint ID
+for this run. Sol and Terra remain forbidden. API keys and request headers were
+not logged.
+
+### Formal live result
+
+The frozen 12-scenario run was issued once through
+`https://api.openai.com/v1` with `VF_AGENT_EVAL_MODEL=gpt-5.6-luna` and the key
+sourced only from `OPENAI_API_KEY`. Exact admission metrics:
+
+```text
+decision_accuracy=0.0
+chain_success_rate=0.0
+illegal_action_count=0
+config_legality_rate=0.0
+```
+
+`tool_schema_valid_rate=0.0` is retained as a diagnostic outside the four gate
+criteria. All 12 attempts produced durable failed summaries/S3 traces with
+`guard_events=["LLMRequestError"]`, zero tool calls, and zero input/output
+tokens. The evaluator consequently recorded all 12 scenarios as missing live
+traces. The conservative cost ledger entry is:
+
+```text
+provider=openai
+model=gpt-5.6-luna
+reservation_usd=2.5
+provider_reported_cost_usd=null
+charged_usd=2.5
+cost_basis=reservation_upper_bound
+status=failed
+```
+
+This ledger value is an authorization upper bound, not a provider billing
+receipt. Gate C **did not pass**. Thresholds and scenarios were not changed; no
+retry was issued; `agent-gate-c-pass` was not created; `VF_AGENT_ENABLED`
+remains false. Final validation: `298 passed, 1 skipped`.

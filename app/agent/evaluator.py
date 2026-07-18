@@ -5,11 +5,18 @@ from __future__ import annotations
 from collections.abc import Iterable
 from pathlib import Path
 import json
-from typing import Any
+import os
+from typing import Any, Mapping
 
 from pydantic import BaseModel, ConfigDict, Field
+from dotenv import find_dotenv, load_dotenv
 
-from app.gpt import DEFAULT_OPENAI_MODEL, LLMConfigurationError, LLMSettings
+from app.gpt import (
+    DEFAULT_OPENAI_MODEL,
+    LLMConfigurationError,
+    LLMSettings,
+    OPENAI_BASE_URL,
+)
 from core.agent_contracts import AgentDecisionType, AgentTrace, TrainingConfig
 
 
@@ -164,6 +171,41 @@ def validate_live_settings(settings: LLMSettings) -> None:
         raise LLMConfigurationError(
             f"Gate C live-eval requires exact model {DEFAULT_OPENAI_MODEL}"
         )
+
+
+def live_settings_from_env(
+    environ: Mapping[str, str] | None = None,
+) -> LLMSettings:
+    """Resolve Gate C through the shared client with a dedicated model input."""
+    if environ is None:
+        dotenv_path = find_dotenv(usecwd=True)
+        if dotenv_path:
+            load_dotenv(dotenv_path, override=False)
+        values = os.environ
+    else:
+        values = environ
+    if values.get("VF_LLM_PROVIDER", "").strip().lower() != "openai":
+        raise LLMConfigurationError(
+            "Gate C live-eval requires VF_LLM_PROVIDER=openai"
+        )
+    model = values.get("VF_AGENT_EVAL_MODEL", "").strip()
+    if not model:
+        raise LLMConfigurationError(
+            "Gate C live-eval requires VF_AGENT_EVAL_MODEL from /v1/models"
+        )
+    api_key = values.get("OPENAI_API_KEY", "").strip()
+    if not api_key:
+        raise LLMConfigurationError(
+            "Gate C live-eval requires OPENAI_API_KEY"
+        )
+    resolved = LLMSettings(
+        api_key=api_key,
+        model=model,
+        base_url=OPENAI_BASE_URL,
+        provider="openai",
+    )
+    validate_live_settings(resolved)
+    return resolved
 
 
 def _chain_is_valid(trace: AgentTrace) -> bool:
