@@ -2261,7 +2261,7 @@ data, GPU, paid LLM, or real provider-provisioning call.
   never changed. The serving SSH/public mapping must be restored before retry.
 - [x] **LA-2:** replaced the legacy freezer with a safe compatibility wrapper,
   disposition `tq/` and the superseded vLLM runbook, and leave Git clean.
-- [ ] **DB-1:** unify relational persistence behind async SQLAlchemy stores and
+- [ ] **DB-1 — v0.23.0 reserved:** unify relational persistence behind async SQLAlchemy stores and
   tag `db-1-complete` only after SQLite/Alembic/full-suite gates.
 - [ ] **P-1:** implement mock-only provisioning contracts, state machine, six
   fuses, and audit persistence; keep `VF_AUTOPROVISION=false`.
