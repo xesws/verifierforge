@@ -24,6 +24,7 @@ from app.gpt import (
     LLMTurn,
     LLMUsage,
 )
+from app.gpt.budget import CostLedger, LLMBudgetError
 from core.agent_contracts import AgentTrace
 
 
@@ -215,3 +216,30 @@ def test_batch_sends_zero_scenarios_when_preflight_fails(
         gate_cli._run_live([object()], settings, tmp_path / "ledger.jsonl")
 
     assert constructed is False
+
+
+def test_live_round_limit_blocks_before_preflight(tmp_path: Path, monkeypatch) -> None:
+    import scripts.agent_gate_c as gate_cli
+
+    ledger = CostLedger(tmp_path / "ledger.jsonl")
+    for index in range(gate_cli.LIVE_ROUND_LIMIT):
+        ledger.record(
+            provider="openai",
+            reservation_usd=0.01,
+            provider_reported_cost_usd=0.0,
+            model="gpt-5.6-luna",
+            input_tokens=0,
+            output_tokens=0,
+            status=f"{gate_cli.LIVE_STATUS_PREFIX}{index + 1}_failed",
+        )
+    monkeypatch.setattr(
+        gate_cli,
+        "run_live_preflight",
+        lambda _client: pytest.fail("preflight must not run after round limit"),
+    )
+    settings = LLMSettings(
+        api_key="test", provider="openai", model="gpt-5.6-luna"
+    )
+
+    with pytest.raises(LLMBudgetError, match="round limit"):
+        gate_cli._run_live([], settings, ledger.path)

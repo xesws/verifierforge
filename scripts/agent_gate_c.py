@@ -19,9 +19,14 @@ from app.agent.runner import AgentRunError, ForgeAgentRunner
 from app.agent.stores import S3AgentTraceStore, SQLiteAgentDecisionStore
 from app.agent.tools import ToolRegistry
 from app.gpt import LLMClient, LLMSettings
-from app.gpt.budget import CostLedger
+from app.gpt.budget import CostLedger, LLMBudgetError
 from app.proxy.traffic import DEFAULT_DB_PATH
 import os
+
+
+LIVE_ROUND_RESERVATION_USD = 1.50
+LIVE_ROUND_LIMIT = 3
+LIVE_STATUS_PREFIX = "gate_c_v0223_round_"
 
 
 def main() -> int:
@@ -35,8 +40,13 @@ def main() -> int:
     args = parser.parse_args()
 
     if args.mode == "live":
-        settings = live_settings_from_env()
         scenarios = load_scenarios(args.scenarios)
+        replay_report = evaluate_traces(
+            scenarios, load_replay(args.replay), mode="replay"
+        )
+        if not replay_report.passed:
+            raise RuntimeError("paid Gate C blocked because replay-eval did not pass")
+        settings = live_settings_from_env()
         records = _run_live(scenarios, settings, args.ledger)
         trace_output = args.trace_output or args.report.with_suffix(".traces.jsonl")
         _atomic_jsonl(trace_output, records)
@@ -52,7 +62,14 @@ def main() -> int:
 
 def _run_live(scenarios, settings: LLMSettings, ledger_path: Path) -> list[ReplayRecord]:
     ledger = CostLedger(ledger_path)
-    reservation = 0.20
+    completed_rounds = ledger.count_status_prefix("openai", LIVE_STATUS_PREFIX)
+    if completed_rounds >= LIVE_ROUND_LIMIT:
+        raise LLMBudgetError(
+            f"Gate C v0.22.3 live round limit reached ({LIVE_ROUND_LIMIT})"
+        )
+    round_number = completed_rounds + 1
+    reservation = LIVE_ROUND_RESERVATION_USD
+    status_prefix = f"{LIVE_STATUS_PREFIX}{round_number}_"
     ledger.authorize("openai", reservation)
     try:
         preflight_usage = run_live_preflight(LLMClient(settings))
@@ -64,7 +81,7 @@ def _run_live(scenarios, settings: LLMSettings, ledger_path: Path) -> list[Repla
             model=settings.model,
             input_tokens=0,
             output_tokens=0,
-            status="preflight_failed",
+            status=status_prefix + "preflight_failed",
         )
         raise
     trace_store = S3AgentTraceStore.from_env()
@@ -106,7 +123,12 @@ def _run_live(scenarios, settings: LLMSettings, ledger_path: Path) -> list[Repla
         + sum(record.trace.total_input_tokens for record in records),
         output_tokens=preflight_usage.output_tokens
         + sum(record.trace.total_output_tokens for record in records),
-        status="failed" if failed or len(records) != len(scenarios) else "ok",
+        status=status_prefix
+        + (
+            "runner_failed"
+            if failed or len(records) != len(scenarios)
+            else "transport_completed"
+        ),
     )
     return records
 

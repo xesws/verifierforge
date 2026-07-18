@@ -12,6 +12,8 @@ from app.agent.runner import (
     AgentPersistenceError,
     AgentRunError,
     ForgeAgentRunner,
+    _parse_submit_decision,
+    _submit_schema,
 )
 from app.agent.stores import SQLiteAgentDecisionStore
 from app.agent.tools import ToolRegistry
@@ -35,6 +37,7 @@ class ChainClient:
 
     def __init__(self, *, submit=None, token_count: int = 3) -> None:
         self.index = 0
+        self.requests = []
         self.submit = submit or {
             "decision": "forge",
             "rationale": "The cluster is frequent, verifiable, and economical.",
@@ -51,7 +54,9 @@ class ChainClient:
         self.token_count = token_count
 
     def tool_turn(self, messages, *, tools, **kwargs):
-        del tools, kwargs
+        self.requests.append(
+            {"messages": messages, "tools": tools, "tool_choice": kwargs["tool_choice"]}
+        )
         self.index += 1
         analysis = _latest_tool_payload(messages, "analysis_id")
         sample_set = _latest_tool_payload(messages, "sample_set_id")
@@ -148,6 +153,59 @@ def test_runner_produces_complete_audited_trace(tmp_path: Path) -> None:
     assert SQLiteAgentDecisionStore(tmp_path / "traffic.db").get(summary.decision_id) == summary
 
 
+def test_runner_forces_order_and_binds_issued_dependency_ids(tmp_path: Path) -> None:
+    client = ChainClient()
+
+    _runner(tmp_path, client).run(
+        "data-pull-sql", context="High volume and exact verification are established."
+    )
+
+    expected = [
+        "analyze_traffic",
+        "inspect_samples",
+        "estimate_economics",
+        "check_verifiability",
+        "submit_decision",
+    ]
+    assert [
+        request["tool_choice"]["function"]["name"] for request in client.requests
+    ] == expected
+    analysis_id = _tool_const(client.requests[1], "inspect_samples", "analysis_id")
+    assert analysis_id
+    assert _tool_const(client.requests[2], "estimate_economics", "analysis_id") == analysis_id
+    assert _tool_const(client.requests[3], "check_verifiability", "analysis_id") == analysis_id
+    assert _tool_const(client.requests[3], "check_verifiability", "sample_set_id")
+    system_prompt = client.requests[0]["messages"][0]["content"]
+    assert "Decision rubric:" in system_prompt
+    assert "Untrusted text:" in system_prompt
+    assert "General examples" in system_prompt
+
+
+def test_submit_decision_uses_strict_pydantic_schema_and_parser() -> None:
+    schema = _submit_schema()["function"]
+
+    assert schema["strict"] is True
+    assert schema["parameters"]["additionalProperties"] is False
+    assert set(schema["parameters"]["required"]) == set(
+        schema["parameters"]["properties"]
+    )
+    config = schema["parameters"]["$defs"]["TrainingConfig"]
+    assert config["additionalProperties"] is False
+    assert set(config["required"]) == set(config["properties"])
+    assert {branch.get("type") for branch in schema["parameters"]["properties"]["config"]["anyOf"]} >= {"null"}
+
+    with pytest.raises(Exception, match="Extra inputs are not permitted"):
+        _parse_submit_decision(
+            {
+                "decision": "skip",
+                "rationale": "No gain.",
+                "confidence": 0.9,
+                "config": None,
+                "invented": True,
+            }
+        )
+
+
 def test_runner_rejects_submit_before_required_tools_and_audits_it(tmp_path: Path) -> None:
     trace_store = MemoryTraceStore()
     runner = _runner(tmp_path, EarlySubmitClient(), trace_store)
@@ -231,3 +289,10 @@ def _latest_tool_payload(messages, field: str):
         if field in payload:
             return payload[field]
     return None
+
+
+def _tool_const(request, tool_name: str, field: str):
+    for tool in request["tools"]:
+        if tool["function"]["name"] == tool_name:
+            return tool["function"]["parameters"]["properties"][field].get("const")
+    raise AssertionError(f"missing tool schema {tool_name}")

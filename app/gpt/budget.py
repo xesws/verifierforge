@@ -9,9 +9,9 @@ from pathlib import Path
 from typing import Any
 
 
-PROVIDER_CAPS_USD = {"openai": 3.0, "openrouter": 2.0}
+PROVIDER_CAPS_USD = {"openai": 8.0, "openrouter": 2.0}
 OPENAI_DECLARED_CREDIT_USD = 10.0
-OPENAI_REQUIRED_RESERVE_USD = 7.0
+OPENAI_REQUIRED_RESERVE_USD = 2.0
 
 
 class LLMBudgetError(RuntimeError):
@@ -42,7 +42,24 @@ class CostLedger:
                 f"{provider} request would exceed the ${PROVIDER_CAPS_USD[provider]:.2f} cap"
             )
         if provider == "openai" and OPENAI_DECLARED_CREDIT_USD - projected < OPENAI_REQUIRED_RESERVE_USD - 1e-12:
-            raise LLMBudgetError("OpenAI request would breach the owner-required $7.00 reserve")
+            raise LLMBudgetError(
+                f"OpenAI request would breach the owner-required "
+                f"${OPENAI_REQUIRED_RESERVE_USD:.2f} reserve"
+            )
+
+    def count_status_prefix(self, provider: str, prefix: str) -> int:
+        """Count durable attempts without exposing request data or credentials."""
+        provider = _provider(provider)
+        if not self.path.exists():
+            return 0
+        count = 0
+        for line in self.path.read_text(encoding="utf-8").splitlines():
+            if not line.strip():
+                continue
+            row = json.loads(line)
+            if row.get("provider") == provider and str(row.get("status", "")).startswith(prefix):
+                count += 1
+        return count
 
     def record(
         self,

@@ -76,6 +76,13 @@ function call. Both must pass with their expected shapes. If either fails, send
 zero scenario requests, preserve the complete bounded provider error, and stop;
 replay success never bypasses this flight check.
 
+Every paid Gate C remediation round must first pass the complete zero-cost
+replay evaluator. Live retries use the durable cost ledger and the round limit
+declared by the active version document; neither a process restart nor a prompt
+edit resets that count. Thresholds, frozen labels, and scenarios are immutable
+during remediation. A passing gate creates its semantic tag but never enables
+the product feature flag without owner approval.
+
 ## Commit & Pull Request Guidelines
 
 Keep commits focused and use the versioned prefix above. PRs state affected modules, validation results, contract/mock impact, and screenshots only for UI-visible changes. Do not stage generated `runs/`, `models/`, or cache files.

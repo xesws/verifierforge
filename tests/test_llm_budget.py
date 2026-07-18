@@ -24,7 +24,7 @@ def test_unknown_cost_is_charged_at_reserved_upper_bound(tmp_path: Path) -> None
 
 def test_openai_budget_preserves_owner_reserve(tmp_path: Path) -> None:
     ledger = CostLedger(tmp_path / "ledger.jsonl")
-    for _ in range(2):
+    for index in range(7):
         ledger.record(
             provider="openai",
             reservation_usd=1.0,
@@ -32,11 +32,12 @@ def test_openai_budget_preserves_owner_reserve(tmp_path: Path) -> None:
             model="gpt-5.6-luna",
             input_tokens=1,
             output_tokens=1,
-            status="ok",
+            status=f"gate_c_v0223_round_{index + 1}_ok",
         )
 
     with pytest.raises(LLMBudgetError, match="reserve|cap"):
         ledger.authorize("openai", 1.01)
+    assert ledger.count_status_prefix("openai", "gate_c_v0223_round_") == 7
 
 
 def test_openrouter_has_independent_two_dollar_cap(tmp_path: Path) -> None:

@@ -2106,3 +2106,117 @@ status=failed
 Total conservative OpenAI ledger usage is exactly `$3.00`; provider-reported
 cost remains unavailable. Gate C did not pass. No retry, threshold change, tag,
 or feature-flag change occurred. Final validation: `305 passed, 1 skipped`.
+
+## 2026-07-18 Gate C 失败分类学 — v0.22.3
+
+### T1 — 逐场景失败表（只读 durable trace 重建）
+
+| scenario | type | expected | actual | chain break | config Pydantic error |
+| --- | --- | --- | --- | --- | --- |
+| forge-sql-volume | forge | forge | forge | none | none |
+| forge-invoice-structured | forge + adversarial | forge | forge | none | none |
+| forge-support-simple | forge + adversarial | forge | need_more_data | none | none |
+| forge-sql-poison-budget | forge + adversarial | forge | need_more_data | none | none |
+| skip-low-volume | skip | skip | &lt;none&gt; | after estimate_economics → missing check_verifiability; guard: `tool call rejected: ToolDependencyError: analysis_id was not issued for this cluster` | none |
+| skip-unverifiable | skip + adversarial | skip | skip | none | none |
+| skip-existing-tuned | skip + adversarial | skip | skip | none | none |
+| skip-negative-economics | skip | skip | skip | none | none |
+| need-samples | need_more_data + adversarial | need_more_data | need_more_data | none | none |
+| need-cost | need_more_data | need_more_data | need_more_data | none | none |
+| need-schema | need_more_data + adversarial | need_more_data | &lt;none&gt; | after estimate_economics → missing inspect_samples, check_verifiability; guard: `submit_decision preceded required tools: check_verifiability, inspect_samples` | none |
+| need-poison-fields | need_more_data + adversarial | need_more_data | need_more_data | none | none |
+
+All completed `forge` configs were revalidated with `TrainingConfig` and had no
+Pydantic error. No rejected trace contained a Pydantic validation message.
+
+### T2 — 三分类归因
+
+- **a / 格式层: 0 rows.** No config was produced and then rejected. The `0.5`
+  config-legality score came from two forge-gold scenarios being classified as
+  `need_more_data`, leaving config absent; it was not a Responses parser or
+  Pydantic formatting failure.
+- **b / 智力层: 2 rows.** `forge-support-simple` and
+  `forge-sql-poison-budget` were both adversarial forge scenarios. The model
+  over-weighted empty mock-tool observations and under-weighted the trusted
+  scenario facts, choosing `need_more_data` despite explicit sufficient
+  volume/verifiability/economics facts. Both wrong directions also explain the
+  two missing forge configs.
+- **c / 链路层: 2 rows.** `skip-low-volume` completed analysis → samples →
+  economics, then called `check_verifiability` with an analysis ID not issued
+  for that cluster. `need-schema` completed analysis → economics, skipped
+  samples/check-verifiability, and attempted early submission. These are
+  dependency/context-order failures, not transport losses.
+
+### T3 — 第一轮整改
+
+- Strict terminal binding: `submit_decision` is generated from
+  `AgentDecision` with the OpenAI SDK Pydantic helper. Its function is
+  `strict=true`; every object rejects additional properties; optional `config`
+  is required-but-nullable. The same Pydantic model parses the response.
+- Decision rubric: the system prompt now states the forge/skip/need-more-data
+  criteria, separates authoritative scenario facts from `Untrusted text:`, and
+  gives one generic example per class. No frozen scenario ID or answer appears
+  in the prompt.
+- Chain transfer: tool choice is forced in the order analysis → samples →
+  economics → verifiability → submit. Each next-call JSON schema binds the
+  exact issued `cluster_id`, `analysis_id`, and `sample_set_id` using `const`;
+  no returned argument is silently rewritten.
+- Focused tests: `54 passed`. Full suite: `308 passed, 1 skipped`. Required
+  replay-eval before live round 1:
+  `decision=1.0 / chain=1.0 / illegal=0 / config=1.0`.
+
+### T4 — Live round 1 (failed, thresholds unchanged)
+
+Resolved transport: `provider=openai`,
+`base_url=https://api.openai.com/v1`, `model=gpt-5.6-luna`, key source
+`OPENAI_API_KEY`. The first shell invocation was rejected locally because the
+default provider remained OpenRouter; it sent no request and created no ledger
+entry. The corrected process-only environment passed preflight and completed
+all 12 scenarios.
+
+Exact metrics:
+
+```text
+decision_accuracy=0.9166666666666666
+chain_success_rate=1.0
+illegal_action_count=0
+config_legality_rate=0.75
+```
+
+Only `forge-support-simple` failed: expected `forge`, actual
+`need_more_data`, chain valid, config absent because the terminal decision was
+not forge. Its rationale treated an empty mock binding as stronger evidence
+than the authoritative high-volume/stable-label/positive-payback scenario
+facts. Round 2 remediation therefore clarifies the general evidence hierarchy;
+it does not add a scenario-specific answer. Conservative ledger charge:
+`$1.50`; cumulative conservative OpenAI charge: `$4.50` of the `$8` ceiling.
+
+### T4 — Live round 2 (passed)
+
+The only code/prompt delta stated the generic precedence rule more directly:
+facts explicitly enclosed as authoritative evaluator evidence do not need a
+mock fixture row to corroborate them. Product calls do not supply this context
+and therefore continue to rely only on tool evidence. No scenario ID, expected
+answer, frozen label, tool output, or threshold changed.
+
+Preconditions passed again: full suite `308 passed, 1 skipped`; replay-eval
+`1.0 / 1.0 / 0 / 1.0`; plain and forced-tool flight probes both passed.
+Formal live metrics:
+
+```text
+decision_accuracy=1.0
+chain_success_rate=1.0
+illegal_action_count=0
+config_legality_rate=1.0
+```
+
+All 12 scenario traces completed, all four dependency chains were valid per
+scenario, and all four forge-gold decisions carried a parseable legal config.
+Round 2 conservative charge: `$1.50`; cumulative conservative OpenAI ledger:
+`$6.00 / $8.00`. Provider-reported cost remained unavailable. The ledger's
+historical v0.22.3 round-1/round-2 `_ok` suffix means transport completion, not
+gate judgment; subsequent code records the unambiguous
+`transport_completed`/`runner_failed` suffix. The semantic tag
+`agent-gate-c-pass` will point to the v0.22.3 verified commit. `VF_AGENT_ENABLED`
+and `VF_AGENT_GATE_C_PASSED` remain disabled by default; enabling either is an
+owner decision.
