@@ -2265,7 +2265,7 @@ data, GPU, paid LLM, or real provider-provisioning call.
   tag `db-1-complete` only after SQLite/Alembic/full-suite gates.
 - [ ] **P-1 — v0.24.0 reserved:** implement mock-only provisioning contracts, state machine, six
   fuses, and audit persistence; keep `VF_AUTOPROVISION=false`.
-- [ ] **DB-2:** migrate and reconcile the legacy SQLite/runs history against
+- [ ] **DB-2 — v0.25.0 reserved:** migrate and reconcile the legacy SQLite/runs history against
   Supabase without logging a DSN. Owner performs the persistent default flip.
 - [ ] **DB-3:** add Fernet credential protection, secret scanning, explicit
   disconnect behavior, and operational documentation if the timebox permits.
