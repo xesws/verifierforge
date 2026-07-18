@@ -186,3 +186,22 @@ class AgentDecisionSummary(AgentModel):
     created_at: datetime
     total_input_tokens: int = Field(ge=0)
     total_output_tokens: int = Field(ge=0)
+
+
+class AgentAnalysisResponse(AgentModel):
+    decision_id: str
+    cluster_id: str
+    decision: AgentDecision
+    cached: bool
+    created_at: datetime
+
+
+class ApprovalRequest(AgentModel):
+    approved_by: str = Field(min_length=1, max_length=128)
+
+
+class ApprovalRecord(AgentModel):
+    approval_id: str
+    decision_id: str
+    approved_by: str
+    approved_at: datetime

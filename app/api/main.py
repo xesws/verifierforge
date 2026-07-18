@@ -12,6 +12,7 @@ from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 
 from app.api.artifacts import ArtifactDataError, ArtifactStore
+from app.api.agent import router as agent_router
 from app.api.copilot import router as copilot_router
 from app.proxy.routing import LivePassRateRecord, RouteRecord, get_route, list_live_pass_rate, put_route
 from app.proxy.traffic import DEFAULT_DB_PATH
@@ -36,6 +37,7 @@ app.add_middleware(
     allow_headers=["*"],
 )
 app.include_router(copilot_router)
+app.include_router(agent_router)
 
 
 def _runs_dir() -> Path:

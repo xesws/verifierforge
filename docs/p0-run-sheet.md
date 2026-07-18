@@ -1888,3 +1888,70 @@ window, rather than an unannounced restart of the live vLLM process.
   flag stays off. Thresholds remain the frozen `0.90 / 0.90 / 0 / 1.00`.
 - Validation: focused evaluator/runner `12 passed`; full suite
   `286 passed, 1 skipped`.
+
+## Forge Agent A-4 — v0.22.0
+
+- [x] Added separate, additive analysis/approval contracts and real/mock routes;
+  existing Job/Cluster contract fields were not changed.
+- [x] `VF_AGENT_ENABLED` remains false by default. Disabled routes return 404
+  before client, S3, or SQLite dependencies are constructed. The real binding
+  also refuses startup without `VF_AGENT_GATE_C_PASSED=true`.
+- [x] Completed decisions are cached only for a byte-identical canonical traffic
+  fingerprint. Changed traffic invalidates the cache. Only completed `forge`
+  decisions with a durable trace key can receive an idempotent SQLite approval.
+- [x] Browser demo completed in mock binding: Analyze displayed the
+  `data-pull-sql` `forge` rationale/config and Approve changed the UI to
+  `Approved`. Screenshot:
+  `assets/forge-agent/v0.22.0-analyze-approve.png`, SHA-256
+  `521c34d70e3a5dbe566334ceecad76690ca502e5881dec390d32490b33e7cbc4`.
+- [x] Persistence proof: the SQLite approval count was exactly one; the full
+  trace was a 3,766-byte S3 object with recorded SHA-256
+  `311ea43b8fde714d192fcf7edc87111fc4389d1a6d00f3dada829dc290b29908`.
+  The demo used deterministic mock tools/client and made no paid LLM request.
+- Validation: focused A-4 tests `26 passed`; full suite
+  `294 passed, 1 skipped`. No trainer/provisioner/GPU action occurred.
+
+## 2026-07-17 Forge Agent 晨报
+
+### Stage 状态
+
+| Stage | 状态 | 结果 |
+| --- | --- | --- |
+| A-0 | 部分通过 | 双 provider 预设、预算账本和 Luna/Sol/Terra 守卫完成；OpenRouter 返回空 completion，OpenAI Luna 返回 HTTP 404。 |
+| A-1 | 通过 | 严格契约、四个只读工具、real/mock 同构注册表完成。 |
+| A-2 | 通过 | 有界 ReAct Runner、非法动作整体拒绝、S3 全轨迹 + SQLite 摘要完成。 |
+| A-3 | replay 通过 / live 未完成 | replay Gate C 为 `1.0 / 1.0 / 0 / 1.0`；live 四元组不可得，未打 tag。 |
+| A-4 | 通过（flag 关闭） | Analyze→Approve 全链、缓存、审批和浏览器截图完成；未绕过 Gate C 开启产品功能。 |
+
+### Gate C 与花费
+
+- Replay：决策准确率 `1.0`；链式成功率 `1.0`；非法行动 `0`；
+  config 合法率 `1.0`。
+- Live：**未完成，四个正式数字不可得**；门禁未通过，阈值未修改，
+  `agent-gate-c-pass` tag 不存在。
+- 实际 provider 报告花费：不可得。保守预算账本：OpenRouter `$0.25`
+  + OpenAI `$0.25`，均为单次请求的 `reservation_upper_bound`；A-1 至
+  A-4 为 `$0`。Sol/Terra 请求数为 `0`，声明的 OpenAI `$10` 余额未被
+  当作查询所得事实。
+
+### Forge Agent commit / tag
+
+- `371dbcb` — `v0.18.0 Agent: add provider presets and budget guard`
+- `ecb49e6` — `v0.19.0 Agent: add contracts and read-only tools`
+- `ca8a220` — `v0.20.0 Agent: add guarded runner and trace stores`
+- `f849977` — `v0.21.0 Agent: add Gate C evaluator and replay set`
+- v0.22.0 commit: see repository HEAD after this wave.
+- Tag: none. `agent-gate-c-pass` is correctly absent because live Gate C did
+  not complete.
+
+### OWNER-ACTION
+
+1. Make the exact OpenAI model slug `gpt-5.6-luna-xhigh` available (or provide
+   the correct Luna endpoint mapping without authorizing Sol/Terra), then run
+   the existing live Gate C once within the remaining `$2.75` task ceiling.
+2. Only after live Gate C passes, create `agent-gate-c-pass` and set the
+   deployment receipt `VF_AGENT_GATE_C_PASSED=true`; enable
+   `VF_AGENT_ENABLED=true` only in the intended review environment.
+3. The pre-existing owner actions in the earlier S10 morning checklist remain
+   unchanged, including endpoint-key rotation and disposition of the four
+   unrelated untracked paths.

@@ -4,7 +4,11 @@ from pathlib import Path
 import boto3
 from moto import mock_aws
 
-from app.agent.stores import S3AgentTraceStore, SQLiteAgentDecisionStore
+from app.agent.stores import (
+    S3AgentTraceStore,
+    SQLiteAgentDecisionStore,
+    SQLiteApprovalStore,
+)
 from core.agent_contracts import (
     AgentDecision,
     AgentDecisionSummary,
@@ -59,6 +63,17 @@ def test_sqlite_decision_store_put_get_latest_and_idempotence(tmp_path: Path) ->
     assert store.get(first.decision_id) == first
     assert store.latest_for_cluster(trace.cluster_id) == first
     assert store.latest_for_cluster(trace.cluster_id, "b" * 64) is None
+
+
+def test_sqlite_approval_is_idempotent_by_decision_id(tmp_path: Path) -> None:
+    store = SQLiteApprovalStore(tmp_path / "traffic.db")
+
+    first = store.put("decision-1", "owner-a")
+    second = store.put("decision-1", "owner-b")
+
+    assert first == second
+    assert second.approved_by == "owner-a"
+    assert store.get_by_decision("decision-1") == first
 
 
 @mock_aws

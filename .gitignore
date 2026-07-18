@@ -4,5 +4,7 @@ models/
 __pycache__/
 .env
 node_modules/
-assets/
+assets/*
+!assets/forge-agent/
+!assets/forge-agent/**
 app/proxy/traffic.db*

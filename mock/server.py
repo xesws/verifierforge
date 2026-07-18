@@ -26,6 +26,14 @@ from core.contracts import (
     Metrics,
     RoutingState,
 )
+from core.agent_contracts import (
+    AgentAnalysisResponse,
+    AgentDecision,
+    ApprovalRecord,
+    ApprovalRequest,
+    TrainingConfig,
+)
+from app.api.agent import agent_enabled
 
 
 app = FastAPI(title="VerifierForge Mock API")
@@ -270,6 +278,9 @@ _ROUTING_STATES: dict[str, RoutingState] = {
     for cluster in CLUSTERS
 }
 
+_AGENT_DECISIONS: dict[str, AgentAnalysisResponse] = {}
+_AGENT_APPROVALS: dict[str, ApprovalRecord] = {}
+
 
 @app.get("/jobs", response_model=list[Job])
 def list_jobs() -> list[Job]:
@@ -345,6 +356,100 @@ def get_live_pass_rate(cluster_id: str) -> LivePassRate:
 def _require_cluster(cluster_id: str) -> None:
     if cluster_id not in _ROUTING_STATES:
         raise HTTPException(status_code=404, detail="Cluster not found")
+
+
+@app.post(
+    "/clusters/{cluster_id}/agent/analyze", response_model=AgentAnalysisResponse
+)
+def analyze_cluster(cluster_id: str) -> AgentAnalysisResponse:
+    _require_agent_enabled()
+    _require_cluster(cluster_id)
+    existing = _AGENT_DECISIONS.get(cluster_id)
+    if existing is not None:
+        return existing.model_copy(update={"cached": True})
+    decision = _mock_agent_decision(cluster_id)
+    response = AgentAnalysisResponse(
+        decision_id=f"mock-agent-{cluster_id}",
+        cluster_id=cluster_id,
+        decision=decision,
+        cached=False,
+        created_at="2026-07-17T12:00:00Z",
+    )
+    _AGENT_DECISIONS[cluster_id] = response
+    return response
+
+
+@app.get(
+    "/clusters/{cluster_id}/agent/decision", response_model=AgentAnalysisResponse
+)
+def latest_agent_decision(cluster_id: str) -> AgentAnalysisResponse:
+    _require_agent_enabled()
+    _require_cluster(cluster_id)
+    response = _AGENT_DECISIONS.get(cluster_id)
+    if response is None:
+        raise HTTPException(status_code=404, detail="Agent decision not found")
+    return response.model_copy(update={"cached": True})
+
+
+@app.post(
+    "/agent-decisions/{decision_id}/approvals", response_model=ApprovalRecord
+)
+def approve_agent_decision(
+    decision_id: str, request: ApprovalRequest
+) -> ApprovalRecord:
+    _require_agent_enabled()
+    existing = _AGENT_APPROVALS.get(decision_id)
+    if existing is not None:
+        return existing
+    response = next(
+        (
+            value
+            for value in _AGENT_DECISIONS.values()
+            if value.decision_id == decision_id
+        ),
+        None,
+    )
+    if response is None:
+        raise HTTPException(status_code=404, detail="Agent decision not found")
+    if response.decision.decision.value != "forge":
+        raise HTTPException(
+            status_code=409,
+            detail="Only audited forge decisions may be approved",
+        )
+    approval = ApprovalRecord(
+        approval_id=f"mock-approval-{len(_AGENT_APPROVALS) + 1}",
+        decision_id=decision_id,
+        approved_by=request.approved_by,
+        approved_at="2026-07-17T12:01:00Z",
+    )
+    _AGENT_APPROVALS[decision_id] = approval
+    return approval
+
+
+def _mock_agent_decision(cluster_id: str) -> AgentDecision:
+    if cluster_id == "data-pull-sql":
+        return AgentDecision(
+            decision="forge",
+            rationale="High SQL volume and deterministic verification support forging.",
+            confidence=0.94,
+            config=TrainingConfig(budget_usd_cap=25.0),
+        )
+    if cluster_id == "support-ticket-extraction":
+        return AgentDecision(
+            decision="skip",
+            rationale="This cluster already has a tuned live route.",
+            confidence=0.88,
+        )
+    return AgentDecision(
+        decision="need_more_data",
+        rationale="More approved samples are required.",
+        confidence=0.82,
+    )
+
+
+def _require_agent_enabled() -> None:
+    if not agent_enabled():
+        raise HTTPException(status_code=404, detail="Not found")
 
 
 if __name__ == "__main__":

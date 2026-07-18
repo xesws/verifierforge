@@ -2,14 +2,16 @@
 
 from __future__ import annotations
 
+from datetime import datetime, timezone
 from hashlib import sha256
 import json
 import os
 from pathlib import Path
 import sqlite3
 from typing import Any, Protocol
+from uuid import uuid4
 
-from core.agent_contracts import AgentDecisionSummary, AgentTrace
+from core.agent_contracts import ApprovalRecord, AgentDecisionSummary, AgentTrace
 
 
 class AgentDecisionStore(Protocol):
@@ -24,6 +26,12 @@ class AgentDecisionStore(Protocol):
 
 class AgentTraceStore(Protocol):
     def put(self, trace: AgentTrace) -> str: ...
+
+
+class ApprovalStore(Protocol):
+    def put(self, decision_id: str, approved_by: str) -> ApprovalRecord: ...
+
+    def get_by_decision(self, decision_id: str) -> ApprovalRecord | None: ...
 
 
 class SQLiteAgentDecisionStore:
@@ -98,6 +106,59 @@ class SQLiteAgentDecisionStore:
         return AgentDecisionSummary.model_validate_json(row[0]) if row else None
 
 
+class SQLiteApprovalStore:
+    """Idempotent approval writer; no execution handle is represented."""
+
+    def __init__(self, db_path: Path | str) -> None:
+        self.db_path = Path(db_path)
+
+    def put(self, decision_id: str, approved_by: str) -> ApprovalRecord:
+        existing = self.get_by_decision(decision_id)
+        if existing is not None:
+            return existing
+        record = ApprovalRecord(
+            approval_id=uuid4().hex,
+            decision_id=decision_id,
+            approved_by=approved_by,
+            approved_at=datetime.now(timezone.utc),
+        )
+        self.db_path.parent.mkdir(parents=True, exist_ok=True)
+        with sqlite3.connect(self.db_path) as connection:
+            _ensure_schema(connection)
+            try:
+                connection.execute(
+                    """
+                    INSERT INTO approvals (
+                        id, decision_id, approved_by, approved_at, approval_json
+                    ) VALUES (?, ?, ?, ?, ?)
+                    """,
+                    (
+                        record.approval_id,
+                        record.decision_id,
+                        record.approved_by,
+                        record.approved_at.isoformat(),
+                        record.model_dump_json(),
+                    ),
+                )
+            except sqlite3.IntegrityError:
+                concurrent = self.get_by_decision(decision_id)
+                if concurrent is None:
+                    raise
+                return concurrent
+        return record
+
+    def get_by_decision(self, decision_id: str) -> ApprovalRecord | None:
+        if not self.db_path.is_file():
+            return None
+        with sqlite3.connect(self.db_path) as connection:
+            _ensure_schema(connection)
+            row = connection.execute(
+                "SELECT approval_json FROM approvals WHERE decision_id = ?",
+                (decision_id,),
+            ).fetchone()
+        return ApprovalRecord.model_validate_json(row[0]) if row else None
+
+
 class S3AgentTraceStore:
     """Publish one immutable, checksum-labelled JSON object per trace."""
 
@@ -149,6 +210,17 @@ def _ensure_schema(connection: sqlite3.Connection) -> None:
             tokens_in INTEGER NOT NULL,
             tokens_out INTEGER NOT NULL,
             summary_json TEXT NOT NULL
+        )
+        """
+    )
+    connection.execute(
+        """
+        CREATE TABLE IF NOT EXISTS approvals (
+            id TEXT PRIMARY KEY,
+            decision_id TEXT NOT NULL UNIQUE,
+            approved_by TEXT NOT NULL,
+            approved_at TEXT NOT NULL,
+            approval_json TEXT NOT NULL
         )
         """
     )

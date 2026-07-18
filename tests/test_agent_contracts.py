@@ -4,6 +4,7 @@ import pytest
 from pydantic import ValidationError
 
 from core.agent_contracts import (
+    AgentAnalysisResponse,
     AgentDecision,
     AgentTrace,
     AgentDecisionType,
@@ -91,3 +92,17 @@ def test_trace_contains_only_public_audit_fields() -> None:
 
     assert "reasoning" not in trace.model_dump()
     assert "chain_of_thought" not in trace.model_dump()
+
+
+def test_product_envelope_round_trip_is_additive() -> None:
+    response = AgentAnalysisResponse(
+        decision_id="decision-1",
+        cluster_id="data-pull-sql",
+        decision=AgentDecision(
+            decision="forge", rationale="viable", confidence=0.9, config=_config()
+        ),
+        cached=False,
+        created_at="2026-07-17T12:00:00Z",
+    )
+
+    assert AgentAnalysisResponse.model_validate_json(response.model_dump_json()) == response
