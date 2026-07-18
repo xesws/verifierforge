@@ -2248,3 +2248,27 @@ d966dad714bc31c95e752d2de910d96aeee6567cf89ca5319150571e3025c44d  assets/forge-a
 69018b1af0e533b31825aab849a25cb18de15c279edb2ee805c5c2add0a5dddb  assets/forge-agent/v0.22.4-discover-schema.png
 a92b5fbbf763f05736b7e848f788a3d7c18fcac178ea8bf903f1b53cdc0e0a8f  assets/forge-agent/v0.22.4-discover-approval-receipt.png
 ```
+
+## 2026-07-18 Afternoon wave — v0.22.5 through v0.26.1
+
+**Status:** in progress. This section is the sole execution record for Lane A
+closeout, DB-1/DB-2/DB-3, and Provisioner P-1. The wave makes no trainer, frozen
+data, GPU, paid LLM, or real provider-provisioning call.
+
+- [ ] **LA-1:** verify `vfserve` locally, attempt the public endpoint once, and
+  run/reset a 200-request SQL canary only after a public success.
+- [ ] **LA-2:** replace the legacy freezer with a safe compatibility wrapper,
+  disposition `tq/` and the superseded vLLM runbook, and leave Git clean.
+- [ ] **DB-1:** unify relational persistence behind async SQLAlchemy stores and
+  tag `db-1-complete` only after SQLite/Alembic/full-suite gates.
+- [ ] **P-1:** implement mock-only provisioning contracts, state machine, six
+  fuses, and audit persistence; keep `VF_AUTOPROVISION=false`.
+- [ ] **DB-2:** migrate and reconcile the legacy SQLite/runs history against
+  Supabase without logging a DSN. Owner performs the persistent default flip.
+- [ ] **DB-3:** add Fernet credential protection, secret scanning, explicit
+  disconnect behavior, and operational documentation if the timebox permits.
+
+Initial evidence: `main == origin/main == b819187`; tracked files were clean;
+the only untracked paths were `docs/vllm-debug/`, `scripts/freeze_nl2sql.py`,
+`tests/test_freeze_nl2sql.py`, and `tq/`. Baseline validation was `311 passed,
+1 skipped`.
