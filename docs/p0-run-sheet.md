@@ -2518,6 +2518,9 @@ and once at `+6h`; it does not block later P-2 stages or the semantic tag.
   four approved IDs. Read-only stock: Community none; Secure RTX 4000 Ada low
   at `$0.26/hr`, Secure L4 low at `$0.39/hr`. Scope updated before code to allow
   one same-list Secure fallback only for that exact capacity error.
+- [x] Secure fallback implementation rejects auth/validation/other HTTP errors,
+  retries only the exact Community capacity response, and preserves GPU order.
+  Focused suite: `15 passed`; full suite: `392 passed, 1 skipped`.
 - [ ] Resume the historical gold proof without creating a second gold pod.
 - [ ] Run and safely reap the live orphan probe.
 - [ ] Complete and collect the approval-driven 100-step S3-only run.

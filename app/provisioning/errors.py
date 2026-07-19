@@ -22,6 +22,17 @@ class ProvisionCreateTimeout(ProvisionLifecycleError):
 class ProvisionProviderError(ProvisionLifecycleError):
     """Raised for a bounded, secret-safe provider HTTP failure."""
 
+    def __init__(
+        self,
+        message: str,
+        *,
+        status_code: int | None = None,
+        provider_body: str | None = None,
+    ) -> None:
+        super().__init__(message)
+        self.status_code = status_code
+        self.provider_body = provider_body
+
 
 class ProvisionAuditError(ProvisioningError):
     """Raised when durable audit cannot be written."""

@@ -111,6 +111,49 @@ def test_create_status_delete_and_billing_contract() -> None:
     assert all(request.headers["Authorization"] == "Bearer secret-test-key" for request in calls)
 
 
+def test_create_retries_secure_only_for_explicit_community_capacity_error() -> None:
+    clouds: list[str] = []
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        payload = json.loads(request.content)
+        clouds.append(payload["cloudType"])
+        if payload["cloudType"] == "COMMUNITY":
+            return httpx.Response(
+                500,
+                json={"error": "create pod: There are no instances currently available"},
+            )
+        return httpx.Response(201, json=_pod(cloudType="SECURE"))
+
+    async def scenario() -> None:
+        client = httpx.AsyncClient(transport=httpx.MockTransport(handler))
+        adapter = RunPodAdapter("key", client=client)
+        handle = await adapter.provision(_spec())
+        assert handle.external_id == "pod-1"
+        await client.aclose()
+
+    _run(scenario())
+    assert clouds == ["COMMUNITY", "SECURE"]
+
+
+def test_create_does_not_retry_secure_for_non_capacity_error() -> None:
+    calls = 0
+
+    def handler(_request: httpx.Request) -> httpx.Response:
+        nonlocal calls
+        calls += 1
+        return httpx.Response(403, text="provider denied")
+
+    async def scenario() -> None:
+        client = httpx.AsyncClient(transport=httpx.MockTransport(handler))
+        adapter = RunPodAdapter("key", client=client)
+        with pytest.raises(ProvisionProviderError, match="HTTP 403"):
+            await adapter.provision(_spec())
+        await client.aclose()
+
+    _run(scenario())
+    assert calls == 1
+
+
 def test_list_active_requires_prefix_and_owner_marker() -> None:
     foreign = _pod(id="foreign", name="owner-pod")
     prefix_only = _pod(id="prefix-only", env={"VF_JOB_ID": "p2-job-1"})

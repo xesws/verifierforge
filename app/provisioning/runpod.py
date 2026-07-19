@@ -90,7 +90,13 @@ class RunPodAdapter:
         }
         if spec.region_pref:
             payload["dataCenterIds"] = spec.region_pref
-        body = await self._request_json("POST", "/pods", json=payload, expected={201})
+        try:
+            body = await self._request_json("POST", "/pods", json=payload, expected={201})
+        except ProvisionProviderError as error:
+            if not _community_capacity_exhausted(error):
+                raise
+            payload["cloudType"] = "SECURE"
+            body = await self._request_json("POST", "/pods", json=payload, expected={201})
         pod = _object(body, "RunPod create response")
         external_id = _required_text(pod, "id")
         if not self._is_managed(pod, expected_name=payload["name"]):
@@ -287,7 +293,9 @@ class RunPodAdapter:
         if response.status_code not in expected:
             body = response.text[:_ERROR_BODY_LIMIT]
             raise ProvisionProviderError(
-                f"RunPod {method} {path} returned HTTP {response.status_code}: {body}"
+                f"RunPod {method} {path} returned HTTP {response.status_code}: {body}",
+                status_code=response.status_code,
+                provider_body=body,
             )
         return response
 
@@ -297,6 +305,14 @@ def _decode_json(response: httpx.Response) -> Any:
         return response.json()
     except ValueError as error:
         raise ProvisionProviderError("RunPod response was not valid JSON") from error
+
+
+def _community_capacity_exhausted(error: ProvisionProviderError) -> bool:
+    return (
+        error.status_code == 500
+        and error.provider_body is not None
+        and "There are no instances currently available" in error.provider_body
+    )
 
 
 def _object(value: Any, label: str) -> dict[str, Any]:
