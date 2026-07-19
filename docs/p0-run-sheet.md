@@ -2659,6 +2659,13 @@ validation: `411 passed, 1 skipped`; shell syntax, compile and diff checks
 passed. The only secret-scan match is the deliberate sanitizer fixture in
 `tests/test_import_legacy_database.py`.
 
+Post-live collection review found that the successful service evidence was
+durable in S3 but absent from the local SHA inventory. Before tagging, the
+collector was tightened to require its manifest, verify the evidence object
+SHA, assert completed `/v1/models` and non-empty real-completion fields, and
+materialize it beside the metrics. Focused validation after this correction:
+`44 passed`; complete suite remained `411 passed, 1 skipped`.
+
 ## 2026-07-19 v0.28.1 — v1 reviewer narrative refresh
 
 - [x] Reserved the docs-only patch and every affected area document before

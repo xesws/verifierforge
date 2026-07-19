@@ -85,14 +85,32 @@ def test_s3_collector_requires_and_hashes_complete_step_100(tmp_path: Path) -> N
                 Key=f"{root}/artifacts/candidate-checkpoints/step_{step}.manifest.json",
                 Body=json.dumps({"files": [candidate]}).encode(),
             )
+        serving = _put(
+            client,
+            f"{root}/artifacts/.tmp/serving/step_100.json",
+            json.dumps(
+                {
+                    "status": "completed",
+                    "models_status": 200,
+                    "completion_status": 200,
+                    "completion": {"choices": [{"text": "SELECT 1;"}]},
+                }
+            ).encode(),
+        )
+        client.put_object(
+            Bucket="p2-test",
+            Key=f"{root}/artifacts/serveability/step_100.json.manifest.json",
+            Body=json.dumps({"files": [serving]}).encode(),
+        )
 
         assert collector.snapshot().complete is True
         inventory = collector.collect(tmp_path / "collected")
         assert inventory["snapshot"]["latest_step"] == 100
         assert (tmp_path / "collected" / "model.txt").read_bytes() == b"model"
         assert (tmp_path / "collected" / "curve.png").read_bytes() == b"png"
-        assert len(inventory["objects"]) == 10
+        assert len(inventory["objects"]) == 12
         assert [item["step"] for item in inventory["candidate_manifests"]] == [50, 100]
+        assert (tmp_path / "collected" / "serveability-step-100.json").is_file()
 
 
 def test_s3_collector_surfaces_checkpoint_publication_failure() -> None:
@@ -149,5 +167,6 @@ def test_s3_collector_distinguishes_candidates_from_published_checkpoint() -> No
 
         assert snapshot.candidate_steps == (50,)
         assert snapshot.candidates_ready is False
+        assert snapshot.serving_evidence_ready is False
         assert snapshot.checkpoint_ready is False
         assert snapshot.complete is False

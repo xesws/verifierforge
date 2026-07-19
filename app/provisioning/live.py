@@ -38,6 +38,7 @@ class P2S3Snapshot:
     checkpoint_ready: bool
     final_model_ready: bool
     curve_ready: bool
+    serving_evidence_ready: bool
     failure_ready: bool = False
     candidate_steps: tuple[int, ...] = ()
 
@@ -52,6 +53,7 @@ class P2S3Snapshot:
             and self.checkpoint_ready
             and self.final_model_ready
             and self.curve_ready
+            and self.serving_evidence_ready
             and self.candidates_ready
         )
 
@@ -110,6 +112,10 @@ class S3RunCollector:
             checkpoint_ready=f"{self.job_prefix}/ckpt/step_{P2_CHECKPOINT_STEP}/manifest.json" in keys,
             final_model_ready=f"{self.job_prefix}/artifacts/final/model.txt.manifest.json" in keys,
             curve_ready=f"{self.job_prefix}/artifacts/curve.png.manifest.json" in keys,
+            serving_evidence_ready=(
+                f"{self.job_prefix}/artifacts/serveability/"
+                f"step_{P2_CHECKPOINT_STEP}.json.manifest.json"
+            ) in keys,
             failure_ready=(
                 f"{self.job_prefix}/artifacts/"
                 "checkpoint-publication-failure.json.manifest.json"
@@ -172,6 +178,42 @@ class S3RunCollector:
                 }
             )
 
+        serving_name = f"serveability/step_{P2_CHECKPOINT_STEP}.json"
+        serving_manifest_key = f"{self.job_prefix}/artifacts/{serving_name}.manifest.json"
+        serving_manifest_body, serving_manifest_identity = self._read_identity(
+            serving_manifest_key
+        )
+        identities[serving_manifest_key] = serving_manifest_identity
+        serving_manifest = json.loads(serving_manifest_body)
+        serving_entries = _manifest_files(serving_manifest, serving_manifest_key)
+        if len(serving_entries) != 1:
+            raise RuntimeError("P2 serving evidence must contain exactly one file")
+        serving_body, serving_identity = self._read_identity(serving_entries[0]["key"])
+        if (
+            serving_identity.size_bytes != serving_entries[0]["size_bytes"]
+            or serving_identity.sha256 != serving_entries[0]["sha256"]
+        ):
+            raise RuntimeError("P2 serving evidence identity mismatch")
+        identities[serving_identity.key] = serving_identity
+        serving_payload = json.loads(serving_body)
+        choices = (
+            serving_payload.get("completion", {}).get("choices")
+            if isinstance(serving_payload, dict)
+            and isinstance(serving_payload.get("completion"), dict)
+            else None
+        )
+        if (
+            not isinstance(serving_payload, dict)
+            or serving_payload.get("status") != "completed"
+            or serving_payload.get("models_status") != 200
+            or serving_payload.get("completion_status") != 200
+            or not isinstance(choices, list)
+            or not choices
+        ):
+            raise RuntimeError("P2 serving evidence does not prove models plus completion")
+        serving_path = destination / "serveability-step-100.json"
+        serving_path.write_bytes(serving_body)
+
         artifact_files: dict[str, str] = {}
         for name, target in (
             ("final/model.txt", destination / "model.txt"),
@@ -199,6 +241,11 @@ class S3RunCollector:
             "snapshot": snapshot.__dict__,
             "objects": [identity.__dict__ for identity in sorted(identities.values(), key=lambda item: item.key)],
             "candidate_manifests": candidate_manifests,
+            "serving_evidence": {
+                "manifest": serving_manifest_identity.__dict__,
+                "file": serving_identity.__dict__,
+                "local_path": str(serving_path),
+            },
             "local_artifacts": artifact_files,
         }
         inventory_path = destination / "s3-inventory.json"
