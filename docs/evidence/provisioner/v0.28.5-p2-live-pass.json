@@ -1,0 +1,79 @@
+{
+  "schema_version": 1,
+  "status": "passed",
+  "version": "v0.28.5",
+  "started_at": "2026-07-19T17:41:22.115099+00:00",
+  "finished_at": "2026-07-19T19:06:13.622425+00:00",
+  "approval_id": "42436bb4c4a144d8980aa886fbb7b14f",
+  "job_id": "p2-42436bb4c4a144d8980a-r5",
+  "external_id": "9z7g1w69kec4kb",
+  "retry_of": "1okqsh91490bgu",
+  "revision": "487a3cca7527fc2a4218bde41d0caae5859d302a",
+  "profile": {
+    "model": "Qwen/Qwen2.5-0.5B-Instruct",
+    "steps": 100,
+    "k": 8,
+    "checkpoint_interval": 50,
+    "serving_gate_timing": "post_training",
+    "storage_backend": "s3"
+  },
+  "budget": {
+    "owner_ceiling_usd": 10.0,
+    "run_enforced_cap_usd": 5.0,
+    "attempt_provider_estimate_usd": 0.177846,
+    "five_attempt_conservative_estimate_usd": 2.36358,
+    "billing_status": "pending",
+    "billing_reconciliation": ["plus-1h", "plus-6h"]
+  },
+  "metrics": {
+    "lines": 100,
+    "sha256": "52d51a587d900d16b93bfc75e3e4c42902a8420b390f24e237a1712f7b109f2d",
+    "first": {"step": 1, "reward_mean": 0.6093750596046448, "pass_at_1": 0.5, "entropy": 0.2518768608570099},
+    "last": {"step": 100, "reward_mean": 0.5171874761581421, "pass_at_1": 0.7, "entropy": 0.4053249955177307}
+  },
+  "candidates": [
+    {
+      "step": 50,
+      "file_count": 16,
+      "declared_bytes": 5198944958,
+      "manifest_sha256": "39f4260741b6fffbaea632acb74e2a2bbae327355f3b290a492c7115e6aa3403",
+      "file_identity_set_sha256": "8f0a35cd8e4d35a4da0fbd8278dedb603ab755c76a3f9d9ba7da669f02555105"
+    },
+    {
+      "step": 100,
+      "file_count": 16,
+      "declared_bytes": 5198944958,
+      "manifest_sha256": "97d539352cfca9858a85882742d41ad1562ac60e0f7dc596a183e74bcaa964f5",
+      "file_identity_set_sha256": "406530a3d8847fe15aba7a42679d0be4232c3c3ec827ccc01209b76fcc6a57ef"
+    }
+  ],
+  "serving_gate": {
+    "status": "completed",
+    "models_status": 200,
+    "completion_status": 200,
+    "choice_count": 1,
+    "model_name": "vf-serving-smoke-global_step_100",
+    "manifest_sha256": "d335c0e7ba4fe3ead1a76db59e4226953a24a145762b664a4609bf7b500c7a56",
+    "evidence_sha256": "1756783619fc4193e1273fa7cf89bef2b03d285b731f8724f5cde3ffcea0d526"
+  },
+  "published_checkpoint": {
+    "step": 100,
+    "file_count": 28,
+    "bytes": 6475212989,
+    "manifest_sha256": "7c49dce281bde9ca6fd419cc0564ed0fbe584319fed9f9566b1045b98f9b5edd"
+  },
+  "collection": {
+    "inventory_object_count": 137,
+    "inventory_sha256": "e34312b82d5001c327d68faeb7e54de924e9690711ec5832cea780c7c0681c70",
+    "model_marker_sha256": "591b4f63cf1219601b2177dab73b79feeaf23e95ae501f8ec058cb57eb029567",
+    "curve_sha256": "df84e6d39315d729551eee037f77418cfc912625579e313060224cd0940dec58"
+  },
+  "termination": {
+    "checked_at": "2026-07-19T19:06:12.218228+00:00",
+    "cleanup_seconds": 4.035,
+    "target_absent": true,
+    "vf_auto_prefix_count": 0,
+    "fresh_account_pod_count": 8,
+    "fresh_account_vf_auto_prefix_count": 0
+  }
+}

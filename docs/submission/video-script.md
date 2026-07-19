@@ -28,8 +28,8 @@ weights, provider dashboards, or an expired tunnel URL.
 - Use `VF_API_DATA_MODE=artifacts` and job
   `d4-m3-1p5b-r1-v0125` for result screens.
 - Show the public proof JSON/canary summary, not the expired quick-tunnel URL.
-- Do not imply that `Approve & Forge` launches a GPU today. P-2 is a separate
-  CLI and its semantic tag is withheld because billing evidence missed its
-  deadline.
+- Do not imply that `Approve & Forge` launches a GPU today. P-2 remains a
+  separately authorized CLI, although its bounded live path now carries the
+  `provisioner-p2-live` tag.
 - Never show `.env`, API headers, terminal process arguments, raw prompts,
   provider dashboards or checkpoint weights.

@@ -32,7 +32,7 @@ Other completed gates are equally explicit:
 | Product decision | A source-less production Analyze returned `need_more_data`; after a human-approved 50-row source, a fresh run returned `forge` at confidence `0.98` and created an approval in Supabase. |
 | Database | SQLite remains local default; the same async SQLAlchemy repositories and Alembic schema passed a real Supabase Postgres migration, reconciliation, and product smoke. |
 | Delivery | A public Cloudflare quick tunnel served the selected model; 200 canary requests split 120 default / 80 tuned and produced Guardian LivePassRate `0.85`, then canary zero sent 20 / 20 requests to default. |
-| Provisioning | Mock P-1 lifecycle/fuses pass. The P-2 RunPod adapter is implemented, but its live tag is withheld because a deleted gold pod produced no billing-history row within the 15-minute evidence deadline. |
+| Provisioning | P-1 mock lifecycle/fuses pass. P-2 then executed an approved 0.5B/100-step S3 run on RunPod, service-tested step 100 after trainer exit, SHA-collected it, and deleted the pod; tag `provisioner-p2-live` records the gate. |
 
 ## Architecture
 
@@ -142,10 +142,9 @@ python -m scripts.scan_secrets
   rows and a 60-row held-out set; it is not a broad benchmark claim.
 - The successful public model proof used an ephemeral Cloudflare quick tunnel,
   not a durable production hostname or SLA.
-- P-1 provisioning is proved with a mock. P-2 created and deleted a real gold
-  pod, but RunPod returned no billing row within the declared 15-minute gate;
-  orphan and approval-driven training proofs therefore did not run and the
-  completion tag is absent.
+- P-2 proves one bounded, separately authorized RunPod execution path, not
+  unattended provisioning from the web button. Its fifth training attempt cost
+  estimate was `$0.177846`; final provider billing remains asynchronous.
 - Agent Gate C covers a frozen 12-scenario evaluator. It is not evidence that
   arbitrary business traffic should auto-train; the flag remains default-off
   and approval is required.
@@ -155,7 +154,7 @@ python -m scripts.scan_secrets
 
 ## How we worked with Codex
 
-### 2026-07-18–19 — v0.18.0 through v0.28.0 product/infrastructure log
+### 2026-07-18–19 — v0.18.0 through v0.28.5 product/infrastructure log
 
 1. **The product had evidence but no decision layer.** The human specified an
    advisory Forge Agent with read-only tools, strict action space, a live Gate
@@ -184,13 +183,17 @@ python -m scripts.scan_secrets
    Guardian ended at `0.85`, and canary zero produced 20/0. This proves the
    traffic path, not a permanent hosting SLA.
 
-4. **Real provisioning needed a fail-closed receipt.** The human set `$5`,
-   180-minute and cleanup limits and required create/status/delete/billing
-   before training. Codex implemented the REST adapter and approval-driven S3
-   executor. The first gold pod reached SSH and was deleted, but billing
-   history stayed empty for 15 minutes. Codex stopped without creating the
-   orphan or training pods and withheld `provisioner-p2-live`; implementation
-   success was not relabeled as operational completion.
+4. **Real provisioning needed a fail-closed receipt.** The human initially set
+   `$5`, 180-minute and cleanup limits; after RunPod billing lagged, the human
+   corrected teardown proof to accepted DELETE plus target absence and raw
+   prefix zero, with billing sampled asynchronously. Codex implemented that
+   rule, the orphan proof and approval-driven S3 executor. Four training tries
+   exposed a same-GPU ordering bug at step 50. The human decided that vLLM must
+   run only after trainer exit; Codex implemented candidate manifests plus a
+   separate finalizer. Attempt five completed 100 steps, passed models and real
+   completion checks, SHA-collected 137 objects, deleted in 4.035 seconds and
+   created `provisioner-p2-live`. The `$0.177846` run estimate is not presented
+   as settled billing.
 
 ### 2026-07-14 — v0.2.0 / v0.3.0 infrastructure log
 

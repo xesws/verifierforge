@@ -89,10 +89,11 @@ run sheet. Thresholds were never lowered to manufacture a pass.
   smoke; step 350 was converted and evaluated before delivery.
 - The public RunPod route did not expose port 8000. The failure stayed in the
   record; the quick tunnel proved the path without being called a permanent SLA.
-- The new RunPod P-2 adapter created, reached and deleted a real gold pod, but
-  billing history returned no row within its declared 15-minute evidence gate.
-  It stopped before orphan/training resources and did not create the completion
-  tag.
+- The RunPod P-2 adapter needed five fail-closed training attempts. The final
+  correction made training and vLLM service verification sequential on one
+  GPU; the approved 0.5B run completed 100 steps, SHA-collected 137 objects and
+  deleted cleanly. Tag `provisioner-p2-live` records the narrow live proof;
+  provider billing is still reconciled asynchronously.
 
 ## Accomplishments
 
@@ -106,11 +107,10 @@ run sheet. Thresholds were never lowered to manufacture a pass.
 
 ## What is next
 
-Close P-2 only after RunPod emits an auditable billing row, then run its orphan
-proof and approved 0.5B S3-only job. Replace the quick tunnel with a durable
-authenticated endpoint, and connect the product approval to execution only in
-the separately scoped P-4 wave. Broader verifiers and benchmarks remain future
-work.
+Replace the quick tunnel with a durable authenticated endpoint, connect the
+product approval to the now-proven executor only in the separately scoped P-4
+wave, and surface asynchronous billing reconciliation operationally. Broader
+verifiers and benchmarks remain future work.
 
 ## Built with
 
@@ -127,6 +127,6 @@ no GPU, model weight, cloud credential, or paid request.
 ## Availability and limitations
 
 The repository is private. The stable review surface is the committed artifact
-path. The public tunnel was ephemeral; Forge Agent is default-off; P-2 live
-completion remains blocked at billing evidence; and one NL→SQL result is not a
-general language-model benchmark.
+path. The public tunnel was ephemeral; Forge Agent is default-off; P-2 is a
+separately authorized CLI rather than a web-button side effect; and one NL→SQL
+result is not a general language-model benchmark.

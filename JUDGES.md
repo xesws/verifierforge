@@ -97,8 +97,9 @@ hardening.
 - One NL→SQL vertical is not a broad benchmark.
 - The public endpoint was a temporary Cloudflare quick tunnel, not an SLA.
 - Forge Agent remains default-off despite passing Gate C.
-- P-2 created, reached, and deleted a real gold pod, but the RunPod billing API
-  returned no row within 15 minutes. The orphan/training phases did not run and
-  `provisioner-p2-live` is correctly absent.
+- P-2 completed the separately authorized RunPod path: orphan cleanup, a
+  0.5B/100-step S3 run, post-training vLLM models/completion gate, 137-object
+  SHA collection, and target-absent/raw-prefix-zero deletion. Tag
+  `provisioner-p2-live` records it; billing reconciliation remains asynchronous.
 - The repository contains no weights, credentials, raw traffic bodies, or
   requirement for a paid provider during review.

@@ -2629,12 +2629,12 @@ skipped`; final raw account prefix count: `0`.
   real-completion checks, then and only then publish checkpoint/final artifacts.
 - [x] Prove the timing and fail-closed invariant in focused/full tests; push a
   clean revision before paid execution.
-- [ ] Admit and run exactly one fresh `-r5` attempt while conservative cumulative
+- [x] Admit and run exactly one fresh `-r5` attempt while conservative cumulative
   spend remains below `$4.5`; monitor no more frequently than every five minutes.
-- [ ] Collect and SHA-check 100 metrics, both candidate manifests, the accepted
+- [x] Collect and SHA-check 100 metrics, both candidate manifests, the accepted
   step-100 checkpoint, service evidence, final marker and curve; terminate and
   prove target absence plus raw `vf-auto-* = 0`.
-- [ ] Complete P-2 DoD and create `provisioner-p2-live` only if every prior item
+- [x] Complete P-2 DoD and create `provisioner-p2-live` only if every prior item
   passes.
 
 **Stop:** any budget, provider, bootstrap, training, candidate identity,
@@ -2665,6 +2665,27 @@ collector was tightened to require its manifest, verify the evidence object
 SHA, assert completed `/v1/models` and non-empty real-completion fields, and
 materialize it beside the metrics. Focused validation after this correction:
 `44 passed`; complete suite remained `411 passed, 1 skipped`.
+
+**Live result:** passed. Clean `-r5` job
+`p2-42436bb4c4a144d8980a-r5` ran pushed revision `487a3cc` on pod
+`9z7g1w69kec4kb`. It stored 100 metrics and atomic candidate manifests at steps
+50 and 100 without starting vLLM. After `trainer.grpo_train` exited, the launcher
+reported no active Ray processes; the separate finalizer returned `/v1/models`
+HTTP 200 plus a non-empty real completion HTTP 200, then published step 100.
+The collected inventory covers 137 objects; inventory SHA-256 is
+`e34312b82d5001c327d68faeb7e54de924e9690711ec5832cea780c7c0681c70`
+and service evidence SHA-256 is
+`1756783619fc4193e1273fa7cf89bef2b03d285b731f8724f5cde3ffcea0d526`.
+DELETE cleanup took 4.035 seconds; the target is absent and a fresh account read
+has eight unrelated pods with raw `vf-auto-* = 0`.
+
+The attempt's provider estimate was `$0.177846`; the conservative five-attempt
+wave estimate is `$2.363580`. Owner raised the total ceiling to `$10` while the
+run was active, but this already-created attempt retained the stricter `$5`
+spec and `$4.5` stop fuse. Billing remains asynchronous; detached
+`vf-billing-r5-1h` and `vf-billing-r5-6h` sessions are scheduled. Sanitized
+evidence is `docs/evidence/provisioner/v0.28.5-p2-live-pass.json`; semantic tag
+`provisioner-p2-live` marks this DoD.
 
 ## 2026-07-19 v0.28.1 — v1 reviewer narrative refresh
 
