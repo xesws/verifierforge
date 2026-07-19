@@ -42,7 +42,12 @@ TERMINAL_PROVISION_STATES = frozenset(
 
 DEFAULT_GPU_MAPPINGS: dict[ProvisionProvider, dict[GPUClass, tuple[str, ...]]] = {
     ProvisionProvider.RUNPOD: {
-        GPUClass.SMALL_ADA: ("NVIDIA L4", "NVIDIA RTX 4000 Ada"),
+        GPUClass.SMALL_ADA: (
+            "NVIDIA RTX 2000 Ada Generation",
+            "NVIDIA RTX 4000 SFF Ada Generation",
+            "NVIDIA RTX 4000 Ada Generation",
+            "NVIDIA L4",
+        ),
         GPUClass.MID_AMPERE: ("NVIDIA A10", "NVIDIA A40"),
         GPUClass.H100: ("NVIDIA H100 PCIe",),
     },

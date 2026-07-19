@@ -45,6 +45,12 @@ def test_provision_spec_round_trip_and_gpu_mapping_excludes_blackwell() -> None:
     assert "blackwell" not in mapping_text
     assert "b200" not in mapping_text
     assert "sm_120" not in mapping_text
+    assert DEFAULT_GPU_MAPPINGS[ProvisionProvider.RUNPOD][GPUClass.SMALL_ADA] == (
+        "NVIDIA RTX 2000 Ada Generation",
+        "NVIDIA RTX 4000 SFF Ada Generation",
+        "NVIDIA RTX 4000 Ada Generation",
+        "NVIDIA L4",
+    )
 
 
 @pytest.mark.parametrize(
