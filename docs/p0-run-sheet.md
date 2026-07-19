@@ -2536,6 +2536,23 @@ Hard stops remain: raw prefix residue, target still present, identity mismatch,
 budget/runtime fuse, incomplete S3 objects or SHA mismatch. Billing delay alone
 is no longer a hard stop.
 
+## v0.28.2 full-attempt failure and approved retry
+
+- [x] First full attempt allocated Secure capacity at `$0.39/hr`, launched
+  pushed revision `d53dfb0`, and wrote 49 metrics to the attempt-1 S3 prefix.
+  Step timing was about 10 seconds with roughly 840–860 tokens/s.
+- [x] Hard failure captured: `ServingSmokeError: checkpoint export conversion
+  failed: missing safetensors index: .../model.safetensors.index.json`. The
+  staged export contained a single `model.safetensors`; disk had 70GB free.
+- [x] Cleanup finally executed: training pod `iqen85eumbjcld` reads absent and
+  raw `vf-auto-*` count is `0` at `2026-07-19T10:42:22Z`.
+- [ ] Add single-safetensors conversion coverage and fail-closed multi-shard
+  behavior; preserve the vLLM serving smoke.
+- [ ] Add evidence-validated full-stage retry with clean `-r2` job/S3 prefix,
+  immutable approval binding and conservative prior-spend reservation.
+- [ ] Re-run only the mandatory 100-step full stage, then collect/delete and
+  finish the P-2 DoD.
+
 ## 2026-07-19 v0.28.1 — v1 reviewer narrative refresh
 
 - [x] Reserved the docs-only patch and every affected area document before
