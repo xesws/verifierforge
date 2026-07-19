@@ -106,7 +106,7 @@ AgentDecision(forge, config) → 用户点 Approve
 **DoD**:不接任何真实厂商即可演示完整生命周期(mock 适配器);保险丝逐条有测试。
 
 ### Stage P-2 RunPodAdapter
-真实金路径:最小实例 provision → terminate + 计费停确认;随后一次完整实战 —— 由一份真实 TrainingConfig 驱动,0.5B 短训全自动:开机 → 训练(S3 后端)→ 收货 → 销毁。
+真实金路径:最小实例 provision → terminate + DELETE/原始实例列表归零确认;厂商 billing 记录在删除后 +1h/+6h 异步补采,不阻塞安全放行。随后一次完整实战 —— 由一份真实 TrainingConfig 驱动,0.5B 短训全自动:开机 → 训练(S3 后端)→ 收货 → 销毁。
 **DoD**:全程零人工介入(批准点击之后);审计与成本记录完整;孤儿收割器演练通过。
 
 ### Stage P-3 NebiusAdapter

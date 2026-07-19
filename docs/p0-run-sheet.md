@@ -2499,6 +2499,29 @@ commit and push.
 - [ ] Approval-driven 0.5B/100-step S3-only run, final SHA inventory and billing-stop receipt.
 - [ ] Tag `provisioner-p2-live` only after all three paid gates pass — correctly not created.
 
+# v0.28.2 P-2 termination-gate correction — 2026-07-19
+
+Owner correction: synchronous provider teardown is proven by (a) accepted
+DELETE and (b) a fresh raw `GET /pods` list containing zero names beginning
+`vf-auto-`. Billing is supporting evidence collected once at deletion `+1h`
+and once at `+6h`; it does not block later P-2 stages or the semantic tag.
+
+- [x] Read-only preflight: account pod count `8`; raw `vf-auto-*` count `0`;
+  historical gold `r6zizmfp8faklt` reads absent. No provider state changed.
+- [x] Approval `42436bb4c4a144d8980aa886fbb7b14f` remains unbound and resolves
+  to the approved 0.5B / 100-step / k=8 / checkpoint-50 / RunPod / `$5` config.
+- [ ] Land and test the corrected deletion, resume, accounting and billing
+  reconciliation semantics.
+- [ ] Resume the historical gold proof without creating a second gold pod.
+- [ ] Run and safely reap the live orphan probe.
+- [ ] Complete and collect the approval-driven 100-step S3-only run.
+- [ ] Commit the sanitized evidence and create `provisioner-p2-live`.
+- [ ] Append the `+1h` and `+6h` billing reconciliation results when due.
+
+Hard stops remain: raw prefix residue, target still present, identity mismatch,
+budget/runtime fuse, incomplete S3 objects or SHA mismatch. Billing delay alone
+is no longer a hard stop.
+
 ## 2026-07-19 v0.28.1 — v1 reviewer narrative refresh
 
 - [x] Reserved the docs-only patch and every affected area document before
