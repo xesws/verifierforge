@@ -62,6 +62,8 @@ MODEL_ID = "Qwen/Qwen2.5-0.5B-Instruct"
 TRAINING_POLL_SECONDS = 300
 SSH_READY_TIMEOUT_SECONDS = 15 * 60
 CLEANUP_SLA_SECONDS = 30 * 60
+P2_LIVE_ATTEMPT_STOP_USD = 4.5
+P2_ATTEMPT_RESERVATION_USD = 0.5
 
 
 class LiveExecutionError(RuntimeError):
@@ -186,6 +188,7 @@ async def execute_live(
             retry_root_external_id = admission.root_external_id
             wave_estimated_cost = admission.prior_estimated_cost_usd
             _check_wave_budget(wave_estimated_cost)
+            _check_live_attempt_headroom(wave_estimated_cost)
             _assert_clean_s3_prefix(
                 _s3_client(),
                 bucket=os.environ["VF_S3_BUCKET"],
@@ -776,9 +779,9 @@ async def _full_training(
             if current.state in {ProvisionState.FAILED, ProvisionState.TERMINATED}:
                 cleanup_trigger = time.monotonic()
                 raise LiveExecutionError(f"RunPod terminated during training: {current.detail}")
-            if prior_estimated_cost + current.cost_accrued_usd >= P2_WAVE_BUDGET_USD:
+            if prior_estimated_cost + current.cost_accrued_usd >= P2_LIVE_ATTEMPT_STOP_USD:
                 cleanup_trigger = time.monotonic()
-                raise LiveExecutionError("P2 wave budget fuse reached")
+                raise LiveExecutionError("P2 $4.5 live-attempt stop fuse reached")
             if current.uptime_min >= P2_MAX_RUNTIME_MIN:
                 cleanup_trigger = time.monotonic()
                 raise LiveExecutionError("P2 runtime fuse reached")
@@ -1150,6 +1153,16 @@ def _check_wave_budget(value: float) -> None:
     if value >= P2_WAVE_BUDGET_USD:
         raise LiveExecutionError(
             f"P2 wave budget reached: ${value:.4f} >= ${P2_WAVE_BUDGET_USD:.2f}"
+        )
+
+
+def _check_live_attempt_headroom(value: float) -> None:
+    projected = value + P2_ATTEMPT_RESERVATION_USD
+    if projected >= P2_LIVE_ATTEMPT_STOP_USD:
+        raise LiveExecutionError(
+            "P2 fifth attempt refused: "
+            f"${value:.4f} + ${P2_ATTEMPT_RESERVATION_USD:.2f} reservation "
+            f">= ${P2_LIVE_ATTEMPT_STOP_USD:.2f} stop threshold"
         )
 
 

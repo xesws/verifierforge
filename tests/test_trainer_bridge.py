@@ -131,6 +131,117 @@ def test_checkpoint_bridge_refuses_publication_when_serving_gate_fails(tmp_path:
     assert native.is_dir()
 
 
+def test_post_training_bridge_stores_candidate_without_running_gate(tmp_path: Path) -> None:
+    storage = LocalStorage(tmp_path / "runs")
+    staging = tmp_path / "staging"
+    native = _write_native_checkpoint(staging, 50)
+    (staging / "latest_checkpointed_iteration.txt").write_text("50", encoding="utf-8")
+
+    def forbidden_gate(*_args: object, **_kwargs: object) -> None:
+        raise AssertionError("training-time candidate must not start vLLM")
+
+    bridge = CheckpointBridge(
+        storage,
+        "grpo-job",
+        staging,
+        serving_gate=forbidden_gate,
+        serving_gate_timing="post_training",
+    )
+
+    assert bridge.publish_available() == [50]
+    assert bridge.has_candidate(50) is True
+    assert storage.checkpoint_paths("grpo-job") == []
+    candidate = storage.root / "grpo-job" / "artifacts" / "candidate-checkpoints" / "step_50"
+    assert (candidate / "global_step_50" / "data.pt").is_file()
+    assert not native.exists()
+
+
+def test_post_training_bridge_gates_selected_candidate_before_publication(tmp_path: Path) -> None:
+    storage = LocalStorage(tmp_path / "runs")
+    staging = tmp_path / "staging"
+    _write_native_checkpoint(staging, 100)
+    (staging / "latest_checkpointed_iteration.txt").write_text("100", encoding="utf-8")
+    calls: list[str] = []
+
+    def passing_gate(path: Path, **kwargs: object) -> None:
+        assert path.name == "global_step_100"
+        assert storage.checkpoint_paths("grpo-job") == []
+        calls.append("gate")
+        evidence = Path(str(kwargs["evidence_path"]))
+        evidence.parent.mkdir(parents=True, exist_ok=True)
+        evidence.write_text('{"status":"completed"}\n', encoding="utf-8")
+
+    bridge = CheckpointBridge(
+        storage,
+        "grpo-job",
+        staging,
+        serving_gate=passing_gate,
+        serving_gate_timing="post_training",
+    )
+    assert bridge.publish_available() == [100]
+
+    restarted = CheckpointBridge(
+        storage,
+        "grpo-job",
+        tmp_path / "finalizer",
+        serving_gate=passing_gate,
+        serving_gate_timing="post_training",
+    )
+    checkpoint = restarted.finalize_candidate(100)
+
+    assert calls == ["gate"]
+    assert checkpoint.name == "step_100"
+    assert (checkpoint / "global_step_100" / "data.pt").is_file()
+    assert (
+        storage.root
+        / "grpo-job"
+        / "artifacts"
+        / "serveability"
+        / "step_100.json"
+    ).is_file()
+
+
+def test_post_training_failed_gate_leaves_candidate_unpublished(tmp_path: Path) -> None:
+    storage = LocalStorage(tmp_path / "runs")
+    staging = tmp_path / "staging"
+    _write_native_checkpoint(staging, 100)
+    (staging / "latest_checkpointed_iteration.txt").write_text("100", encoding="utf-8")
+
+    bridge = CheckpointBridge(
+        storage,
+        "grpo-job",
+        staging,
+        serving_gate=_passing_serving_gate,
+        serving_gate_timing="post_training",
+    )
+    assert bridge.publish_available() == [100]
+
+    def failing_gate(*_args: object, **kwargs: object) -> None:
+        evidence = Path(str(kwargs["evidence_path"]))
+        evidence.parent.mkdir(parents=True, exist_ok=True)
+        evidence.write_text('{"status":"failed"}\n', encoding="utf-8")
+        raise RuntimeError("exclusive serving smoke failed")
+
+    finalizer = CheckpointBridge(
+        storage,
+        "grpo-job",
+        tmp_path / "finalizer",
+        serving_gate=failing_gate,
+        serving_gate_timing="post_training",
+    )
+    with pytest.raises(CheckpointPublicationError, match="exclusive serving smoke failed"):
+        finalizer.finalize_candidate(100)
+
+    assert storage.checkpoint_paths("grpo-job") == []
+    assert (
+        storage.root
+        / "grpo-job"
+        / "artifacts"
+        / "candidate-checkpoints"
+        / "step_100"
+    ).is_dir()
+
+
 def test_checkpoint_retention_keeps_all_hf_exports_but_only_latest_native(tmp_path: Path) -> None:
     storage = LocalStorage(tmp_path / "runs")
     staging = tmp_path / "staging"

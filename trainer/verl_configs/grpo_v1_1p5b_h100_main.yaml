@@ -20,3 +20,4 @@ dataset_mode: frozen_training_pool
 reward_mode: verifier
 save_hf_model: true
 entropy_brake: true
+serving_gate_timing: per_checkpoint

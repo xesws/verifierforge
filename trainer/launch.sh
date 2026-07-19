@@ -23,8 +23,17 @@ case "$cfg" in
   fake_smoke)
     exec "$python" -m trainer.fake_train --job "$job" --steps 150 --interval 2
     ;;
-  grpo_v1_0p5b|grpo_v1_0p5b_p2)
+  grpo_v1_0p5b)
     exec "$python" -m trainer.grpo_train --job "$job" --config "$cfg"
+    ;;
+  grpo_v1_0p5b_p2)
+    "$python" -m trainer.grpo_train --job "$job" --config "$cfg"
+    ray_executable="$(dirname "$python")/ray"
+    if [[ ! -x "$ray_executable" ]]; then
+      ray_executable="$(command -v ray)"
+    fi
+    "$ray_executable" stop --force
+    exec "$python" -m trainer.finalize_checkpoint --job "$job" --config "$cfg"
     ;;
   grpo_v1_0p5b_preflight)
     exec "$python" -m trainer.grpo_train --job "$job" --config grpo_v1_0p5b --steps 2

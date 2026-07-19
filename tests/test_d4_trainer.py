@@ -66,6 +66,7 @@ def test_p2_profile_is_frozen_s3_delivery_shape() -> None:
     assert config.dataset_mode == "frozen_training_pool"
     assert config.reward_function_name == "compute_score"
     assert config.save_hf_model is True
+    assert config.serving_gate_timing == "post_training"
 
 
 def test_frozen_training_mode_uses_all_pool_rows_and_no_heldout(monkeypatch, tmp_path: Path) -> None:

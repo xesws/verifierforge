@@ -8,6 +8,7 @@ from moto import mock_aws
 
 from core.storage.local import LocalStorage
 from core.storage.s3 import S3Storage
+from trainer.checkpoint_bridge import CheckpointBridge
 
 
 @pytest.fixture
@@ -28,6 +29,18 @@ def _storage(tmp_path: Path, client) -> S3Storage:
         cache_root=tmp_path / "cache",
         client=client,
     )
+
+
+def _native_checkpoint(root: Path, step: int) -> Path:
+    native = root / f"global_step_{step}"
+    actor = native / "actor"
+    hf = actor / "huggingface"
+    hf.mkdir(parents=True)
+    (native / "data.pt").write_bytes(b"data")
+    (actor / "model_world_size_1_rank_0.pt").write_bytes(b"model")
+    (actor / "optim_world_size_1_rank_0.pt").write_bytes(b"optim")
+    (hf / "model.safetensors").write_bytes(b"hf")
+    return native
 
 
 def test_s3_checkpoint_publish_overwrite_and_resume(tmp_path, s3_client):
@@ -126,6 +139,49 @@ def test_s3_cache_reconstruction_verifies_checkpoint_identity(tmp_path, s3_clien
 
     metrics_path = cache / "job-a" / "metrics.jsonl"
     assert [json.loads(line)["step"] for line in metrics_path.read_text(encoding="utf-8").splitlines()] == [1, 2]
+
+
+def test_s3_post_training_candidate_is_separate_until_service_gate(tmp_path, s3_client):
+    storage = _storage(tmp_path, s3_client)
+    staging = tmp_path / "staging"
+    _native_checkpoint(staging, 100)
+    (staging / "latest_checkpointed_iteration.txt").write_text("100", encoding="utf-8")
+
+    def passing_gate(_path: Path, **kwargs: object) -> None:
+        evidence = Path(str(kwargs["evidence_path"]))
+        evidence.parent.mkdir(parents=True, exist_ok=True)
+        evidence.write_text('{"status":"completed"}\n', encoding="utf-8")
+
+    bridge = CheckpointBridge(
+        storage,
+        "job-candidate",
+        staging,
+        serving_gate=passing_gate,
+        serving_gate_timing="post_training",
+    )
+    assert bridge.publish_available() == [100]
+    assert storage.checkpoint_paths("job-candidate") == []
+    candidate_key = (
+        "test-prefix/jobs/job-candidate/artifacts/"
+        "candidate-checkpoints/step_100.manifest.json"
+    )
+    candidate_manifest = json.loads(
+        s3_client.get_object(Bucket=storage.bucket, Key=candidate_key)["Body"].read()
+    )
+    assert candidate_manifest["files"]
+    assert all(len(item["sha256"]) == 64 for item in candidate_manifest["files"])
+
+    finalizer = CheckpointBridge(
+        storage,
+        "job-candidate",
+        tmp_path / "finalizer",
+        serving_gate=passing_gate,
+        serving_gate_timing="post_training",
+    )
+    published = finalizer.finalize_candidate(100)
+
+    assert published.name == "step_100"
+    assert storage.load_latest_checkpoint("job-candidate") is not None
 
 
 def test_local_storage_selects_s3_only_when_explicit(tmp_path, s3_client, monkeypatch):

@@ -17,6 +17,7 @@ from scripts.provision_runpod import (
     LiveExecutionError,
     _assert_clean_s3_prefix,
     _check_wave_budget,
+    _check_live_attempt_headroom,
     _confirm_deleted,
     _resume_full_path,
     _resume_gold_path,
@@ -521,3 +522,9 @@ def test_pending_billing_slots_are_idempotent_and_audited_once(tmp_path: Path) -
 def test_wave_budget_uses_estimate_even_while_billing_is_pending() -> None:
     with pytest.raises(LiveExecutionError, match="wave budget reached"):
         _check_wave_budget(5.0)
+
+
+def test_fifth_attempt_requires_half_dollar_headroom_below_4p5() -> None:
+    _check_live_attempt_headroom(3.99)
+    with pytest.raises(LiveExecutionError, match="fifth attempt refused"):
+        _check_live_attempt_headroom(4.0)

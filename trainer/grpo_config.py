@@ -63,6 +63,7 @@ class GrpoSmokeConfig:
     reward_mode: str
     save_hf_model: bool
     entropy_brake: bool
+    serving_gate_timing: str
 
     @classmethod
     def load(cls, name: str = "grpo_v1_0p5b") -> "GrpoSmokeConfig":
@@ -129,6 +130,10 @@ class GrpoSmokeConfig:
             raise ValueError("save_hf_model must be a boolean")
         if not isinstance(self.entropy_brake, bool):
             raise ValueError("entropy_brake must be a boolean")
+        if self.serving_gate_timing not in ("per_checkpoint", "post_training"):
+            raise ValueError(
+                "serving_gate_timing must be per_checkpoint or post_training"
+            )
 
     @property
     def checkpoint_save_contents(self) -> str:

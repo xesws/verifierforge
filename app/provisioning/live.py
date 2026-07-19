@@ -15,9 +15,13 @@ from core.agent_contracts import P2_BASE_MODEL, ProviderPreference, TrainingConf
 P2_CONFIG_NAME = "grpo_v1_0p5b_p2"
 P2_TOTAL_STEPS = 100
 P2_CHECKPOINT_STEP = 100
+P2_CANDIDATE_STEPS = (50, 100)
 P2_WAVE_BUDGET_USD = 5.0
 P2_MAX_RUNTIME_MIN = 180
 _METRIC_KEY = re.compile(r"/(\d{12})-[0-9a-f]+\.json$")
+_CANDIDATE_MANIFEST_KEY = re.compile(
+    r"/artifacts/candidate-checkpoints/step_(\d+)\.manifest\.json$"
+)
 
 
 @dataclass(frozen=True)
@@ -35,6 +39,11 @@ class P2S3Snapshot:
     final_model_ready: bool
     curve_ready: bool
     failure_ready: bool = False
+    candidate_steps: tuple[int, ...] = ()
+
+    @property
+    def candidates_ready(self) -> bool:
+        return set(P2_CANDIDATE_STEPS).issubset(self.candidate_steps)
 
     @property
     def complete(self) -> bool:
@@ -43,6 +52,7 @@ class P2S3Snapshot:
             and self.checkpoint_ready
             and self.final_model_ready
             and self.curve_ready
+            and self.candidates_ready
         )
 
 
@@ -87,6 +97,13 @@ class S3RunCollector:
         metric_keys = [key for key in self.list_keys(metric_prefix) if _METRIC_KEY.search(key)]
         steps = [int(_METRIC_KEY.search(key).group(1)) for key in metric_keys]
         keys = set(self.list_keys(f"{self.job_prefix}/"))
+        candidate_steps = tuple(
+            sorted(
+                int(match.group(1))
+                for key in keys
+                if (match := _CANDIDATE_MANIFEST_KEY.search(key)) is not None
+            )
+        )
         return P2S3Snapshot(
             latest_step=max(steps, default=0),
             metric_count=len(metric_keys),
@@ -97,6 +114,7 @@ class S3RunCollector:
                 f"{self.job_prefix}/artifacts/"
                 "checkpoint-publication-failure.json.manifest.json"
             ) in keys,
+            candidate_steps=candidate_steps,
         )
 
     def collect(self, destination: Path) -> dict[str, Any]:
@@ -136,6 +154,24 @@ class S3RunCollector:
                 raise RuntimeError(f"S3 checkpoint identity mismatch for {entry['key']!r}")
             identities[identity.key] = identity
 
+        candidate_manifests: list[dict[str, Any]] = []
+        for step in snapshot.candidate_steps:
+            manifest_key = (
+                f"{self.job_prefix}/artifacts/candidate-checkpoints/"
+                f"step_{step}.manifest.json"
+            )
+            manifest_body, manifest_identity = self._read_identity(manifest_key)
+            identities[manifest_key] = manifest_identity
+            manifest = json.loads(manifest_body)
+            entries = _manifest_files(manifest, manifest_key)
+            candidate_manifests.append(
+                {
+                    "step": step,
+                    "manifest": manifest_identity.__dict__,
+                    "files": entries,
+                }
+            )
+
         artifact_files: dict[str, str] = {}
         for name, target in (
             ("final/model.txt", destination / "model.txt"),
@@ -162,6 +198,7 @@ class S3RunCollector:
             "prefix": self.job_prefix,
             "snapshot": snapshot.__dict__,
             "objects": [identity.__dict__ for identity in sorted(identities.values(), key=lambda item: item.key)],
+            "candidate_manifests": candidate_manifests,
             "local_artifacts": artifact_files,
         }
         inventory_path = destination / "s3-inventory.json"
@@ -218,6 +255,7 @@ def tree_sha256(paths: Iterable[Path], *, root: Path) -> str:
 
 __all__ = [
     "P2_CHECKPOINT_STEP",
+    "P2_CANDIDATE_STEPS",
     "P2_CONFIG_NAME",
     "P2_MAX_RUNTIME_MIN",
     "P2_TOTAL_STEPS",

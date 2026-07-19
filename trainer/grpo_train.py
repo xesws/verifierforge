@@ -232,6 +232,7 @@ def run(
         staging_dir,
         lora_rank=config.lora_rank,
         lora_alpha=config.lora_alpha,
+        serving_gate_timing=config.serving_gate_timing,
     )
     if resume_path is not None:
         quarantined = checkpoint_bridge.prepare_resume()
@@ -382,6 +383,19 @@ def run(
         print(f"verl exited with status {return_code}; no final manifest was published", flush=True)
         return return_code
 
+    if config.serving_gate_timing == "post_training":
+        if not checkpoint_bridge.has_candidate(config.total_steps):
+            raise RuntimeError(
+                f"verl completed but Storage has no candidate through step {config.total_steps}; "
+                "refusing post-training finalization"
+            )
+        print(
+            f"Training completed for {job_id}; candidate step_{config.total_steps} "
+            "awaits the post-training serving gate",
+            flush=True,
+        )
+        return 0
+
     final_checkpoint = latest_storage_resume_path(storage, job_id)
     if final_checkpoint is None or _native_step(final_checkpoint) < config.total_steps:
         raise RuntimeError(
@@ -405,7 +419,12 @@ def _drain_bridges(
             flush=True,
         )
     for step in checkpoint_bridge.publish_available():
-        print(f"Published Storage checkpoint step_{step}", flush=True)
+        action = (
+            "Stored candidate checkpoint"
+            if checkpoint_bridge.serving_gate_timing == "post_training"
+            else "Published Storage checkpoint"
+        )
+        print(f"{action} step_{step}", flush=True)
     return metrics
 
 

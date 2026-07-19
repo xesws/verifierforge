@@ -2621,13 +2621,13 @@ skipped`; final raw account prefix count: `0`.
 
 - [x] Reserve the patch and write version, model-trainer, infrastructure and
   run-sheet intent before implementation.
-- [ ] Store step-50/100 training outputs as atomic candidate artifacts with
+- [x] Store step-50/100 training outputs as atomic candidate artifacts with
   file SHA manifests; candidates must remain invisible to published-checkpoint
   discovery and lifecycle completion.
-- [ ] After the verl process exits successfully, stop Ray, materialize selected
+- [x] After the verl process exits successfully, stop Ray, materialize selected
   step 100 in a separate finalizer, run unchanged conversion plus vLLM models /
   real-completion checks, then and only then publish checkpoint/final artifacts.
-- [ ] Prove the timing and fail-closed invariant in focused/full tests; push a
+- [x] Prove the timing and fail-closed invariant in focused/full tests; push a
   clean revision before paid execution.
 - [ ] Admit and run exactly one fresh `-r5` attempt while conservative cumulative
   spend remains below `$4.5`; monitor no more frequently than every five minutes.
@@ -2645,6 +2645,19 @@ sixth run and do not create the tag.
 during training must use pause-verify: stop trainer, release GPU, test, then
 resume from Storage. It must never reintroduce concurrent same-GPU trainer and
 serving processes.
+
+Implementation result: P-2's YAML explicitly selects `post_training`; all
+other profiles retain `per_checkpoint`. Training-time candidate directories
+are stored through the existing atomic artifact path, whose S3 manifest holds
+every file name, size and SHA-256. The P-2 collector requires candidates 50 and
+100 in addition to the service-accepted published step 100. The shell waits for
+`trainer.grpo_train` to exit, runs `ray stop --force`, then starts the separate
+`trainer.finalize_checkpoint` process. Unexpected materialization/final-artifact
+errors also publish the existing failure artifact, so the controller cannot
+poll a dead tmux until its runtime fuse. Focused validation: `53 passed`; full
+validation: `411 passed, 1 skipped`; shell syntax, compile and diff checks
+passed. The only secret-scan match is the deliberate sanitizer fixture in
+`tests/test_import_legacy_database.py`.
 
 ## 2026-07-19 v0.28.1 — v1 reviewer narrative refresh
 
