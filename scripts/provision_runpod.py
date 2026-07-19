@@ -342,12 +342,16 @@ async def _resume_full_path(
         carried_estimated_cost = 0.0
     else:
         retry_created = selected["training.retry-created"]
+        immediate_previous_external_id = str(retry_created.get("retry_of") or "")
         root_external_id = str(
-            retry_created.get("approval_root") or retry_created.get("retry_of") or ""
+            retry_created.get("approval_root") or immediate_previous_external_id
         )
         admitted = selected["training.retry-admitted"]
-        if admitted.get("previous_external_id") != root_external_id:
-            raise LiveExecutionError("full-run retry chain does not return to the bound root")
+        if (
+            not immediate_previous_external_id
+            or admitted.get("previous_external_id") != immediate_previous_external_id
+        ):
+            raise LiveExecutionError("full-run retry chain does not match the previous handle")
         try:
             carried_estimated_cost = float(admitted["prior_estimated_cost_usd"])
         except (KeyError, TypeError, ValueError) as error:

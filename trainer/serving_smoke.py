@@ -62,7 +62,7 @@ class _ServerHandle:
 
 ServerLauncher = Callable[[Path, int, str, Path], _ServerHandle]
 RequestJson = Callable[[str, Mapping[str, Any] | None], tuple[int, dict[str, Any]]]
-SERVING_SMOKE_GPU_MEMORY_UTILIZATION = 0.90
+SERVING_SMOKE_GPU_MEMORY_UTILIZATION = 0.70
 
 
 def validate_checkpoint_for_serving(

@@ -2593,12 +2593,17 @@ created by validation.
 
 - [x] Reserve the patch and affected trainer/provisioner/infrastructure docs
   before code.
-- [ ] Set serving smoke to 0.70 and generalize chained retry validation so
+- [x] Set serving smoke to 0.70 and generalize chained retry validation so
   immediate previous handle and immutable approval root are checked separately.
-- [ ] Run focused/full tests, real-evidence admission, secret scan, prefix-zero
+- [x] Run focused/full tests, real-evidence admission, secret scan, prefix-zero
   and empty `-r4` preflights; commit and push before provider create.
 - [ ] Run one clean `-r4` full stage. On success collect/delete/tag; on any
   failure delete, record evidence and stop without a fifth attempt.
+
+Pre-live result: focused `42 passed`; complete `403 passed, 1 skipped`.
+Real-evidence admission resolved previous `wuvk037vks2c57`, root
+`iqen85eumbjcld`, job suffix `-r4`, cumulative conservative reservation
+`$1.688479`, raw prefix zero and an empty `-r4` S3 prefix.
 
 ## 2026-07-19 v0.28.1 — v1 reviewer narrative refresh
 

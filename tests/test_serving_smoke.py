@@ -136,7 +136,7 @@ def test_vllm_command_reserves_memory_above_the_resident_trainer() -> None:
     )
 
     option = command.index("--gpu-memory-utilization")
-    assert command[option + 1] == "0.90"
+    assert command[option + 1] == "0.70"
     assert "--enforce-eager" in command
     assert command[command.index("--max-model-len") + 1] == "64"
     assert command[command.index("--max-num-seqs") + 1] == "1"
