@@ -2559,6 +2559,28 @@ The tracked secret scan found only the intentional, constructed sanitizer test
 fixture and no credential value. No provider resource was created by this
 implementation/test wave.
 
+## 2026-07-19 v0.28.3 — P-2 serving-smoke memory correction
+
+- [x] Preserve the v0.28.2 failure: retry pod `33rpq7bee28z9f` reached 49
+  published metrics and completed its step-50 native export. Conversion of the
+  single `model.safetensors` succeeded and vLLM loaded 0.927 GiB.
+- [x] Capture the decisive error before cleanup: with the paused trainer still
+  resident and serving smoke capped at 0.10, vLLM logged `Available KV cache
+  memory: -5.32 GiB` then `ValueError: No available memory for the cache
+  blocks`. This is a serving-gate resource ceiling, not a model/export failure.
+- [x] Delete the failed retry: target absent, raw `vf-auto-*` count `0`;
+  lifecycle closed with `training.terminated` and billing reconciliation
+  remains asynchronous.
+- [ ] Raise the loopback smoke ceiling to bounded 0.90, retain complete root
+  cause evidence, and detect the remote S3 failure artifact in the controller.
+- [ ] Validate a chained, immutable-binding `-r3` admission with cumulative
+  conservative spend and a clean S3 prefix; run full regression and push.
+- [ ] Run the one final 100-step full stage; collect/verify/delete, close the
+  P-2 DoD, tag `provisioner-p2-live`, and leave delayed billing follow-ups.
+
+Stop conditions: the prior P-2 redlines plus any failure of `-r3`. There is no
+fourth attempt. Monitoring cadence remains five minutes.
+
 ## 2026-07-19 v0.28.1 — v1 reviewer narrative refresh
 
 - [x] Reserved the docs-only patch and every affected area document before
