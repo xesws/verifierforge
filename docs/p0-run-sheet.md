@@ -2498,3 +2498,23 @@ commit and push.
 - [ ] Live orphan-reaper proof.
 - [ ] Approval-driven 0.5B/100-step S3-only run, final SHA inventory and billing-stop receipt.
 - [ ] Tag `provisioner-p2-live` only after all three paid gates pass — correctly not created.
+
+## 2026-07-19 v0.28.1 — v1 reviewer narrative refresh
+
+- [x] Reserved the docs-only patch and every affected area document before
+  editing reviewer-facing files (`0facd49`).
+- [x] Reconciled README, Devpost, the exact three-minute video script, JUDGES
+  and the external development record against committed evidence: D4 held-out
+  `0.5833→0.7833`, Gate C `1.0/1.0/0/1.0`, real source→forge→approval,
+  Supabase cutover, and public 120/80 canary with Guardian 0.85.
+- [x] Removed the stale “public endpoint unavailable” claim while retaining
+  that the Cloudflare quick tunnel was ephemeral. Added the P-2 billing-row
+  blocker and absence of `provisioner-p2-live` everywhere it affects scope.
+- [x] Added the video highlight: Discover → Input → Analyze → GPT-5.6 Luna
+  rationale/config → Approve. Approval records intent and does not launch a GPU
+  from the web request.
+- [x] Executed both documented zero-cost paths: artifact sandbox returned two
+  jobs and 400 main metrics; mock Agent Discover served 95,000 monthly calls
+  and $5,500 monthly cost. Relative links all exist.
+- [x] Validation: `383 passed, 1 skipped`; secret scan, shell syntax and
+  `git diff --check` passed. No model, GPU or provider call occurred.

@@ -1,7 +1,8 @@
 # VerifierForge judge path (under ten minutes)
 
-This path inspects the real FastAPI routes against committed D4 evidence. It
-needs Python 3.11+ but no GPU, model weights, cloud account, or API key.
+This path inspects committed evidence and the real product surface with
+deterministic local bindings. It needs Python 3.11+ but no GPU, model weights,
+cloud account, API key, or paid request.
 
 ## 1. Install and verify (about 3 minutes)
 
@@ -10,69 +11,94 @@ python -m pip install -r requirements-app.txt
 pytest -q
 ```
 
-Expected current result: `246 passed, 1 skipped` (the optional live-S3 test is
-skipped without explicit credentials).
+Expected at this revision: `383 passed, 1 skipped`. The skip is the explicitly
+credential-gated live S3 test.
 
-## 2. Start the one-command reviewer sandbox (about 1 minute)
+## 2. Start the reviewer sandbox (about 1 minute)
 
 ```bash
 bash scripts/start_reviewer_sandbox.sh
 ```
 
-It opens only loopback endpoints and keeps running until you press Ctrl-C:
+It binds only loopback and runs until Ctrl-C:
 
 ```text
 API:   http://127.0.0.1:8012/docs
 Proxy: http://127.0.0.1:8013/v1/chat/completions
 ```
 
-The API serves committed immutable evidence; the proxy is deterministic fake
-mode, so this path needs no API key or model-provider request.
+The API reads immutable committed evidence; the proxy uses a deterministic fake
+upstream.
 
-## 3. Inspect the immutable evidence (about 1 minute)
-
-In one terminal:
+## 3. Inspect the training result (about 2 minutes)
 
 ```bash
 curl http://127.0.0.1:8012/jobs
 curl http://127.0.0.1:8012/jobs/d4-m3-1p5b-r1-v0125/metrics
 curl http://127.0.0.1:8012/jobs/d4-m3-1p5b-r1-v0125
+cat data/demo-artifacts/manifest.json
 ```
 
-The selected main job is `d4-m3-1p5b-r1-v0125`; the control is
-`d4-m4-0p5b-random-v0126`. Artifact mode validates the same Pydantic shapes as
-the local-runs API and rejects route mutation rather than pretending the demo
-is live state.
+The 60-row held-out report records pass@1 `0.5833 → 0.7833`, pass@8
+`0.7667 → 0.9000`, and selected step 350. The companion job
+`d4-m4-0p5b-random-v0126` is the 0.5B random-reward control.
 
-## 4. Check the result and provenance (about 3 minutes)
+Verify the main public metric bytes:
 
 ```bash
-cat data/demo-artifacts/manifest.json
 shasum -a 256 data/demo-artifacts/jobs/d4-m3-1p5b-r1-v0125/metrics.jsonl
 ```
 
-The manifest records held-out pass@1 `0.5833 → 0.7833`, pass@8
-`0.7667 → 0.9000`, and the main metrics SHA-256
+Expected SHA-256:
 `be3fdb965dc72a2333761a8f50181053af3c4b5355e83624c3784b6be30cd433`.
-The 0.5B random-reward control JSONL is included next to it.
 
-## 5. Inspect the engineering claims (about 3 minutes)
+## 4. Demo Discover → Agent → approval locally (about 2 minutes)
 
-- [`README.md`](README.md) explains the system boundary and limitations.
-- [`docs/dev_doc_v0.md`](docs/dev_doc_v0.md) is the external design/evidence
-  record; [`docs/p0-run-sheet.md`](docs/p0-run-sheet.md) is the detailed live
-  operational history.
-- [`core/rewards/nl2sql.py`](core/rewards/nl2sql.py) contains the executable
-  tiered verifier.
-- [`core/storage/s3.py`](core/storage/s3.py) and
-  [`tests/test_s3_storage.py`](tests/test_s3_storage.py) show manifest-last
-  S3 publication and its contract tests.
+In a separate terminal, run the real API/UI with the deterministic Agent
+binding and an isolated SQLite file:
+
+```bash
+VF_AGENT_ENABLED=true \
+VF_AGENT_BINDING=mock \
+VF_DB_BACKEND=sqlite \
+VF_PROXY_DB_PATH=./runs/judges-agent.sqlite3 \
+python -m uvicorn app.api.main:app --host 127.0.0.1 --port 8014
+```
+
+Open `http://127.0.0.1:8014/discover`. On **Data Pull SQL**:
+
+1. inspect `95,000 SQL queries/month` and `$5,500/month`;
+2. click **Input**, keep the default repository source, and confirm;
+3. click **Analyze** to see the mock-bound decision, rationale and config;
+4. click **Approve & Forge** and observe the durable approval receipt.
+
+This UI path is structurally real but intentionally zero-cost. The separate
+live Gate C evidence is `1.0 / 1.0 / 0 / 1.0` under tag
+`agent-gate-c-pass`; the production source/decision/approval record is in
+[`docs/p0-run-sheet.md`](docs/p0-run-sheet.md). Approval writes intent only—it
+does not launch a GPU from the browser.
+
+## 5. Inspect delivery and persistence evidence (about 2 minutes)
+
+```bash
+cat assets/lane-a-v0.22.5-public-proof.json
+cat assets/lane-a-v0.22.5-canary-summary.json
+git tag --list '*complete' 'agent-gate-c-pass' 'lane-a-closeout'
+```
+
+The ephemeral public proof returned `SELECT name FROM users;`. The 200-request
+run produced 120 default / 80 tuned, Guardian final `0.85`; canary zero then
+produced 20 default / 0 tuned. `db-1-complete`, `db-2-complete`, and
+`db-3-complete` mark repository extraction, Supabase cutover, and credential
+hardening.
 
 ## Honest boundary
 
-The repository intentionally does not include weights, credentials, or a paid
-provider dependency. The selected export passed local and public vLLM proofs;
-a 200-request canary produced 120 default / 80 tuned with final Guardian
-LivePassRate 0.85, then a zero-canary proof produced 20 default / 0 tuned. The
-public quick-tunnel URL is ephemeral, so the artifact route above remains the
-stable review surface.
+- One NL→SQL vertical is not a broad benchmark.
+- The public endpoint was a temporary Cloudflare quick tunnel, not an SLA.
+- Forge Agent remains default-off despite passing Gate C.
+- P-2 created, reached, and deleted a real gold pod, but the RunPod billing API
+  returned no row within 15 minutes. The orphan/training phases did not run and
+  `provisioner-p2-live` is correctly absent.
+- The repository contains no weights, credentials, raw traffic bodies, or
+  requirement for a paid provider during review.

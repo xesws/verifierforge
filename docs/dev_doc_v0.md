@@ -1,142 +1,172 @@
-# VerifierForge v0 — external development document
+# VerifierForge v1 prototype — external development record
 
-**Status:** delivery evidence through D5 infrastructure work, 2026-07-17.
-Operational detail and live stop conditions are maintained in
-[`p0-run-sheet.md`](p0-run-sheet.md); this document is the public-facing design
-and evidence record.
+**Status:** evidence through Forge Agent, Supabase, public canary, and P-2
+adapter implementation, 2026-07-19. The detailed operational ledger is
+[`p0-run-sheet.md`](p0-run-sheet.md).
 
-## Purpose
+## Product thesis
 
-VerifierForge is a small-system pattern for verifier-backed reinforcement
-learning. It separates three concerns that are often blurred together:
+VerifierForge is a controlled path from repeated production traffic to a
+smaller task model. It separates five authorities:
 
-1. a programmatic verifier defines success;
-2. a disposable GPU worker produces candidate training state; and
-3. a durable, inspectable control plane retains evidence and allows recovery.
+1. traffic metadata establishes demand and economics;
+2. a programmatic verifier defines success;
+3. a bounded advisory Agent recommends `forge`, `skip`, or `need_more_data`;
+4. a human approval authorizes a concrete configuration; and
+5. held-out evidence—not the training curve—decides whether a model ships.
 
-The v0 implementation is intentionally narrow: NL→SQL is the first vertical,
-the verifier is SQLite-backed, and the product surface is a FastAPI API/proxy
-with a reversible routing switch. The aim is to show a credible end-to-end
-engineering loop, not to claim a general language-model benchmark.
+The proved vertical is NL→SQL. This is a credible narrow system, not a claim
+that every task is verifiable or every small model should be fine-tuned.
 
 ## Architecture
 
 ```text
-                  ┌────────────────────────────────────┐
-                  │ Laptop / review host                │
-                  │ FastAPI · proxy · verifier · docs   │
-                  └───────────────┬────────────────────┘
-                                  SSH
-                                  ▼
-                  ┌────────────────────────────────────┐
-                  │ Disposable GPU worker               │
-                  │ verl GRPO · vLLM rollout · tmux     │
-                  └───────────────┬────────────────────┘
-                                  Storage
-                    ┌─────────────┴─────────────┐
-                    ▼                           ▼
-             LocalStorage                  S3Storage
-             (default)                 (durable proof)
+Client ──▶ OpenAI-compatible proxy ──▶ default / tuned upstream
+                 │                           │
+                 ├── traffic metadata       └── sampled guardian
+                 ▼
+              Discover
+                 │ approved sample identity
+                 ▼
+       Forge Agent (read-only tools)
+                 │ strict decision
+                 ▼
+          human approval record
+                 │ separate execution seam
+                 ▼
+  provisioner ──▶ disposable verl/vLLM worker ──▶ Storage
+                 │                                 │
+                 └──────── audit / status ─────────┘
+
+SQLite (local) or Supabase Postgres stores product facts.
+S3 stores full Agent traces and durable training objects.
 ```
 
-The laptop is the development host and contains the principal Codex session.
-RunPod is a stateless compute executor driven over SSH. A worker can die
-without becoming the authoritative owner of metrics, evidence, or checkpoints.
-`scripts/vf` provides the deliberately small remote control plane:
-`bootstrap`, `train`, `watch`, `logs`, `status`, `kill`, and `model`.
+Pydantic v2 contracts protect product, Agent, provisioning and storage
+boundaries. The proxy never needs prompt bodies for clustering: it records a
+system-prompt hash, model, tokens, latency, estimated cost and selected route.
 
-## Stable interfaces
+## Discover, Agent and approval
 
-`core/contracts.py` supplies the frontend-facing job, metric, report, routing,
-and live-pass shapes. The storage boundary is equally small:
+Data Pull SQL is presented as 95,000 queries/month and $5,500/month. Because
+traffic storage is body-free, a user must confirm an approved repository sample
+source. The server accepts only a repository-relative JSONL path, recomputes its
+SHA-256 and row count, validates required NL→SQL fields, and stores identity
+metadata. The current source is a frozen 50-row pool.
 
-```python
-save_checkpoint(job_id, step, path)
-load_latest_checkpoint(job_id)
-append_metrics(job_id, record)
-put_artifact(job_id, name, path)
-get_artifact(job_id, name, dest)
+Forge Agent can call four tools: analyze traffic, inspect approved samples,
+estimate economics, and check verifiability. Tools are read-only, use strict
+input/output models and have deterministic mock bindings. The Runner enforces
+turn/token/time limits, an ordered dependency chain, a closed action space and
+strict terminal schema. It contains no provisioning/training handle.
+
+Live Gate C used the provider-listed `gpt-5.6-luna` via OpenAI Responses. The
+12-scenario final tuple was:
+
+```text
+decision_accuracy=1.0
+chain_success_rate=1.0
+illegal_action_count=0
+config_legality_rate=1.0
 ```
 
-Local storage publishes checkpoints through a temporary directory and rename;
-metrics are append-only JSONL. S3 storage uploads immutable generations and
-publishes one manifest object last. A reader considers only a manifest-published
-checkpoint resumable, so a truncated object set is never mistaken for state.
+The feature flag remains false by default. One real product Analyze with no
+approved source returned `need_more_data` at confidence 0.99. After human source
+approval, a fresh run returned `forge` at confidence 0.98 with the exact P2
+profile: Qwen2.5-0.5B, 100 steps, k=8, checkpoint 50, RunPod, budget at most $5.
+`Approve & Forge` then wrote an approval to Supabase. The web request did not
+start a GPU.
 
-## Verified development record
+## Verifier, freeze and training evidence
 
-| Milestone | Evidence |
-| --- | --- |
-| D1 remote loop | GPU-free fake trainer completed 150 tmux steps; rsynced metrics matched SHA-256; kill/resume retained append-only metrics. |
-| D2 GRPO smoke | Real 0.5B GRPO ran through the checkpoint bridge; `vf kill` and resume used Storage rather than transient staging. |
-| D3 freeze | Training pool (50), held-out evaluation set (60), and verifier version were frozen before main training. |
-| D4 main result | 1.5B step 350 was selected on held-out pass@1: `0.5833 → 0.7833`; pass@8: `0.7667 → 0.9000`; mixed fraction: `0.4667 → 0.4333`. A 0.5B random-reward control was also run. |
-| Serving compatibility | The converted step-350 HF export loaded under vLLM 0.10.2 after aligning `transformers==4.57.6`, `tokenizers==0.22.2`, and `huggingface_hub==0.36.2`; local `/v1/models` and an NL→SQL completion passed. |
-| S3 semantics | Moto validates all Storage operations; one real bucket restored a checkpoint by SHA, recovered 50 ordered metrics, and kept an intentionally interrupted upload invisible. |
+`NL2SQLVerifier` awards interpretable tiers for parseable SQL, successful
+execution against the supplied in-memory SQLite schema, and exact result-set
+match, with a length penalty. Candidate data is verifier-screened before the
+three-piece freeze: 50 training rows, 60 non-overlapping held-out rows, and the
+verifier source identity.
 
-The committed `data/demo-artifacts/` directory carries the review-safe D4
-metrics and held-out report. It contains no checkpoint weights or credentials.
-`VF_API_DATA_MODE=artifacts` exposes it through the real FastAPI routes.
+The main 1.5B GRPO run completed 400 steps; a 0.5B random-reward control ran 200
+steps. Eight checkpoints were evaluated on held-out data, and step 350 won by
+pass@1 (ties would choose the earlier step):
 
-## Verifier and evaluation workflow
+| Held-out metric (60 rows, k=8) | Before | Step 350 |
+| --- | ---: | ---: |
+| pass@1 | 0.5833 | 0.7833 |
+| pass@8 | 0.7667 | 0.9000 |
+| mixed fraction | 0.4667 | 0.4333 |
 
-The NL→SQL verifier gives tiered credit: syntactic parsing, successful SQLite
-execution against a supplied schema, then exact result-set match. The final
-score penalizes overly long completions. This produces interpretable partial
-reward while retaining an exact-success endpoint.
+The committed `data/demo-artifacts/` bundle contains metrics, report, control
+and per-file SHA identities, but no weights. `VF_API_DATA_MODE=artifacts`
+serves those bytes through the real API.
 
-The workflow is fixed in order:
+## Disposable compute and Storage
 
-1. construct or expand prompts and verifier-screen candidates;
-2. baseline sample with multiple completions per prompt;
-3. freeze train pool, held-out set, and verifier identity;
-4. train plus an independent random-reward control;
-5. select checkpoints only on held-out data; and
-6. preserve full sample-level evidence before making a report claim.
+The laptop owns development and orchestration. GPU nodes run detached tmux
+jobs and can die. `LocalStorage` uses append-only JSONL and atomic directory
+publication. `S3Storage` uploads immutable generations and publishes a manifest
+last; readers ignore every generation lacking that manifest. A real bucket
+round trip restored a checkpoint SHA, read 50 ordered metric records, and kept
+an interrupted upload invisible.
 
-The training pool is monitoring-only after freeze. The held-out 60 rows are the
-only basis for the `before`/`after` result above.
+The P-1 provisioner defines provider-neutral specs/status and a lifecycle from
+REQUESTED through TERMINATED/FAILED. Tests cover budget, concurrency, runtime,
+kill switch, orphan reap and audit fuses with a deterministic adapter.
 
-## Product traffic and routing
+P-2 adds a RunPod REST adapter and approval-driven executor. It manages only
+pods whose name begins `vf-auto-` and whose owner marker matches; Blackwell is
+blocked; S3 state and Git-bundle bootstrap keep pods disposable. Its live gold
+pod reached SSH and was deleted, but RunPod returned no billing-history row
+within the hard 15-minute gate. Therefore orphan and 100-step training proofs
+did not run, and `provisioner-p2-live` is absent.
 
-`app/proxy/` exposes an OpenAI-compatible transparent proxy. In development,
-the default upstream is deterministic `fake`, so product-path tests have no
-provider cost. It records request metadata in SQLite, clusters by system-prompt
-hash, and can route a configured cluster to a tuned target at a canary percent.
+## Database and security
 
-The guardian is a sidecar: sampled data-pull SQL replies receive the NL→SQL
-verifier and aggregate to `LivePassRate`. A scoring failure must not block a
-user request. The routing and live-pass API shapes are shared by the real API
-and mock server.
+All product facts use async SQLAlchemy repositories: traffic, clusters,
+routing, guardian/live points, jobs, Agent decisions, approvals, credentials
+and provisioning audits. SQLite is the zero-config default. With
+`VF_DB_BACKEND=postgres`, `SUPABASE_DB_URL` selects Supabase's pooler; there is
+no silent fallback after a database error.
 
-## Serving status and reproducibility
+Alembic owns the schema. The idempotent legacy importer reconciled row counts
+and canonical digests, and the product smoke passed against real Postgres.
+Provider credentials use Fernet with environment-only `VF_CRED_KEY`; database
+errors are sanitized; the CI secret scan rejects tracked environment files,
+private keys and common credential shapes.
 
-The verified serving stack is captured in `requirements-serve.txt`:
-vLLM 0.10.2, torch 2.8.0, Transformers 4.57.6, tokenizers 0.22.2, and
-huggingface_hub 0.36.2. A local L4 vLLM service loaded the selected step-350
-export and returned a real SQL completion.
+## Delivery evidence
 
-The public RunPod proxy hostname did not return bytes within 30 seconds during
-the delivery attempt. Therefore this document makes no live-public-endpoint or
-real-canary claim. The endpoint is left as an explicit owner-side exposure
-task, not hidden by a fake success.
+The selected serviceable step-350 export passed vLLM load and one real
+completion with the locked serving stack. RunPod's native port-8000 hostname
+returned 404 because the pod registered only port 8888. An outbound Cloudflare
+quick tunnel provided the bounded public proof instead:
 
-Run the reviewer-safe API locally:
+- official SDK response: `SELECT name FROM users;`;
+- 200 canary requests: 120 default / 80 tuned, 0 failures;
+- 13 new Guardian points, final LivePassRate 0.85; and
+- post-reset proof: 20 default / 0 tuned.
+
+The tunnel was ephemeral. The stable reviewer path is the committed artifact
+API, not an expired public hostname.
+
+## Reproduce the safe review surface
 
 ```bash
 python -m pip install -r requirements-app.txt
-VF_API_DATA_MODE=artifacts uvicorn app.api.main:app --reload
-curl http://127.0.0.1:8000/jobs
+pytest -q
+bash scripts/start_reviewer_sandbox.sh
 ```
 
-## Boundaries and follow-up work
+Then inspect `http://127.0.0.1:8012/docs` and follow
+[`JUDGES.md`](../JUDGES.md). No GPU, cloud credential, model weight, or paid LLM
+request is needed.
 
-v0 does not implement automatic rescheduling, spot-instance orchestration,
-cross-card FSDP recovery, a production model registry, or a broad benchmark.
-The S3 GPU node-loss demonstration is tracked in the run sheet and is not
-claimed complete until its 100-step kill/resume curve and object inventory are
-archived.
+## Explicit boundaries
 
-The next product work is intentionally mundane: expose the serving port,
-connect the existing proxy’s one environment-variable target to it, re-run the
-50% canary proof, and keep the switch at zero outside a recorded demonstration.
+- One NL→SQL task family is not a broad benchmark.
+- Forge Agent is default-off and advisory; approval is mandatory.
+- The public tunnel is not durable production hosting.
+- P-2 is implemented but has not passed billing/orphan/full-training DoD.
+- Product artifacts omit weights, credentials, raw traffic and paid-provider
+  dependencies.
+- Multi-node recovery, spot scheduling, Nebius, broad verifier templates and
+  button-triggered P-4 execution remain future work.

@@ -1,14 +1,15 @@
 # VerifierForge
 
-VerifierForge is a developer tool for improving small open models against a
-programmatic verifier, then proving that the improvement survives a held-out
-evaluation and operational handoff.
+VerifierForge turns production traffic with a programmatic success criterion
+into an evidence-backed small-model forge: Discover identifies a candidate,
+an audited Agent recommends whether to train, a human approves, and a
+disposable GPU path publishes results through durable storage.
 
-It is deliberately a narrow, inspectable system: a verifier is the source of
-truth; training nodes are disposable; metrics and checkpoints flow through a
-small Storage contract; and a routing/guardian layer makes a canary reversible.
+The v1 prototype is deliberately narrow and inspectable. NL→SQL is the proved
+vertical; the verifier is the source of truth; held-out data selects the model;
+and routing remains reversible.
 
-## What is real in this repository
+## What is proved in this repository
 
 The committed demo artifacts preserve the completed NL→SQL D4 result without
 shipping model weights:
@@ -23,37 +24,53 @@ The 0.5B random-reward control curve is included beside the main curve. It is a
 falsification reference, not proof that one training run establishes a general
 causal claim.
 
+Other completed gates are equally explicit:
+
+| Layer | Current evidence |
+| --- | --- |
+| Forge Agent | Live 12-scenario Gate C on `gpt-5.6-luna`: decision `1.0`, chain `1.0`, illegal actions `0`, config legality `1.0`; feature flag remains off by default. |
+| Product decision | A source-less production Analyze returned `need_more_data`; after a human-approved 50-row source, a fresh run returned `forge` at confidence `0.98` and created an approval in Supabase. |
+| Database | SQLite remains local default; the same async SQLAlchemy repositories and Alembic schema passed a real Supabase Postgres migration, reconciliation, and product smoke. |
+| Delivery | A public Cloudflare quick tunnel served the selected model; 200 canary requests split 120 default / 80 tuned and produced Guardian LivePassRate `0.85`, then canary zero sent 20 / 20 requests to default. |
+| Provisioning | Mock P-1 lifecycle/fuses pass. The P-2 RunPod adapter is implemented, but its live tag is withheld because a deleted gold pod produced no billing-history row within the 15-minute evidence deadline. |
+
 ## Architecture
 
 ```text
-Laptop / CI                         Disposable GPU worker
-───────────                         ─────────────────────
-FastAPI + proxy + verifier ─SSH──▶  verl GRPO + vLLM rollout
-     │                                      │
-     │  contracts / Storage                 │ append metrics, publish checkpoints
-     ▼                                      ▼
-Demo artifacts / local runs  ◀──────  LocalStorage or S3Storage
-     │
-     └── routing canary + sampled verifier guardian
+OpenAI-compatible traffic ──▶ proxy ──▶ default / tuned model
+          │                    │                │
+          ▼                    └── guardian ────┘
+   Discover clusters                 verifier score
+          │
+          ▼
+ Forge Agent (read-only tools) ──▶ human approval ──▶ provisioner
+          │                                               │
+          ▼                                               ▼
+ Supabase / SQLite                         disposable verl + vLLM worker
+                                                          │
+                                                          ▼
+                                        LocalStorage or manifest-last S3
 ```
 
-The laptop owns development and reviewable artifacts. A RunPod worker is an
-executor, not a source of truth: it may be replaced after a failure. Local
-Storage is the normal path; S3 Storage uses immutable object generations and a
-manifest-last publication boundary so an interrupted upload cannot become a
-resume checkpoint.
+Pydantic contracts sit at each boundary. Product metadata, decisions,
+approvals, routing, and audit events use one repository layer. Full Agent
+traces and training objects remain in S3. A GPU worker is an executor, never a
+source of truth.
 
-## Six-step workflow
+## Product workflow
 
-1. Define a task and a deterministic verifier with tiered scoring.
-2. Build and verifier-screen a candidate prompt set.
-3. Measure a baseline with multiple samples, then freeze data and verifier
-   identities before training.
-4. Train a small model and run a random-reward control under the same control
-   plane.
-5. Select checkpoints only on held-out data; retain sample-level evidence.
-6. Serve through an OpenAI-compatible endpoint, route a reversible canary, and
-   score sampled traffic in a non-blocking guardian.
+1. The proxy records hashes and usage metadata, not prompt bodies, then groups
+   a stable task cluster in Discover.
+2. A user confirms a repository sample source; the server recomputes its path,
+   row count and SHA-256.
+3. Forge Agent calls read-only traffic, sample, economics and verifiability
+   tools. Its only terminal actions are `forge`, `skip`, or `need_more_data`.
+4. `Approve & Forge` writes durable human intent. It does not hide a GPU side
+   effect inside the web request.
+5. The training path freezes data/verifier identity, runs the main job and a
+   random-reward control, and selects only on held-out evidence.
+6. The proxy canaries the tuned endpoint while a non-blocking guardian scores
+   sampled SQL output; setting canary to zero restores the default path.
 
 ## Quickstart
 
@@ -64,28 +81,31 @@ python -m pip install -r requirements-app.txt -r requirements-trainer.txt
 pytest -q
 ```
 
-Serve the committed, reviewer-safe D4 evidence without a GPU or cloud account:
+Start the reviewer-safe artifact API and deterministic fake proxy without a
+GPU, cloud account, or model-provider request:
 
 ```bash
-VF_API_DATA_MODE=artifacts uvicorn app.api.main:app --reload
-curl http://127.0.0.1:8000/jobs
-curl http://127.0.0.1:8000/jobs/d4-m3-1p5b-r1-v0125/metrics
+bash scripts/start_reviewer_sandbox.sh
+curl http://127.0.0.1:8012/jobs
+curl http://127.0.0.1:8012/jobs/d4-m3-1p5b-r1-v0125/metrics
 ```
 
-The default API mode reads ignored local `runs/`; artifact mode is deliberately
-read-only. For proxy development, use `VF_PROXY_UPSTREAM=fake`; it makes no
-network request. A disposable serving pod uses the direct, locked
-`requirements-serve.txt` environment and an ignored `VF_ENDPOINT_API_KEY`.
+Open `http://127.0.0.1:8012/docs` for the API. The optional mock Agent demo is
+documented in [JUDGES.md](JUDGES.md); it uses the real Discover UI and stores a
+decision/approval locally without a paid call.
 
-## Stateless-compute battle history
+## Engineering boundaries
 
-The project was built against disposable GPU nodes rather than treating a pod
-as a workstation. The control plane detaches jobs in tmux, records process
-groups for kill/recovery, and keeps checkpoint publication separate from
-transient verl staging. A real S3 round trip has already verified checkpoint
-SHA recovery, 50 append-only metrics, and invisible interrupted uploads. The
-separate GPU node-loss proof is recorded live in `docs/p0-run-sheet.md` rather
-than being claimed early here.
+The training control plane detaches jobs in tmux, records process groups for
+kill/recovery, and keeps checkpoint publication separate from transient verl
+staging. S3 uses immutable generations plus a manifest-last boundary; a real
+bucket proof restored a checkpoint SHA, 50 ordered metrics, and kept an
+interrupted upload invisible.
+
+Forge Agent is advisory. It has bounded turns/tokens/time, read-only tools,
+strict structured submission, and no provisioning or training handle. Gate C
+passed, but `VF_AGENT_ENABLED` stays false unless an operator opts in. The web
+approval remains a database write; the separate P-2 CLI is the execution seam.
 
 ## Database operations
 
@@ -120,17 +140,57 @@ python -m scripts.scan_secrets
 
 - The demonstrated quality result is one NL→SQL task family with 50 training
   rows and a 60-row held-out set; it is not a broad benchmark claim.
-- The public RunPod proxy endpoint was not reachable during the delivery test
-  (30-second timeout with zero bytes). Local vLLM serving passed, but public
-  canary/guardian claims are therefore intentionally absent.
-- S3 object semantics are tested and a true-bucket proof passed; automated
-  multi-node rescheduling, cross-card FSDP recovery, and spot orchestration are
-  explicitly out of scope.
+- The successful public model proof used an ephemeral Cloudflare quick tunnel,
+  not a durable production hostname or SLA.
+- P-1 provisioning is proved with a mock. P-2 created and deleted a real gold
+  pod, but RunPod returned no billing row within the declared 15-minute gate;
+  orphan and approval-driven training proofs therefore did not run and the
+  completion tag is absent.
+- Agent Gate C covers a frozen 12-scenario evaluator. It is not evidence that
+  arbitrary business traffic should auto-train; the flag remains default-off
+  and approval is required.
 - Demo artifacts exclude weights, checkpoints, credentials, raw traffic, and
   any paid-provider dependency.
 
 
 ## How we worked with Codex
+
+### 2026-07-18–19 — v0.18.0 through v0.28.0 product/infrastructure log
+
+1. **The product had evidence but no decision layer.** The human specified an
+   advisory Forge Agent with read-only tools, strict action space, a live Gate
+   C, and a default-off flag. Codex implemented the Responses-based tool loop,
+   discovered the valid Luna model from `/v1/models`, diagnosed the first Gate
+   C failures by scenario, and changed the general evidence hierarchy and
+   dependency binding rather than the thresholds. The final live tuple was
+   `1.0 / 1.0 / 0 / 1.0`; tag `agent-gate-c-pass` records it. A later real
+   product run first requested more data, then—after human approval of a
+   50-row source—recommended the exact P2 forge profile at confidence `0.98`.
+
+2. **SQLite-specific persistence had become the product foundation.** The
+   human chose Supabase/Postgres and required the default switch to remain an
+   owner action. Codex extracted async SQLAlchemy repositories, created the
+   Alembic schema and idempotent importer, then diagnosed test-time `.env`
+   mutation that accidentally leaked Postgres into SQLite fixtures. After
+   isolating settings, the migration, row/digest reconciliation and product
+   smoke passed; tags `db-1-complete`, `db-2-complete`, and `db-3-complete`
+   separate repository, cutover, and credential-hardening judgments.
+
+3. **A model that worked locally still lacked a public delivery proof.** The
+   RunPod-native port-8000 hostname returned 404 because the pod exposed only
+   8888. The human required a real public request and reversible canary; Codex
+   chose a Cloudflare quick tunnel as an explicit ephemeral fallback. The
+   official SDK returned `SELECT name FROM users;`; 200 requests split 120/80,
+   Guardian ended at `0.85`, and canary zero produced 20/0. This proves the
+   traffic path, not a permanent hosting SLA.
+
+4. **Real provisioning needed a fail-closed receipt.** The human set `$5`,
+   180-minute and cleanup limits and required create/status/delete/billing
+   before training. Codex implemented the REST adapter and approval-driven S3
+   executor. The first gold pod reached SSH and was deleted, but billing
+   history stayed empty for 15 minutes. Codex stopped without creating the
+   orphan or training pods and withheld `provisioner-p2-live`; implementation
+   success was not relabeled as operational completion.
 
 ### 2026-07-14 — v0.2.0 / v0.3.0 infrastructure log
 
