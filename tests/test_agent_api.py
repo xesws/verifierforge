@@ -123,6 +123,27 @@ def test_analyze_caches_identical_fingerprint_and_approval_is_idempotent(
     assert persisted.json() == approved.json()
 
 
+def test_force_refresh_bypasses_an_unchanged_cached_decision(
+    tmp_path: Path, monkeypatch
+) -> None:
+    monkeypatch.setenv("VF_AGENT_ENABLED", "true")
+    db_path = tmp_path / "traffic.db"
+    traces = MemoryTraceStore()
+    _install_services(monkeypatch, db_path, traces)
+    client = TestClient(app)
+
+    first = client.post("/clusters/data-pull-sql/agent/analyze")
+    refreshed = client.post(
+        "/clusters/data-pull-sql/agent/analyze",
+        json={"force_refresh": True},
+    )
+
+    assert first.status_code == refreshed.status_code == 200
+    assert first.json()["decision_id"] != refreshed.json()["decision_id"]
+    assert refreshed.json()["cached"] is False
+    assert len(traces.values) == 2
+
+
 def test_non_forge_decision_cannot_be_approved(tmp_path: Path, monkeypatch) -> None:
     monkeypatch.setenv("VF_AGENT_ENABLED", "true")
     db_path = tmp_path / "traffic.db"

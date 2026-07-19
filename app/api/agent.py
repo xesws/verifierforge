@@ -60,6 +60,7 @@ class AgentAnalyzeRequest(BaseModel):
 
     data_source: str | None = Field(default=None, min_length=1, max_length=2048)
     execution_profile: Literal["standard", "p2_gate_b"] = STANDARD_EXECUTION_PROFILE
+    force_refresh: bool = False
 
 
 class ApprovedSampleSourceRequest(BaseModel):
@@ -239,7 +240,11 @@ def analyze_cluster(
                 str(analysis["evidence_fingerprint"]), execution_profile
             ),
         )
-        if cached is not None and cached.decision is not None:
+        if (
+            not (request is not None and request.force_refresh)
+            and cached is not None
+            and cached.decision is not None
+        ):
             return _analysis_response(cached, cached=True)
         summary = ForgeAgentRunner(
             client=services.client,
