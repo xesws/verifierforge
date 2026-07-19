@@ -2575,8 +2575,10 @@ implementation/test wave.
   cause evidence, and detect the remote S3 failure artifact in the controller.
 - [x] Validate a chained, immutable-binding `-r3` admission with cumulative
   conservative spend and a clean S3 prefix; run full regression and push.
-- [ ] Run the one final 100-step full stage; collect/verify/delete, close the
-  P-2 DoD, tag `provisioner-p2-live`, and leave delayed billing follow-ups.
+- [x] Run the `-r3` full stage and stop on its serving failure. It reached 49
+  metrics, published no checkpoint, and was deleted automatically by the new
+  S3 failure detector. vLLM reported `Free memory on device (14.51/19.67 GiB)`
+  was below the 0.90 target `17.71 GiB`; target absent and raw prefix count 0.
 
 Stop conditions: the prior P-2 redlines plus any failure of `-r3`. There is no
 fourth attempt. Monitoring cadence remains five minutes.
@@ -2586,6 +2588,17 @@ passed, 1 skipped`. The read-only real-evidence admission resolved previous
 handle `33rpq7bee28z9f`, root binding `iqen85eumbjcld`, next job suffix `-r3`,
 and cumulative conservative reservation `$1.174772`. No provider resource was
 created by validation.
+
+## 2026-07-19 v0.28.4 — vLLM free-memory correction
+
+- [x] Reserve the patch and affected trainer/provisioner/infrastructure docs
+  before code.
+- [ ] Set serving smoke to 0.70 and generalize chained retry validation so
+  immediate previous handle and immutable approval root are checked separately.
+- [ ] Run focused/full tests, real-evidence admission, secret scan, prefix-zero
+  and empty `-r4` preflights; commit and push before provider create.
+- [ ] Run one clean `-r4` full stage. On success collect/delete/tag; on any
+  failure delete, record evidence and stop without a fifth attempt.
 
 ## 2026-07-19 v0.28.1 — v1 reviewer narrative refresh
 
