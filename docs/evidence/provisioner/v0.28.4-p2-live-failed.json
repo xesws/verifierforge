@@ -1,0 +1,82 @@
+{
+  "schema_version": 1,
+  "captured_at": "2026-07-19T11:58:31.469934+00:00",
+  "approval_id": "42436bb4c4a144d8980aa886fbb7b14f",
+  "approval_root_external_id": "iqen85eumbjcld",
+  "result": "failed_checkpoint_serving_gate",
+  "semantic_tag_created": false,
+  "gold": {
+    "external_id": "r6zizmfp8faklt",
+    "target_absent": true,
+    "vf_auto_prefix_count": 0,
+    "billing_plus_1h": "empty"
+  },
+  "orphan_probe": {
+    "external_id": "41l2l81044358g",
+    "cleanup_seconds": 8.756,
+    "target_absent": true,
+    "vf_auto_prefix_count": 0,
+    "billing_plus_1h": "empty"
+  },
+  "attempts": [
+    {
+      "job_id": "p2-42436bb4c4a144d8980a",
+      "external_id": "iqen85eumbjcld",
+      "revision": "d53dfb0f54d5",
+      "metric_count": 49,
+      "checkpoint_manifest_count": 0,
+      "failure": "missing safetensors index for a valid single-file export",
+      "target_absent": true,
+      "vf_auto_prefix_count": 0,
+      "actual_billing_usd": 0.124736,
+      "failure_manifest_sha256": "f024948ce2fef36f54864d20ce775e897fc2d198ab9737af9c4f6b24d1d8c62c"
+    },
+    {
+      "job_id": "p2-42436bb4c4a144d8980a-r2",
+      "external_id": "33rpq7bee28z9f",
+      "revision": "b1bc2ca5b4c3",
+      "metric_count": 49,
+      "checkpoint_manifest_count": 0,
+      "failure": "Available KV cache memory: -5.32 GiB at gpu_memory_utilization=0.10",
+      "target_absent": true,
+      "vf_auto_prefix_count": 0,
+      "estimated_cost_usd": 0.11831,
+      "failure_manifest_sha256": "140e8c3f465ad00d999b2fd807d1502f972c182b4890d31ab352d6e329eab338"
+    },
+    {
+      "job_id": "p2-42436bb4c4a144d8980a-r3",
+      "external_id": "wuvk037vks2c57",
+      "revision": "11dd6a27ee63",
+      "metric_count": 49,
+      "checkpoint_manifest_count": 0,
+      "failure": "Free memory 14.51/19.67 GiB was below the 0.90 target 17.71 GiB",
+      "target_absent": true,
+      "vf_auto_prefix_count": 0,
+      "estimated_cost_usd": 0.057496,
+      "failure_manifest_sha256": "4d04b30caa7cffc75cef6f204a4af6c05ce91ab0796bcc96eb85d009fb87a950"
+    },
+    {
+      "job_id": "p2-42436bb4c4a144d8980a-r4",
+      "external_id": "1okqsh91490bgu",
+      "revision": "8dbd7ff30473",
+      "metric_count": 49,
+      "checkpoint_manifest_count": 0,
+      "failure": "Free memory 12.7/22.04 GiB was below the 0.70 target 15.43 GiB",
+      "target_absent": true,
+      "vf_auto_prefix_count": 0,
+      "estimated_cost_usd": 0.082404,
+      "failure_manifest_sha256": "81e3c24b7accf4ecb8ae2fbe01902c1dc8a2012fc609927aa1f5155a71066879"
+    }
+  ],
+  "validation": {
+    "focused": "42 passed",
+    "complete": "403 passed, 1 skipped",
+    "tracked_secret_scan": "only deliberate sanitizer fixture",
+    "final_account_vf_auto_prefix_count": 0
+  },
+  "billing_reconciliation": {
+    "status": "pending_async",
+    "detached_sessions": 7,
+    "slots": ["plus-1h", "plus-6h"]
+  }
+}

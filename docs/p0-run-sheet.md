@@ -2526,8 +2526,9 @@ and once at `+6h`; it does not block later P-2 stages or the semantic tag.
   externally guarded at 180 minutes and `$5`; it is not restarted for this
   parser-only fix. Live readback after repair: uptime `13 min`, estimated cost
   `$0.082815`; full suite `393 passed, 1 skipped`.
-- [ ] Resume the historical gold proof without creating a second gold pod.
-- [ ] Run and safely reap the live orphan probe.
+- [x] Resume the historical gold proof without creating a second gold pod.
+- [x] Run and safely reap the live orphan probe: `41l2l81044358g`, cleanup
+  8.756 seconds, target absent and raw prefix zero.
 - [ ] Complete and collect the approval-driven 100-step S3-only run.
 - [ ] Commit the sanitized evidence and create `provisioner-p2-live`.
 - [ ] Append the `+1h` and `+6h` billing reconciliation results when due.
@@ -2597,13 +2598,24 @@ created by validation.
   immediate previous handle and immutable approval root are checked separately.
 - [x] Run focused/full tests, real-evidence admission, secret scan, prefix-zero
   and empty `-r4` preflights; commit and push before provider create.
-- [ ] Run one clean `-r4` full stage. On success collect/delete/tag; on any
-  failure delete, record evidence and stop without a fifth attempt.
+- [x] Run one clean `-r4` full stage. It reached 49 metrics, then vLLM rejected
+  free memory `12.7/22.04 GiB` below the 0.70 target `15.43 GiB`. The failure
+  detector deleted pod `1okqsh91490bgu` in 3.96 seconds; target absent and raw
+  prefix zero. No fifth attempt and no `provisioner-p2-live` tag.
 
 Pre-live result: focused `42 passed`; complete `403 passed, 1 skipped`.
 Real-evidence admission resolved previous `wuvk037vks2c57`, root
 `iqen85eumbjcld`, job suffix `-r4`, cumulative conservative reservation
 `$1.688479`, raw prefix zero and an empty `-r4` S3 prefix.
+
+Final P-2 status: **not passed**. All four training prefixes have 49 metrics,
+one failure manifest and zero checkpoint manifests. Sanitized identities and
+per-attempt causes are tracked in
+`docs/evidence/provisioner/v0.28.4-p2-live-failed.json`. First due billing
+reconciliation confirmed `$0.124736` for `iqen85eumbjcld`; orphan billing was
+still empty. Seven detached `vf-billing-*` tmux sessions will perform the
+remaining idempotent +1h/+6h reads. Complete suite before live: `403 passed, 1
+skipped`; final raw account prefix count: `0`.
 
 ## 2026-07-19 v0.28.1 — v1 reviewer narrative refresh
 
