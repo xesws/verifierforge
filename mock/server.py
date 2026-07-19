@@ -15,6 +15,7 @@ import uvicorn
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
 from core.contracts import (
+    ApprovedSampleSource,
     Arena,
     ArenaSample,
     Cluster,
@@ -242,6 +243,19 @@ CLUSTERS: list[Cluster] = [
         }
     )
     if cluster.cluster_id == "support-ticket-extraction"
+    else cluster.model_copy(
+        update={
+            "approved_sample_source": ApprovedSampleSource(
+                kind="repository_jsonl",
+                uri="data/nl2sql/v0.10.0-training-pool.jsonl",
+                sha256="c97a5adea789fae3be249bc9ac95a1902ae5a9769de9eefbc08277f056878e8c",
+                row_count=50,
+                approved_by="demo-owner",
+                approved_at=datetime(2026, 7, 19, tzinfo=timezone.utc),
+            )
+        }
+    )
+    if cluster.cluster_id == "data-pull-sql"
     else cluster
     for cluster in list_cluster_profiles()
 ]

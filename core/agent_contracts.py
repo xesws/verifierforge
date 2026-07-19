@@ -11,6 +11,8 @@ from pydantic import BaseModel, ConfigDict, Field, model_validator
 
 
 BASE_MODEL = "Qwen/Qwen2.5-1.5B-Instruct"
+P2_BASE_MODEL = "Qwen/Qwen2.5-0.5B-Instruct"
+ALLOWED_BASE_MODELS = frozenset({BASE_MODEL, P2_BASE_MODEL})
 MAX_TRAINING_BUDGET_USD = 100.0
 
 
@@ -47,8 +49,9 @@ class TrainingConfig(AgentModel):
 
     @model_validator(mode="after")
     def validate_policy(self) -> "TrainingConfig":
-        if self.base_model != BASE_MODEL:
-            raise ValueError(f"base_model must be {BASE_MODEL}")
+        if self.base_model not in ALLOWED_BASE_MODELS:
+            allowed = ", ".join(sorted(ALLOWED_BASE_MODELS))
+            raise ValueError(f"base_model must be one of: {allowed}")
         if self.checkpoint_interval > self.steps:
             raise ValueError("checkpoint_interval must not exceed steps")
         if not math.isfinite(self.budget_usd_cap):

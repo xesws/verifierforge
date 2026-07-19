@@ -1,6 +1,8 @@
 from datetime import datetime, timezone
 
 from core.contracts import (
+    ApprovedSampleSource,
+    ApprovedSampleSourceKind,
     Arena,
     ArenaSample,
     Cluster,
@@ -89,12 +91,22 @@ def test_cluster_and_live_pass_rate_round_trip() -> None:
                 )
             ],
         ),
+        approved_sample_source=ApprovedSampleSource(
+            kind=ApprovedSampleSourceKind.REPOSITORY_JSONL,
+            uri="data/nl2sql/v0.10.0-training-pool.jsonl",
+            sha256="a" * 64,
+            row_count=50,
+            approved_by="owner@example.com",
+            approved_at=datetime(2026, 7, 19, 12, 0, tzinfo=timezone.utc),
+        ),
     )
 
     restored = Cluster.model_validate_json(cluster.model_dump_json())
 
     assert restored == cluster
     assert restored.live_pass_rate is not None
+    assert restored.approved_sample_source is not None
+    assert restored.approved_sample_source.row_count == 50
     dumped = restored.live_pass_rate.points[0].model_dump()
     assert "pass_rate" in dumped
     assert "pass_at_1" not in dumped

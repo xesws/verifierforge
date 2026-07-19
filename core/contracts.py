@@ -34,6 +34,12 @@ class ClusterStatus(str, Enum):
     LIVE = "live"
 
 
+class ApprovedSampleSourceKind(str, Enum):
+    """Storage kinds accepted at the governed Agent sample boundary."""
+
+    REPOSITORY_JSONL = "repository_jsonl"
+
+
 class Metrics(BaseModel):
     steps: list[int]
     reward_mean: list[float]
@@ -96,6 +102,17 @@ class LivePassRate(BaseModel):
     points: list[LivePassRatePoint]
 
 
+class ApprovedSampleSource(BaseModel):
+    """Identity and approval metadata for samples; never the sample bodies."""
+
+    kind: ApprovedSampleSourceKind
+    uri: str = Field(min_length=1, max_length=512)
+    sha256: str = Field(pattern=r"^[0-9a-f]{64}$")
+    row_count: int = Field(ge=1)
+    approved_by: str = Field(min_length=1, max_length=128)
+    approved_at: datetime
+
+
 class Cluster(BaseModel):
     cluster_id: str
     name: str
@@ -106,6 +123,7 @@ class Cluster(BaseModel):
     job_id: str | None = None
     routing: RoutingState | None = None
     live_pass_rate: LivePassRate | None = None
+    approved_sample_source: ApprovedSampleSource | None = None
 
 
 class Job(BaseModel):

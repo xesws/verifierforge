@@ -70,3 +70,11 @@ def test_get_cluster_detail() -> None:
     assert body["cluster_id"] == "data-pull-sql"
     assert body["monthly_cost_usd"] == 5500.0
     assert body["status"] == "discovered"
+    assert body["approved_sample_source"] == {
+        "kind": "repository_jsonl",
+        "uri": "data/nl2sql/v0.10.0-training-pool.jsonl",
+        "sha256": "c97a5adea789fae3be249bc9ac95a1902ae5a9769de9eefbc08277f056878e8c",
+        "row_count": 50,
+        "approved_by": "demo-owner",
+        "approved_at": "2026-07-19T00:00:00Z",
+    }

@@ -9,6 +9,7 @@ from core.agent_contracts import (
     AgentTrace,
     AgentDecisionType,
     AgentRunStatus,
+    P2_BASE_MODEL,
     TrainingConfig,
 )
 
@@ -70,6 +71,20 @@ def test_decision_rejects_invalid_shapes(payload: dict[str, object]) -> None:
 def test_training_config_enforces_static_and_business_policy(overrides: dict[str, object]) -> None:
     with pytest.raises(ValidationError):
         _config(**overrides)
+
+
+def test_training_config_accepts_p2_small_model_without_changing_default() -> None:
+    config = _config(
+        base_model=P2_BASE_MODEL,
+        steps=100,
+        k=8,
+        checkpoint_interval=50,
+        budget_usd_cap=5.0,
+        provider_pref="runpod",
+    )
+
+    assert TrainingConfig(budget_usd_cap=25.0).base_model != P2_BASE_MODEL
+    assert config.base_model == P2_BASE_MODEL
 
 
 def test_trace_contains_only_public_audit_fields() -> None:
