@@ -2521,10 +2521,11 @@ and once at `+6h`; it does not block later P-2 stages or the semantic tag.
 - [x] Secure fallback implementation rejects auth/validation/other HTTP errors,
   retries only the exact Community capacity response, and preserves GPU order.
   Focused suite: `15 passed`; full suite: `392 passed, 1 skipped`.
-- [ ] Normalize RunPod's `lastStartedAt='... +0000 UTC'` fallback so uptime and
+- [x] Normalize RunPod's `lastStartedAt='... +0000 UTC'` fallback so uptime and
   estimated cost remain armed when REST omits `runtime`. Current live run is
   externally guarded at 180 minutes and `$5`; it is not restarted for this
-  parser-only fix.
+  parser-only fix. Live readback after repair: uptime `13 min`, estimated cost
+  `$0.082815`; full suite `393 passed, 1 skipped`.
 - [ ] Resume the historical gold proof without creating a second gold pod.
 - [ ] Run and safely reap the live orphan probe.
 - [ ] Complete and collect the approval-driven 100-step S3-only run.

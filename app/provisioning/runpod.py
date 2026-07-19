@@ -372,11 +372,9 @@ def _uptime_seconds(pod: Mapping[str, Any]) -> float:
         return max(0.0, float(direct or 0))
     started = pod.get("lastStartedAt")
     if isinstance(started, str):
-        try:
-            value = datetime.fromisoformat(started.replace("Z", "+00:00"))
+        value = _provider_datetime(started)
+        if value is not None:
             return max(0.0, (datetime.now(timezone.utc) - value).total_seconds())
-        except ValueError:
-            pass
     return 0.0
 
 
@@ -412,11 +410,26 @@ def _region(pod: Mapping[str, Any]) -> str | None:
 def _created_at(pod: Mapping[str, Any]) -> datetime:
     value = pod.get("createdAt") or pod.get("created_at") or pod.get("lastStartedAt")
     if isinstance(value, str):
-        try:
-            return datetime.fromisoformat(value.replace("Z", "+00:00"))
-        except ValueError:
-            pass
+        parsed = _provider_datetime(value)
+        if parsed is not None:
+            return parsed
     return datetime.now(timezone.utc)
+
+
+def _provider_datetime(value: str) -> datetime | None:
+    normalized = value.strip()
+    if normalized.endswith(" UTC"):
+        normalized = normalized[:-4]
+    timestamp, separator, offset = normalized.rpartition(" ")
+    if separator and len(offset) in {5, 6} and offset[0] in {"+", "-"}:
+        normalized = timestamp + offset
+    try:
+        parsed = datetime.fromisoformat(normalized.replace("Z", "+00:00"))
+    except ValueError:
+        return None
+    if parsed.tzinfo is None:
+        return parsed.replace(tzinfo=timezone.utc)
+    return parsed.astimezone(timezone.utc)
 
 
 def _number(value: Mapping[str, Any], *keys: str) -> float:

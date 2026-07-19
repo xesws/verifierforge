@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import asyncio
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 import json
 
 import httpx
@@ -216,6 +216,37 @@ def test_status_refreshes_ssh_and_refuses_foreign_delete() -> None:
         )
         with pytest.raises(ProvisionProviderError, match="ownership"):
             await adapter.terminate(handle)
+        await client.aclose()
+
+    _run(scenario())
+
+
+def test_status_derives_uptime_and_cost_from_runpod_utc_timestamp() -> None:
+    started = datetime.now(timezone.utc) - timedelta(minutes=2)
+    provider_timestamp = (
+        started.strftime("%Y-%m-%d %H:%M:%S.")
+        + f"{started.microsecond // 10_000:02d} +0000 UTC"
+    )
+
+    async def scenario() -> None:
+        client = httpx.AsyncClient(
+            transport=httpx.MockTransport(
+                lambda _request: httpx.Response(
+                    200,
+                    json=_pod(runtime=None, lastStartedAt=provider_timestamp, costPerHr=0.39),
+                )
+            )
+        )
+        adapter = RunPodAdapter("key", client=client)
+        handle = ProvisionHandle(
+            provider=ProvisionProvider.RUNPOD,
+            external_id="pod-1",
+            job_id="p2-job-1",
+            approval_id="approval-1",
+        )
+        status = await adapter.status(handle)
+        assert status.uptime_min >= 2
+        assert status.cost_accrued_usd >= 0.012
         await client.aclose()
 
     _run(scenario())
