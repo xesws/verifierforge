@@ -33,7 +33,11 @@ from core.agent_contracts import (
     ApprovalRequest,
     TrainingConfig,
 )
-from app.api.agent import AgentAnalyzeRequest, agent_enabled
+from app.api.agent import (
+    AgentAnalyzeRequest,
+    ApprovedSampleSourceRequest,
+    agent_enabled,
+)
 from app.proxy.clusters import list_cluster_profiles
 
 
@@ -347,9 +351,41 @@ def get_live_pass_rate(cluster_id: str) -> LivePassRate:
     return _live_pass_rate(cluster_id)
 
 
-def _require_cluster(cluster_id: str) -> None:
-    if cluster_id not in _ROUTING_STATES:
-        raise HTTPException(status_code=404, detail="Cluster not found")
+@app.get(
+    "/clusters/{cluster_id}/sample-source",
+    response_model=ApprovedSampleSource | None,
+)
+def get_sample_source(cluster_id: str) -> ApprovedSampleSource | None:
+    _require_agent_enabled()
+    return _require_cluster(cluster_id).approved_sample_source
+
+
+@app.put(
+    "/clusters/{cluster_id}/sample-source", response_model=ApprovedSampleSource
+)
+def put_sample_source(
+    cluster_id: str, request: ApprovedSampleSourceRequest
+) -> ApprovedSampleSource:
+    _require_agent_enabled()
+    cluster = _require_cluster(cluster_id)
+    source = ApprovedSampleSource(
+        kind="repository_jsonl",
+        uri=request.uri,
+        sha256=request.expected_sha256 or "c" * 64,
+        row_count=request.expected_row_count or 50,
+        approved_by=request.approved_by,
+        approved_at=datetime(2026, 7, 19, tzinfo=timezone.utc),
+    )
+    index = next(i for i, item in enumerate(CLUSTERS) if item.cluster_id == cluster_id)
+    CLUSTERS[index] = cluster.model_copy(update={"approved_sample_source": source})
+    return source
+
+
+def _require_cluster(cluster_id: str) -> Cluster:
+    for cluster in CLUSTERS:
+        if cluster.cluster_id == cluster_id:
+            return cluster
+    raise HTTPException(status_code=404, detail="Cluster not found")
 
 
 @app.post(
@@ -360,11 +396,12 @@ def analyze_cluster(
 ) -> AgentAnalysisResponse:
     _require_agent_enabled()
     _require_cluster(cluster_id)
-    del request  # The deterministic mock accepts the same optional body shape.
-    existing = _AGENT_DECISIONS.get(cluster_id)
+    profile = request.execution_profile if request is not None else "standard"
+    cache_key = cluster_id if profile == "standard" else f"{cluster_id}|{profile}"
+    existing = _AGENT_DECISIONS.get(cache_key)
     if existing is not None:
         return existing.model_copy(update={"cached": True})
-    decision = _mock_agent_decision(cluster_id)
+    decision = _mock_agent_decision(cluster_id, p2=profile == "p2_gate_b")
     response = AgentAnalysisResponse(
         decision_id=f"mock-agent-{cluster_id}",
         cluster_id=cluster_id,
@@ -372,7 +409,7 @@ def analyze_cluster(
         cached=False,
         created_at="2026-07-17T12:00:00Z",
     )
-    _AGENT_DECISIONS[cluster_id] = response
+    _AGENT_DECISIONS[cache_key] = response
     return response
 
 
@@ -382,7 +419,7 @@ def analyze_cluster(
 def latest_agent_decision(cluster_id: str) -> AgentAnalysisResponse:
     _require_agent_enabled()
     _require_cluster(cluster_id)
-    response = _AGENT_DECISIONS.get(cluster_id)
+    response = _AGENT_DECISIONS.get(f"{cluster_id}|p2_gate_b") or _AGENT_DECISIONS.get(cluster_id)
     if response is None:
         raise HTTPException(status_code=404, detail="Agent decision not found")
     return response.model_copy(update={"cached": True})
@@ -434,13 +471,24 @@ def get_agent_approval(decision_id: str) -> ApprovalRecord:
     return approval
 
 
-def _mock_agent_decision(cluster_id: str) -> AgentDecision:
+def _mock_agent_decision(cluster_id: str, *, p2: bool = False) -> AgentDecision:
     if cluster_id == "data-pull-sql":
         return AgentDecision(
             decision="forge",
             rationale="High SQL volume and deterministic verification support forging.",
             confidence=0.94,
-            config=TrainingConfig(budget_usd_cap=25.0),
+            config=TrainingConfig(
+                base_model=(
+                    "Qwen/Qwen2.5-0.5B-Instruct"
+                    if p2
+                    else "Qwen/Qwen2.5-1.5B-Instruct"
+                ),
+                steps=100 if p2 else 400,
+                k=8,
+                checkpoint_interval=50,
+                budget_usd_cap=5.0 if p2 else 25.0,
+                provider_pref="runpod" if p2 else "auto",
+            ),
         )
     if cluster_id == "support-ticket-extraction":
         return AgentDecision(

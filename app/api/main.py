@@ -19,6 +19,7 @@ from app.db.records import JobRecord as DatabaseJobRecord
 from app.proxy.clusters import cluster_profile, list_cluster_profiles
 from app.proxy.routing import LivePassRateRecord, RouteRecord, get_route, list_live_pass_rate, put_route
 from core.contracts import (
+    ApprovedSampleSource,
     Cluster,
     Control,
     Job,
@@ -196,7 +197,7 @@ def list_clusters() -> list[Cluster]:
     """Return the stable product profiles used by Discover and the mock API."""
     profiles = list_cluster_profiles()
     _materialize_clusters_best_effort(profiles)
-    return profiles
+    return [_cluster_with_database_source(profile) for profile in profiles]
 
 
 @app.get("/clusters/{cluster_id}", response_model=Cluster)
@@ -205,7 +206,7 @@ def get_cluster(cluster_id: str) -> Cluster:
     try:
         profile = cluster_profile(cluster_id)
         _materialize_clusters_best_effort([profile])
-        return profile
+        return _cluster_with_database_source(profile)
     except KeyError as error:
         raise HTTPException(status_code=404, detail="Cluster not found") from error
 
@@ -279,6 +280,14 @@ def _materialize_clusters_best_effort(profiles: list[Cluster]) -> None:
 
     async def write(repositories) -> None:
         for profile in profiles:
+            existing = await repositories.clusters.get(profile.cluster_id)
+            source = (
+                profile.approved_sample_source.model_dump(mode="json")
+                if profile.approved_sample_source is not None
+                else existing.approved_sample_source
+                if existing is not None
+                else None
+            )
             await repositories.clusters.put(
                 DatabaseClusterRecord(
                     cluster_id=profile.cluster_id,
@@ -289,6 +298,7 @@ def _materialize_clusters_best_effort(profiles: list[Cluster]) -> None:
                     trainable=profile.trainable,
                     job_id=profile.job_id,
                     analyzer_summary=None,
+                    approved_sample_source=source,
                     updated_at=timestamp,
                 )
             )
@@ -298,6 +308,24 @@ def _materialize_clusters_best_effort(profiles: list[Cluster]) -> None:
     except (OSError, RuntimeError, ValueError):
         # Static product profiles remain available if observability storage is down.
         pass
+
+
+def _cluster_with_database_source(profile: Cluster) -> Cluster:
+    try:
+        record = repository_gateway().call(
+            lambda repositories: repositories.clusters.get(profile.cluster_id)
+        )
+    except (OSError, RuntimeError, ValueError):
+        return profile
+    if record is None or record.approved_sample_source is None:
+        return profile
+    return profile.model_copy(
+        update={
+            "approved_sample_source": ApprovedSampleSource.model_validate(
+                record.approved_sample_source
+            )
+        }
+    )
 
 
 def _materialize_job_best_effort(record: DatabaseJobRecord) -> None:

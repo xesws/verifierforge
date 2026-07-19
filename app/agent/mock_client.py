@@ -16,7 +16,7 @@ class MockAgentClient:
         self.turn = 0
 
     def tool_turn(self, messages, *, tools, **kwargs) -> LLMTurn:
-        del tools, kwargs
+        del kwargs
         self.turn += 1
         analysis_id = _latest(messages, "analysis_id")
         sample_set_id = _latest(messages, "sample_set_id")
@@ -32,6 +32,12 @@ class MockAgentClient:
             name, arguments = "estimate_economics", {
                 "cluster_id": self.cluster_id,
                 "analysis_id": analysis_id,
+                "base_model": _tool_const(
+                    tools,
+                    "estimate_economics",
+                    "base_model",
+                    "Qwen/Qwen2.5-1.5B-Instruct",
+                ),
             }
         elif self.turn == 4:
             name, arguments = "check_verifiability", {
@@ -40,7 +46,17 @@ class MockAgentClient:
                 "sample_set_id": sample_set_id,
             }
         else:
-            name, arguments = "submit_decision", _decision(self.cluster_id)
+            p2_model = _tool_const(
+                tools,
+                "submit_decision",
+                "base_model",
+                "Qwen/Qwen2.5-1.5B-Instruct",
+            )
+            name, arguments = "submit_decision", _decision(
+                self.cluster_id,
+                p2=p2_model == "Qwen/Qwen2.5-0.5B-Instruct",
+                verified=_latest(messages, "data_sufficient") == "True",
+            )
         return LLMTurn(
             content=None,
             tool_calls=(
@@ -56,19 +72,32 @@ class MockAgentClient:
         )
 
 
-def _decision(cluster_id: str) -> dict[str, Any]:
+def _decision(
+    cluster_id: str, *, p2: bool = False, verified: bool = True
+) -> dict[str, Any]:
     if cluster_id == "data-pull-sql":
+        if not verified:
+            return {
+                "decision": "need_more_data",
+                "rationale": "Traffic exists, but no approved samples establish programmatic verifiability.",
+                "confidence": 0.9,
+                "config": None,
+            }
         return {
             "decision": "forge",
             "rationale": "High SQL volume, deterministic verification, and positive payback support a small-model forge.",
             "confidence": 0.94,
             "config": {
-                "base_model": "Qwen/Qwen2.5-1.5B-Instruct",
-                "steps": 400,
+                "base_model": (
+                    "Qwen/Qwen2.5-0.5B-Instruct"
+                    if p2
+                    else "Qwen/Qwen2.5-1.5B-Instruct"
+                ),
+                "steps": 100 if p2 else 400,
                 "k": 8,
                 "checkpoint_interval": 50,
-                "budget_usd_cap": 25.0,
-                "provider_pref": "auto",
+                "budget_usd_cap": 5.0 if p2 else 25.0,
+                "provider_pref": "runpod" if p2 else "auto",
             },
         }
     if cluster_id == "support-ticket-extraction":
@@ -94,3 +123,25 @@ def _latest(messages: list[dict[str, Any]], field: str) -> str | None:
         if field in payload:
             return str(payload[field])
     return None
+
+
+def _tool_const(
+    tools: list[dict[str, Any]],
+    tool_name: str,
+    field: str,
+    default: str,
+) -> str:
+    for tool in tools:
+        function = tool.get("function", {})
+        if function.get("name") != tool_name:
+            continue
+        parameters = function.get("parameters", {})
+        if tool_name == "submit_decision":
+            properties = parameters.get("$defs", {}).get("TrainingConfig", {}).get(
+                "properties", {}
+            )
+        else:
+            properties = parameters.get("properties", {})
+        value = properties.get(field, {}).get("const")
+        return str(value) if value is not None else default
+    return default

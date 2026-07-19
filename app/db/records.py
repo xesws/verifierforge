@@ -42,6 +42,7 @@ class ClusterRecord:
     updated_at: datetime
     job_id: str | None = None
     analyzer_summary: JsonObject | None = None
+    approved_sample_source: JsonObject | None = None
 
 
 @dataclass(frozen=True)

@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width,initial-scale=1">
-  <meta name="vf-data-source" content="__VF_DISCOVER_DATA_SOURCE__">
+  <meta name="vf-sample-source" content="__VF_DISCOVER_DATA_SOURCE__">
   <title>VerifierForge Discover</title>
   <style>
     :root {
@@ -100,7 +100,7 @@
 <main>
   <div class="eyebrow">VerifierForge · Discover</div>
   <h1>Which traffic deserves its own model?</h1>
-  <p class="sub">Connect a traffic source, inspect the evidence, and review the Agent's proposed Forge configuration before recording a human approval.</p>
+  <p class="sub">Approve a sample source, inspect traffic evidence, and review the Agent's proposed Forge configuration before recording a human approval.</p>
   <section class="grid" id="grid" aria-live="polite"></section>
 
   <section class="detail" id="detail" aria-live="polite" hidden>
@@ -191,7 +191,7 @@
 </main>
 <script>
 const SQL_CLUSTER = "data-pull-sql";
-const DEFAULT_DATA_SOURCE = document.querySelector('meta[name="vf-data-source"]').content;
+const DEFAULT_DATA_SOURCE = document.querySelector('meta[name="vf-sample-source"]').content;
 const state = {clusters: new Map(), inputConfirmed: false, inputSource: DEFAULT_DATA_SOURCE, analysis: null};
 const grid = document.querySelector("#grid");
 const detail = document.querySelector("#detail");
@@ -231,7 +231,7 @@ function renderCluster(cluster) {
     analyzeButton.disabled = true;
     const inputPanel = element("div", "input-panel");
     inputPanel.hidden = true;
-    const label = element("label", "", "Traffic database address");
+    const label = element("label", "", "Approved sample JSONL address");
     label.htmlFor = "sql-data-source";
     const input = element("input");
     input.id = "sql-data-source";
@@ -253,18 +253,37 @@ function renderCluster(cluster) {
       analyzeButton.disabled = true;
       inputStatus.textContent = "";
     });
-    useButton.addEventListener("click", () => {
+    useButton.addEventListener("click", async () => {
       const value = input.value.trim();
       if (!value) {
-        inputError.textContent = "Enter a traffic database address.";
+        inputError.textContent = "Enter a repository sample JSONL address.";
         inputError.hidden = false;
         return;
       }
-      inputError.hidden = true;
-      state.inputSource = value;
-      state.inputConfirmed = true;
-      analyzeButton.disabled = false;
-      inputStatus.textContent = `Input ready · ${value}`;
+      useButton.disabled = true;
+      inputStatus.textContent = "Validating source identity…";
+      try {
+        const response = await fetch(`/clusters/${cluster.cluster_id}/sample-source`, {
+          method: "PUT",
+          headers: {"content-type": "application/json"},
+          body: JSON.stringify({uri: value, approved_by: "demo-owner"})
+        });
+        const payload = await response.json();
+        if (!response.ok) throw new Error(payload.detail || "Sample approval failed");
+        inputError.hidden = true;
+        state.inputSource = payload.uri;
+        state.inputConfirmed = true;
+        analyzeButton.disabled = false;
+        inputStatus.textContent = `Approved · ${payload.row_count} rows · SHA ${payload.sha256.slice(0, 12)}…`;
+      } catch (error) {
+        state.inputConfirmed = false;
+        analyzeButton.disabled = true;
+        inputError.textContent = error.message;
+        inputError.hidden = false;
+        inputStatus.textContent = "";
+      } finally {
+        useButton.disabled = false;
+      }
     });
     actions.append(inputButton, analyzeButton);
     card.append(inputPanel, actions, result);
@@ -280,7 +299,7 @@ async function analyze(cluster, button, result) {
   button.disabled = true;
   result.textContent = "Reading traffic evidence…";
   const options = {method: "POST", headers: {"content-type": "application/json"}};
-  if (cluster.cluster_id === SQL_CLUSTER) options.body = JSON.stringify({data_source: state.inputSource});
+  if (cluster.cluster_id === SQL_CLUSTER) options.body = JSON.stringify({execution_profile: "p2_gate_b"});
   try {
     const response = await fetch(`/clusters/${cluster.cluster_id}/agent/analyze`, options);
     const payload = await response.json();

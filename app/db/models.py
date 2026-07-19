@@ -86,6 +86,7 @@ class ClusterRow(Base):
     trainable: Mapped[bool] = mapped_column(Boolean, nullable=False)
     job_id: Mapped[str | None] = mapped_column(String(128))
     analyzer_summary: Mapped[dict[str, Any] | None] = mapped_column(JSON)
+    approved_sample_source: Mapped[dict[str, Any] | None] = mapped_column(JSON)
     updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
 
 

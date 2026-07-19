@@ -66,6 +66,7 @@ async def test_alembic_upgrade_downgrade_upgrade_cycle(tmp_path: Path) -> None:
     assert columns["provision_events"] >= {
         "id", "approval_id", "action", "status", "occurred_at",
     }
+    assert "approved_sample_source" in columns["clusters"]
 
     await asyncio.to_thread(downgrade_database, settings)
     assert not (EXPECTED_TABLES & await _tables(settings))

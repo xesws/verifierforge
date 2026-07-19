@@ -154,6 +154,9 @@ class SQLAlchemyClusterStore:
             row.trainable = record.trainable
             row.job_id = record.job_id
             row.analyzer_summary = _bounded_json(record.analyzer_summary, "analyzer_summary")
+            row.approved_sample_source = _bounded_json(
+                record.approved_sample_source, "approved_sample_source"
+            )
             row.updated_at = _utc(record.updated_at)
             await session.flush()
             return _cluster_record(row)
@@ -503,6 +506,7 @@ def _cluster_record(row: ClusterRow) -> ClusterRecord:
         trainable=row.trainable,
         job_id=row.job_id,
         analyzer_summary=row.analyzer_summary,
+        approved_sample_source=row.approved_sample_source,
         updated_at=_utc(row.updated_at),
     )
 

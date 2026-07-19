@@ -12,6 +12,7 @@ from app.agent.runner import (
     AgentPersistenceError,
     AgentRunError,
     ForgeAgentRunner,
+    P2_EXECUTION_PROFILE,
     _parse_submit_decision,
     _submit_schema,
 )
@@ -72,6 +73,9 @@ class ChainClient:
             name, arguments = "estimate_economics", {
                 "cluster_id": "data-pull-sql",
                 "analysis_id": analysis,
+                "base_model": self.submit.get("config", {}).get(
+                    "base_model", "Qwen/Qwen2.5-1.5B-Instruct"
+                ),
             }
         elif self.index == 4:
             name, arguments = "check_verifiability", {
@@ -123,7 +127,13 @@ class FailedProviderClient:
         )
 
 
-def _runner(tmp_path: Path, client, trace_store=None, limits=None) -> ForgeAgentRunner:
+def _runner(
+    tmp_path: Path,
+    client,
+    trace_store=None,
+    limits=None,
+    execution_profile="standard",
+) -> ForgeAgentRunner:
     return ForgeAgentRunner(
         client=client,
         registry=ToolRegistry("mock"),
@@ -131,6 +141,7 @@ def _runner(tmp_path: Path, client, trace_store=None, limits=None) -> ForgeAgent
         trace_store=trace_store or MemoryTraceStore(),
         provider="mock",
         limits=limits,
+        execution_profile=execution_profile,
     )
 
 
@@ -228,6 +239,63 @@ def test_runner_rejects_dynamic_budget_without_silent_correction(tmp_path: Path,
     assert trace_store.traces[0].terminal_decision is None
 
 
+def test_p2_profile_binds_and_accepts_only_the_exact_gate_b_shape(tmp_path: Path) -> None:
+    submit = {
+        "decision": "forge",
+        "rationale": "Approved SQL examples support the bounded P2 smoke.",
+        "confidence": 0.95,
+        "config": {
+            "base_model": "Qwen/Qwen2.5-0.5B-Instruct",
+            "steps": 100,
+            "k": 8,
+            "checkpoint_interval": 50,
+            "budget_usd_cap": 5.0,
+            "provider_pref": "runpod",
+        },
+    }
+    client = ChainClient(submit=submit)
+
+    summary = _runner(
+        tmp_path,
+        client,
+        execution_profile=P2_EXECUTION_PROFILE,
+    ).run("data-pull-sql")
+
+    assert summary.decision is not None
+    assert summary.decision.config is not None
+    assert summary.decision.config.model_dump(mode="json") == submit["config"]
+    submit_schema = client.requests[-1]["tools"][-1]["function"]["parameters"]
+    config = submit_schema["$defs"]["TrainingConfig"]["properties"]
+    assert config["base_model"]["const"] == "Qwen/Qwen2.5-0.5B-Instruct"
+    assert config["steps"]["const"] == 100
+    assert config["budget_usd_cap"]["maximum"] == 5.0
+
+
+def test_p2_profile_rejects_a_structurally_valid_but_wrong_config(tmp_path: Path) -> None:
+    client = ChainClient(
+        submit={
+            "decision": "forge",
+            "rationale": "Wrong P2 step count.",
+            "confidence": 0.8,
+            "config": {
+                "base_model": "Qwen/Qwen2.5-0.5B-Instruct",
+                "steps": 400,
+                "k": 8,
+                "checkpoint_interval": 50,
+                "budget_usd_cap": 5.0,
+                "provider_pref": "runpod",
+            },
+        }
+    )
+
+    with pytest.raises(AgentGuardError, match="p2_gate_b execution profile"):
+        _runner(
+            tmp_path,
+            client,
+            execution_profile=P2_EXECUTION_PROFILE,
+        ).run("data-pull-sql")
+
+
 def test_runner_rejects_token_limit_before_executing_action(tmp_path: Path) -> None:
     runner = _runner(
         tmp_path,
@@ -277,7 +345,16 @@ def test_provider_error_status_and_body_are_preserved_in_trace(tmp_path: Path) -
 def test_agent_modules_have_no_execution_side_imports() -> None:
     root = Path(__file__).resolve().parents[1] / "app" / "agent"
     text = "\n".join(path.read_text(encoding="utf-8") for path in root.glob("*.py"))
-    forbidden = ("import trainer", "from trainer", "scripts.vf", "import subprocess", "runpod", "nebius")
+    forbidden = (
+        "import trainer",
+        "from trainer",
+        "scripts.vf",
+        "import subprocess",
+        "import runpod",
+        "from runpod",
+        "import nebius",
+        "from nebius",
+    )
     assert not [value for value in forbidden if value in text.lower()]
 
 

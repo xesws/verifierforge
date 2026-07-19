@@ -12,6 +12,7 @@ from typing import Any, Callable, Literal
 
 from app.db import RepositoryGateway, repository_gateway
 from app.db.settings import DatabaseBackend, DatabaseSettings
+from app.agent.sample_sources import validate_approved_source
 from app.proxy.clusters import (
     SYSTEM_PROMPTS_BY_CLUSTER,
     cluster_profile,
@@ -19,6 +20,8 @@ from app.proxy.clusters import (
 )
 from app.proxy.traffic import DEFAULT_DB_PATH
 from core.agent_contracts import (
+    ALLOWED_BASE_MODELS,
+    P2_BASE_MODEL,
     AnalyzeTrafficInput,
     AnalyzeTrafficOutput,
     CheckVerifiabilityInput,
@@ -29,6 +32,8 @@ from core.agent_contracts import (
     InspectSamplesOutput,
     RedactedSample,
 )
+from core.contracts import ApprovedSampleSource
+from core.rewards.nl2sql import NL2SQLVerifier
 
 
 class ToolDependencyError(ValueError):
@@ -65,6 +70,7 @@ class ToolRegistry:
         self.gateway = gateway
         self._analyses: dict[str, AnalyzeTrafficOutput] = {}
         self._sample_sets: dict[str, InspectSamplesOutput] = {}
+        self._sample_verifier_results: dict[str, list[bool]] = {}
 
     def call(self, name: str, arguments: dict[str, Any]) -> dict[str, Any]:
         try:
@@ -104,16 +110,36 @@ class ToolRegistry:
 
     def _inspect_samples(self, request: InspectSamplesInput) -> InspectSamplesOutput:
         analysis = self._require_analysis(request.cluster_id, request.analysis_id)
-        samples = (
-            _mock_samples(request.cluster_id, request.n)
-            if self.binding == "mock"
-            else []
-        )
+        verifier_results: list[bool] = []
+        if self.binding == "mock":
+            samples = _mock_samples(request.cluster_id, request.n)
+        else:
+            source = _real_approved_source(
+                request.cluster_id,
+                self.db_path,
+                self.gateway,
+                db_path_explicit=self._db_path_explicit,
+            )
+            records = validate_approved_source(source) if source is not None else []
+            selected = sorted(records, key=lambda item: str(item["id"]))[: request.n]
+            samples = [
+                RedactedSample(
+                    sample_id=str(record["id"]),
+                    request_excerpt=str(record.get("question") or record["prompt"])[:500],
+                    response_excerpt=str(record["reference_sql"])[:500],
+                )
+                for record in selected
+            ]
+            verifier_results = [_reference_is_verifiable(record) for record in selected]
         sufficient = bool(samples)
         reason = (
-            "deterministic redacted fixture samples"
+            (
+                "deterministic redacted fixture samples"
+                if self.binding == "mock"
+                else "deterministic excerpts from the user-approved sample source"
+            )
             if sufficient
-            else "traffic metadata schema stores no request or response bodies"
+            else "traffic metadata stores no bodies and no approved sample source is attached"
         )
         sample_set_id = _digest(
             {
@@ -132,15 +158,19 @@ class ToolRegistry:
             samples=samples,
         )
         self._sample_sets[sample_set_id] = output
+        self._sample_verifier_results[sample_set_id] = verifier_results
         return output
 
     def _estimate_economics(
         self, request: EstimateEconomicsInput
     ) -> EstimateEconomicsOutput:
         analysis = self._require_analysis(request.cluster_id, request.analysis_id)
-        if request.base_model != "Qwen/Qwen2.5-1.5B-Instruct":
+        if request.base_model not in ALLOWED_BASE_MODELS:
             raise ValueError("economics model is outside the Forge Agent whitelist")
-        training_cost = 2.0 * 2.5
+        gpu_hours, hourly_price = (
+            (1.0, 0.50) if request.base_model == P2_BASE_MODEL else (2.0, 2.50)
+        )
+        training_cost = gpu_hours * hourly_price
         projected = analysis.monthly_cost_usd * 0.30
         savings = max(analysis.monthly_cost_usd - projected, 0.0)
         payback = training_cost / savings if savings > 0 else None
@@ -154,12 +184,13 @@ class ToolRegistry:
             projected_monthly_savings_usd=savings,
             payback_months=payback,
             formula=(
-                "training_cost=2_gpu_hours*$2.50; tuned_monthly=0.30*current_monthly; "
+                f"training_cost={gpu_hours:g}_gpu_hours*${hourly_price:.2f}; "
+                "tuned_monthly=0.30*current_monthly; "
                 "savings=current_monthly-tuned_monthly; payback=training_cost/savings"
             ),
             assumptions=[
-                "one 1.5B training run uses two GPU hours",
-                "GPU price is $2.50/hour",
+                f"the selected model run uses {gpu_hours:g} GPU hour(s)",
+                f"assumed GPU price is ${hourly_price:.2f}/hour",
                 "tuned inference costs 30% of current inference",
             ],
         )
@@ -171,7 +202,7 @@ class ToolRegistry:
         samples = self._sample_sets.get(request.sample_set_id)
         if samples is None or samples.cluster_id != request.cluster_id:
             raise ToolDependencyError("sample_set_id was not issued for this cluster")
-        if self.binding == "real" or not samples.data_sufficient:
+        if not samples.data_sufficient:
             return CheckVerifiabilityOutput(
                 cluster_id=request.cluster_id,
                 analysis_id=request.analysis_id,
@@ -179,6 +210,20 @@ class ToolRegistry:
                 data_sufficient=False,
                 confidence=0.0,
                 reasons=["no approved request/response samples are available"],
+            )
+        if self.binding == "real":
+            results = self._sample_verifier_results.get(request.sample_set_id, [])
+            confidence = sum(results) / len(results) if results else 0.0
+            return CheckVerifiabilityOutput(
+                cluster_id=request.cluster_id,
+                analysis_id=request.analysis_id,
+                sample_set_id=request.sample_set_id,
+                data_sufficient=bool(results),
+                confidence=confidence,
+                reasons=[
+                    f"{sum(results)}/{len(results)} approved reference SQL samples pass NL2SQLVerifier v{NL2SQLVerifier.VERSION}",
+                    "each inspected record includes schema SQL and deterministic expected results",
+                ],
             )
         confidence = {
             "data-pull-sql": 0.95,
@@ -209,21 +254,11 @@ def _real_analysis(
     db_path_explicit: bool,
 ) -> AnalyzeTrafficOutput:
     rows: list[tuple[Any, ...]] = []
+    source: ApprovedSampleSource | None = None
     if cluster_id in SYSTEM_PROMPTS_BY_CLUSTER:
-        resolved = gateway
-        if resolved is None:
-            if db_path_explicit:
-                settings = (
-                    DatabaseSettings.sqlite(db_path) if db_path.is_file() else None
-                )
-            else:
-                settings = DatabaseSettings.from_env()
-                if settings.backend is DatabaseBackend.SQLITE and not db_path.is_file():
-                    settings = None
-                elif settings.backend is DatabaseBackend.SQLITE:
-                    settings = DatabaseSettings.sqlite(db_path)
-            if settings is not None:
-                resolved = repository_gateway(settings)
+        resolved = _resolve_gateway(
+            db_path, gateway, db_path_explicit=db_path_explicit
+        )
         if resolved is not None:
             try:
                 prompt_hash = system_prompt_hash(SYSTEM_PROMPTS_BY_CLUSTER[cluster_id])
@@ -243,6 +278,7 @@ def _real_analysis(
                     )
                     for record in records
                 ]
+                source = _source_from_gateway(resolved, cluster_id)
             except (OSError, RuntimeError, ValueError):
                 rows = []
     try:
@@ -254,6 +290,9 @@ def _real_analysis(
             "cluster_id": cluster_id,
             "rows": rows,
             "profile": profile.model_dump(mode="json") if profile else None,
+            "approved_sample_source": (
+                source.model_dump(mode="json") if source is not None else None
+            ),
         }
     )
     latencies = sorted(float(row[3]) for row in rows)
@@ -263,7 +302,9 @@ def _real_analysis(
     cost = sum(float(row[4]) for row in rows)
     return AnalyzeTrafficOutput(
         cluster_id=cluster_id,
-        analysis_id=_digest({"binding": "real", "cluster_id": cluster_id, "fingerprint": fingerprint}),
+        analysis_id=_digest(
+            {"binding": "real", "cluster_id": cluster_id, "fingerprint": fingerprint}
+        ),
         evidence_fingerprint=fingerprint,
         data_sufficient=count > 0,
         request_count=count,
@@ -275,6 +316,55 @@ def _real_analysis(
         observed_from=min(timestamps) if timestamps else None,
         observed_to=max(timestamps) if timestamps else None,
     )
+
+
+def _resolve_gateway(
+    db_path: Path,
+    gateway: RepositoryGateway | None,
+    *,
+    db_path_explicit: bool,
+) -> RepositoryGateway | None:
+    if gateway is not None:
+        return gateway
+    if db_path_explicit:
+        settings = DatabaseSettings.sqlite(db_path) if db_path.is_file() else None
+    else:
+        settings = DatabaseSettings.from_env()
+        if settings.backend is DatabaseBackend.SQLITE and not db_path.is_file():
+            settings = None
+        elif settings.backend is DatabaseBackend.SQLITE:
+            settings = DatabaseSettings.sqlite(db_path)
+    return repository_gateway(settings) if settings is not None else None
+
+
+def _source_from_gateway(
+    gateway: RepositoryGateway, cluster_id: str
+) -> ApprovedSampleSource | None:
+    record = gateway.call(lambda repositories: repositories.clusters.get(cluster_id))
+    if record is None or record.approved_sample_source is None:
+        return None
+    return ApprovedSampleSource.model_validate(record.approved_sample_source)
+
+
+def _real_approved_source(
+    cluster_id: str,
+    db_path: Path,
+    gateway: RepositoryGateway | None,
+    *,
+    db_path_explicit: bool,
+) -> ApprovedSampleSource | None:
+    resolved = _resolve_gateway(
+        db_path, gateway, db_path_explicit=db_path_explicit
+    )
+    return _source_from_gateway(resolved, cluster_id) if resolved is not None else None
+
+
+def _reference_is_verifiable(record: dict[str, Any]) -> bool:
+    try:
+        verifier = NL2SQLVerifier(record["schema_sql"], record["expected_results"])
+        return verifier.score(str(record["prompt"]), str(record["reference_sql"])) == 1.0
+    except (KeyError, TypeError, ValueError):
+        return False
 
 
 def _mock_analysis(cluster_id: str) -> AnalyzeTrafficOutput:

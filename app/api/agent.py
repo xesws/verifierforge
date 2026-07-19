@@ -2,10 +2,12 @@
 
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
+from datetime import datetime, timezone
 import html
 import os
 from pathlib import Path
+from typing import Literal
 
 from fastapi import APIRouter, HTTPException
 from fastapi.responses import HTMLResponse
@@ -17,6 +19,8 @@ from app.agent.runner import (
     AgentPersistenceError,
     AgentRunError,
     ForgeAgentRunner,
+    STANDARD_EXECUTION_PROFILE,
+    scoped_evidence_fingerprint,
 )
 from app.agent.stores import (
     AgentDecisionStore,
@@ -27,8 +31,15 @@ from app.agent.stores import (
     RelationalApprovalStore,
 )
 from app.agent.tools import ToolRegistry
+from app.agent.sample_sources import (
+    ApprovedSampleSourceError,
+    inspect_repository_jsonl,
+    validate_approved_source,
+)
 from app.gpt import LLMClient, LLMConfigurationError, LLMSettings
 from app.db import DatabaseOperationError, repository_gateway
+from app.db.records import ClusterRecord as DatabaseClusterRecord
+from app.proxy.clusters import cluster_profile
 from app.proxy.traffic import DEFAULT_DB_PATH
 from core.agent_contracts import (
     AgentAnalysisResponse,
@@ -36,6 +47,7 @@ from core.agent_contracts import (
     ApprovalRecord,
     ApprovalRequest,
 )
+from core.contracts import ApprovedSampleSource, ApprovedSampleSourceKind
 
 
 router = APIRouter()
@@ -46,7 +58,19 @@ class AgentAnalyzeRequest(BaseModel):
 
     model_config = ConfigDict(extra="forbid")
 
-    data_source: str = Field(min_length=1, max_length=2048)
+    data_source: str | None = Field(default=None, min_length=1, max_length=2048)
+    execution_profile: Literal["standard", "p2_gate_b"] = STANDARD_EXECUTION_PROFILE
+
+
+class ApprovedSampleSourceRequest(BaseModel):
+    """User approval input; byte identity is recomputed by the server."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    uri: str = Field(min_length=1, max_length=512)
+    approved_by: str = Field(min_length=1, max_length=128)
+    expected_sha256: str | None = Field(default=None, pattern=r"^[0-9a-f]{64}$")
+    expected_row_count: int | None = Field(default=None, ge=1)
 
 
 @dataclass(frozen=True)
@@ -76,7 +100,85 @@ def _configured_db_path() -> Path:
 
 
 def _configured_source_label() -> str:
-    return os.environ.get("VF_PROXY_DB_PATH", "app/proxy/traffic.db")
+    return os.environ.get(
+        "VF_AGENT_SAMPLE_SOURCE", "data/nl2sql/v0.10.0-training-pool.jsonl"
+    )
+
+
+@router.get(
+    "/clusters/{cluster_id}/sample-source",
+    response_model=ApprovedSampleSource | None,
+)
+def get_sample_source(cluster_id: str) -> ApprovedSampleSource | None:
+    _require_enabled()
+    _require_product_cluster(cluster_id)
+    try:
+        record = repository_gateway().call(
+            lambda repositories: repositories.clusters.get(cluster_id)
+        )
+    except DatabaseOperationError as error:
+        raise HTTPException(
+            status_code=503, detail="Agent sample-source persistence is unavailable"
+        ) from error
+    if record is None or record.approved_sample_source is None:
+        return None
+    return ApprovedSampleSource.model_validate(record.approved_sample_source)
+
+
+@router.put(
+    "/clusters/{cluster_id}/sample-source",
+    response_model=ApprovedSampleSource,
+)
+def put_sample_source(
+    cluster_id: str, request: ApprovedSampleSourceRequest
+) -> ApprovedSampleSource:
+    _require_enabled()
+    profile = _require_product_cluster(cluster_id)
+    try:
+        digest, records = inspect_repository_jsonl(request.uri)
+        if request.expected_sha256 is not None and digest != request.expected_sha256:
+            raise ApprovedSampleSourceError("sample source SHA-256 does not match expected identity")
+        if request.expected_row_count is not None and len(records) != request.expected_row_count:
+            raise ApprovedSampleSourceError("sample source row count does not match expected identity")
+        source = ApprovedSampleSource(
+            kind=ApprovedSampleSourceKind.REPOSITORY_JSONL,
+            uri=request.uri,
+            sha256=digest,
+            row_count=len(records),
+            approved_by=request.approved_by,
+            approved_at=datetime.now(timezone.utc),
+        )
+        validate_approved_source(source)
+
+        async def write(repositories):
+            existing = await repositories.clusters.get(cluster_id)
+            base = existing or DatabaseClusterRecord(
+                cluster_id=profile.cluster_id,
+                name=profile.name,
+                status=profile.status.value,
+                monthly_calls=profile.monthly_calls,
+                monthly_cost_usd=profile.monthly_cost_usd,
+                trainable=profile.trainable,
+                job_id=profile.job_id,
+                analyzer_summary=None,
+                updated_at=datetime.now(timezone.utc),
+            )
+            return await repositories.clusters.put(
+                replace(
+                    base,
+                    approved_sample_source=source.model_dump(mode="json"),
+                    updated_at=datetime.now(timezone.utc),
+                )
+            )
+
+        repository_gateway().call(write)
+        return source
+    except ApprovedSampleSourceError as error:
+        raise HTTPException(status_code=422, detail=str(error)) from error
+    except DatabaseOperationError as error:
+        raise HTTPException(
+            status_code=503, detail="Agent sample-source persistence is unavailable"
+        ) from error
 
 
 def _stores() -> AgentStores:
@@ -125,11 +227,17 @@ def analyze_cluster(
 ) -> AgentAnalysisResponse:
     _require_enabled()
     _validate_data_source(request)
+    execution_profile = (
+        request.execution_profile if request is not None else STANDARD_EXECUTION_PROFILE
+    )
     try:
         services = _services(cluster_id)
         analysis = services.registry.call("analyze_traffic", {"cluster_id": cluster_id})
         cached = services.decisions.latest_for_cluster(
-            cluster_id, str(analysis["evidence_fingerprint"])
+            cluster_id,
+            scoped_evidence_fingerprint(
+                str(analysis["evidence_fingerprint"]), execution_profile
+            ),
         )
         if cached is not None and cached.decision is not None:
             return _analysis_response(cached, cached=True)
@@ -139,6 +247,7 @@ def analyze_cluster(
             decision_store=services.decisions,
             trace_store=services.traces,
             provider=services.provider,
+            execution_profile=execution_profile,
         ).run(cluster_id)
     except AgentGuardError as error:
         raise HTTPException(status_code=422, detail=str(error)) from error
@@ -245,7 +354,7 @@ def _require_enabled() -> None:
 
 
 def _validate_data_source(request: AgentAnalyzeRequest | None) -> None:
-    if request is None:
+    if request is None or request.data_source is None:
         return
     supplied = Path(request.data_source).expanduser().resolve()
     configured = _configured_db_path().resolve()
@@ -254,6 +363,13 @@ def _validate_data_source(request: AgentAnalyzeRequest | None) -> None:
             status_code=422,
             detail="data_source must match the configured VF_PROXY_DB_PATH",
         )
+
+
+def _require_product_cluster(cluster_id: str):
+    try:
+        return cluster_profile(cluster_id)
+    except KeyError as error:
+        raise HTTPException(status_code=404, detail="Cluster not found") from error
 
 
 def _analysis_response(summary, *, cached: bool) -> AgentAnalysisResponse:

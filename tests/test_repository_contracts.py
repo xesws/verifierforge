@@ -93,6 +93,14 @@ async def test_all_repository_contracts_round_trip(repositories) -> None:
         trainable=True,
         updated_at=NOW,
         analyzer_summary={"source": "traffic"},
+        approved_sample_source={
+            "kind": "repository_jsonl",
+            "uri": "data/nl2sql/v0.10.0-training-pool.jsonl",
+            "sha256": "a" * 64,
+            "row_count": 50,
+            "approved_by": "owner",
+            "approved_at": "2026-07-19T00:00:00Z",
+        },
     )
     assert await repositories.clusters.put(cluster) == cluster
     assert await repositories.clusters.get(cluster.cluster_id) == cluster

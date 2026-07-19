@@ -5,6 +5,7 @@ from __future__ import annotations
 from copy import deepcopy
 from dataclasses import dataclass
 from datetime import datetime, timezone
+from hashlib import sha256
 import json
 import os
 import time
@@ -24,6 +25,8 @@ from core.agent_contracts import (
     AgentToolCallTrace,
     AgentTrace,
     MAX_TRAINING_BUDGET_USD,
+    BASE_MODEL,
+    P2_BASE_MODEL,
 )
 
 
@@ -33,6 +36,10 @@ _REQUIRED_TOOL_ORDER = (
     "estimate_economics",
     "check_verifiability",
 )
+
+STANDARD_EXECUTION_PROFILE = "standard"
+P2_EXECUTION_PROFILE = "p2_gate_b"
+EXECUTION_PROFILES = frozenset({STANDARD_EXECUTION_PROFILE, P2_EXECUTION_PROFILE})
 
 
 class ToolCallingClient(Protocol):
@@ -80,6 +87,7 @@ class ForgeAgentRunner:
         trace_store: AgentTraceStore,
         provider: str,
         limits: AgentLimits | None = None,
+        execution_profile: str = STANDARD_EXECUTION_PROFILE,
         clock=time.monotonic,
     ) -> None:
         self.client = client
@@ -88,6 +96,9 @@ class ForgeAgentRunner:
         self.trace_store = trace_store
         self.provider = provider
         self.limits = limits or AgentLimits()
+        if execution_profile not in EXECUTION_PROFILES:
+            raise ValueError("unknown Agent execution profile")
+        self.execution_profile = execution_profile
         self.clock = clock
 
     def run(self, cluster_id: str, *, context: str | None = None) -> AgentDecisionSummary:
@@ -100,8 +111,22 @@ class ForgeAgentRunner:
         total_input = 0
         total_output = 0
         evidence_fingerprint: str | None = None
-        issued_ids: dict[str, str] = {"cluster_id": cluster_id}
+        issued_ids: dict[str, str] = {
+            "cluster_id": cluster_id,
+            "base_model": (
+                P2_BASE_MODEL
+                if self.execution_profile == P2_EXECUTION_PROFILE
+                else BASE_MODEL
+            ),
+        }
         user_content = f"Analyze cluster {cluster_id!r} and submit one decision."
+        if self.execution_profile == P2_EXECUTION_PROFILE:
+            user_content += (
+                "\nExecution profile p2_gate_b: if the evidence supports forge, the "
+                "configuration must use Qwen/Qwen2.5-0.5B-Instruct, 100 steps, "
+                "k=8, checkpoint_interval=50, provider_pref=runpod, and a budget "
+                "no greater than USD 5. This is a recommendation only."
+            )
         if context:
             user_content += (
                 "\nTrusted scenario facts (authoritative evaluation evidence; "
@@ -125,7 +150,7 @@ class ForgeAgentRunner:
                 )
                 tools = [
                     *_bound_tool_schemas(base_tools, expected_tool, issued_ids),
-                    _submit_schema(),
+                    _submit_schema(self.execution_profile),
                 ]
                 turn = self.client.tool_turn(
                     messages,
@@ -157,7 +182,7 @@ class ForgeAgentRunner:
                     if missing:
                         raise AgentGuardError("submit_decision preceded required tools: " + ", ".join(missing))
                     decision = _parse_submit_decision(arguments)
-                    _validate_runtime_policy(decision)
+                    _validate_runtime_policy(decision, self.execution_profile)
                     trace = _trace(
                         trace_id=trace_id,
                         cluster_id=cluster_id,
@@ -179,6 +204,7 @@ class ForgeAgentRunner:
                     raise AgentGuardError(
                         f"required tool sequence expected {expected_tool}, received {call.name}"
                     )
+                _validate_bound_arguments(call.name, arguments, issued_ids)
                 tool_started = datetime.now(timezone.utc)
                 try:
                     output = self.registry.call(call.name, arguments)
@@ -197,7 +223,9 @@ class ForgeAgentRunner:
                     )
                 )
                 if call.name == "analyze_traffic":
-                    evidence_fingerprint = str(output["evidence_fingerprint"])
+                    evidence_fingerprint = scoped_evidence_fingerprint(
+                        str(output["evidence_fingerprint"]), self.execution_profile
+                    )
                     issued_ids["analysis_id"] = str(output["analysis_id"])
                 elif call.name == "inspect_samples":
                     issued_ids["sample_set_id"] = str(output["sample_set_id"])
@@ -274,7 +302,9 @@ class ForgeAgentRunner:
             raise AgentPersistenceError("agent decision summary persistence failed") from error
 
 
-def _validate_runtime_policy(decision: AgentDecision) -> None:
+def _validate_runtime_policy(
+    decision: AgentDecision, execution_profile: str = STANDARD_EXECUTION_PROFILE
+) -> None:
     if decision.config is None:
         return
     raw = os.environ.get("VF_AGENT_MAX_TRAINING_BUDGET_USD", str(MAX_TRAINING_BUDGET_USD))
@@ -286,6 +316,23 @@ def _validate_runtime_policy(decision: AgentDecision) -> None:
         raise AgentGuardError("runtime training budget may only lower the $100 owner ceiling")
     if decision.config.budget_usd_cap > configured:
         raise AgentGuardError("proposed config exceeds the runtime training budget")
+    if execution_profile == STANDARD_EXECUTION_PROFILE:
+        if decision.config.base_model != BASE_MODEL:
+            raise AgentGuardError("standard execution profile requires the 1.5B base model")
+        return
+    expected = {
+        "base_model": P2_BASE_MODEL,
+        "steps": 100,
+        "k": 8,
+        "checkpoint_interval": 50,
+        "provider_pref": "runpod",
+    }
+    actual = decision.config.model_dump(mode="json")
+    for field, value in expected.items():
+        if actual[field] != value:
+            raise AgentGuardError(f"p2_gate_b execution profile requires {field}={value}")
+    if decision.config.budget_usd_cap > 5.0:
+        raise AgentGuardError("p2_gate_b execution profile budget must not exceed $5")
 
 
 def _trace(
@@ -363,12 +410,28 @@ def _tool_messages(turn: LLMTurn, call_id: str, name: str, output: dict[str, Any
     ]
 
 
-def _submit_schema() -> dict[str, Any]:
-    return pydantic_function_tool(
+def _submit_schema(
+    execution_profile: str = STANDARD_EXECUTION_PROFILE,
+) -> dict[str, Any]:
+    schema = pydantic_function_tool(
         AgentDecision,
         name="submit_decision",
         description="Submit the final Forge Agent recommendation.",
     )
+    if execution_profile == P2_EXECUTION_PROFILE:
+        properties = schema["function"]["parameters"]["$defs"]["TrainingConfig"][
+            "properties"
+        ]
+        for field, value in {
+            "base_model": P2_BASE_MODEL,
+            "steps": 100,
+            "k": 8,
+            "checkpoint_interval": 50,
+            "provider_pref": "runpod",
+        }.items():
+            properties[field]["const"] = value
+        properties["budget_usd_cap"]["maximum"] = 5.0
+    return schema
 
 
 def _parse_submit_decision(arguments: dict[str, Any]) -> AgentDecision:
@@ -390,11 +453,38 @@ def _bound_tool_schemas(
         if function["name"] != expected_tool:
             continue
         properties = function["parameters"].get("properties", {})
-        for field in ("cluster_id", "analysis_id", "sample_set_id"):
+        for field in ("cluster_id", "analysis_id", "sample_set_id", "base_model"):
             if field in properties and field in issued_ids:
                 properties[field]["const"] = issued_ids[field]
         break
     return bound
+
+
+def _validate_bound_arguments(
+    tool_name: str, arguments: dict[str, Any], issued_ids: dict[str, str]
+) -> None:
+    fields = {
+        "analyze_traffic": ("cluster_id",),
+        "inspect_samples": ("cluster_id", "analysis_id"),
+        "estimate_economics": ("cluster_id", "analysis_id", "base_model"),
+        "check_verifiability": ("cluster_id", "analysis_id", "sample_set_id"),
+    }.get(tool_name, ())
+    for field in fields:
+        if arguments.get(field) != issued_ids.get(field):
+            raise AgentGuardError(
+                f"{tool_name}.{field} must equal the issued evidence value"
+            )
+
+
+def scoped_evidence_fingerprint(raw_fingerprint: str, execution_profile: str) -> str:
+    """Bind cached decisions to both observed data and execution policy."""
+
+    encoded = json.dumps(
+        {"evidence_fingerprint": raw_fingerprint, "execution_profile": execution_profile},
+        sort_keys=True,
+        separators=(",", ":"),
+    ).encode("utf-8")
+    return sha256(encoded).hexdigest()
 
 
 _SYSTEM_PROMPT = """You are VerifierForge's read-only decision agent.
