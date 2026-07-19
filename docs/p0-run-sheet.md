@@ -2487,3 +2487,14 @@ commit and push.
 - [x] Paid-LLM ledger: `$0.25 + $0.25 = $0.50` new reservation upper bound,
   `$6.50 / $8.00` cumulative OpenAI ceiling; provider-reported cost absent.
   Complete suite: `374 passed, 1 skipped`. No GPU/provider action occurred.
+# v0.28.0 P-2 RunPod live adapter — 2026-07-19
+
+- [x] Documentation-first reservation committed before implementation (`4c910f6`).
+- [x] Provider-neutral GPU mapping wave landed first (`9365010`): RTX 2000 Ada → RTX 4000 SFF Ada → RTX 4000 Ada → L4; Blackwell remains blocked.
+- [x] Official REST contract rechecked before implementation: `POST/GET/DELETE /v1/pods` and `GET /v1/billing/pods`; create payload uses Community on-demand, one GPU, 80 GB container disk, `volumeInGb=0`, public SSH, and no `networkVolumeId`.
+- [x] Zero-cost implementation: REST adapter, double ownership filter (`vf-auto-*` + `VF_MANAGED_BY=verifierforge-p2`), fresh SSH resolution per status read, atomic approval-handle binding, handle-specific active registry, provider-neutral workload observations, S3 completion collector, exact Git-bundle bootstrap, P2 config and explicit paid CLI gate.
+- [x] Zero-cost validation: 382 passed, 1 skipped; shell syntax and Python compile clean. No provider resource was created during this phase.
+- [ ] Paid gold create/status/delete/billing receipt.
+- [ ] Live orphan-reaper proof.
+- [ ] Approval-driven 0.5B/100-step S3-only run, final SHA inventory and billing-stop receipt.
+- [ ] Tag `provisioner-p2-live` only after all three paid gates pass.

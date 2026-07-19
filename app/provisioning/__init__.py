@@ -6,16 +6,20 @@ from app.provisioning.errors import (
     ProvisionCreateTimeout,
     ProvisioningError,
     ProvisionLifecycleError,
+    ProvisionProviderError,
     ProvisionRejected,
 )
 from app.provisioning.mock import MockAdapter, MockFailureMode
 from app.provisioning.orchestrator import LifecycleOrchestrator
 from app.provisioning.policy import KillSwitch, ProvisioningPolicy
 from app.provisioning.protocols import ActiveProvisionRegistry, Provisioner
+from app.provisioning.registry import DatabaseActiveProvisionRegistry
+from app.provisioning.runpod import RunPodAdapter, RunPodBilling
 
 __all__ = [
     "ActiveProvisionRegistry",
     "DatabaseAuditLog",
+    "DatabaseActiveProvisionRegistry",
     "InMemoryAuditLog",
     "KillSwitch",
     "LifecycleOrchestrator",
@@ -28,5 +32,8 @@ __all__ = [
     "ProvisioningError",
     "ProvisioningPolicy",
     "ProvisionLifecycleError",
+    "ProvisionProviderError",
     "ProvisionRejected",
+    "RunPodAdapter",
+    "RunPodBilling",
 ]

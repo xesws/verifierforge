@@ -7,6 +7,7 @@ import pytest
 
 from app.provisioning import (
     DatabaseAuditLog,
+    DatabaseActiveProvisionRegistry,
     InMemoryAuditLog,
     KillSwitch,
     LifecycleOrchestrator,
@@ -21,6 +22,7 @@ from app.db.migration import migrate_sqlite
 from app.db.records import (
     AgentDecisionRecord,
     ApprovalRecord as DatabaseApprovalRecord,
+    ProvisionEventRecord,
 )
 from app.db.repositories import create_repositories
 from app.db.settings import DatabaseSettings
@@ -108,6 +110,42 @@ def test_run_to_completion_uses_mock_adapter_and_leaves_no_active_handle() -> No
     status = _run(orchestrator.run_to_completion(_spec()))
 
     assert status.state == ProvisionState.TERMINATED
+    assert _run(adapter.list_active()) == []
+
+
+def test_workload_observations_advance_running_and_collecting_without_provider_leakage() -> None:
+    orchestrator, adapter, _audit = _orchestrator()
+    handle = _run(orchestrator.request(_spec()))
+    assert _run(orchestrator.tick(handle)).state == ProvisionState.PROVISIONING
+    ready = _run(orchestrator.tick(handle))
+    assert ready.state == ProvisionState.BOOTSTRAPPING
+    running = _run(
+        orchestrator.observe(
+            handle,
+            ProvisionStatus(
+                state=ProvisionState.RUNNING,
+                ssh=ready.ssh,
+                cost_accrued_usd=0.1,
+                uptime_min=2,
+                detail="workload started",
+            ),
+        )
+    )
+    assert running.state == ProvisionState.RUNNING
+    collecting = _run(
+        orchestrator.observe(
+            handle,
+            ProvisionStatus(
+                state=ProvisionState.COLLECTING,
+                ssh=ready.ssh,
+                cost_accrued_usd=0.2,
+                uptime_min=3,
+                detail="S3 completion visible",
+            ),
+        )
+    )
+    assert collecting.state == ProvisionState.COLLECTING
+    assert _run(orchestrator.terminate(handle)).state == ProvisionState.TERMINATED
     assert _run(adapter.list_active()) == []
 
 
@@ -246,7 +284,6 @@ def test_package_has_no_real_provider_or_training_side_effect_imports() -> None:
         "import runpod",
         "import nebius",
         "import requests",
-        "import httpx",
         "import subprocess",
         "from trainer",
         "import trainer",
@@ -298,6 +335,68 @@ def test_database_audit_log_persists_full_mock_lifecycle(tmp_path: Path) -> None
         )
         assert [event.action for event in events][0] == "provision.requested"
         assert events[-1].status == "TERMINATED"
+        await runtime.close()
+
+    _run(scenario())
+
+
+def test_database_registry_requires_bound_handle_without_terminal_event(tmp_path: Path) -> None:
+    async def scenario() -> None:
+        settings = DatabaseSettings.sqlite(tmp_path / "registry.sqlite3")
+        await migrate_sqlite(settings)
+        runtime = create_database_runtime(settings)
+        repositories = create_repositories(runtime)
+        now = datetime.now(timezone.utc)
+        await repositories.agent_decisions.put(
+            AgentDecisionRecord(
+                id="decision-registry",
+                cluster_id="data-pull-sql",
+                decision="forge",
+                rationale="approved",
+                confidence=1.0,
+                config_json=None,
+                trace_s3_key=None,
+                model_name="mock",
+                created_at=now,
+            )
+        )
+        await repositories.approvals.put(
+            DatabaseApprovalRecord(
+                id="approval-registry",
+                decision_id="decision-registry",
+                approved_by="owner",
+                approved_at=now,
+            )
+        )
+        handle = ProvisionHandle(
+            provider="runpod",
+            external_id="pod-registry",
+            job_id="job-registry",
+            approval_id="approval-registry",
+        )
+        registry = DatabaseActiveProvisionRegistry(
+            approvals=repositories.approvals,
+            provision_audit=repositories.provision_audit,
+        )
+        assert await registry.is_active(handle) is False
+        await repositories.approvals.bind_provision_handle(
+            "approval-registry", "pod-registry"
+        )
+        assert await registry.is_active(handle) is True
+        await repositories.provision_audit.append(
+            ProvisionEventRecord(
+                id="terminal-event",
+                approval_id="approval-registry",
+                job_id="job-registry",
+                provider="runpod",
+                action="provision.terminated",
+                status="TERMINATED",
+                actor="system",
+                occurred_at=now,
+                detail_json={"external_id": "pod-registry"},
+            )
+        )
+        assert await registry.is_active(handle) is False
         await runtime.close()
 
     _run(scenario())

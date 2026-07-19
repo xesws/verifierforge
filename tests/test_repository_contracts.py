@@ -180,7 +180,13 @@ async def test_all_repository_contracts_round_trip(repositories) -> None:
     assert await repositories.approvals.put(approval) == approval
     duplicate = ApprovalRecord("ignored-id", decision.id, "other", NOW + timedelta(seconds=1))
     assert await repositories.approvals.put(duplicate) == approval
+    assert await repositories.approvals.get(approval.id) == approval
     assert await repositories.approvals.get_by_decision(decision.id) == approval
+    bound = await repositories.approvals.bind_provision_handle(approval.id, "pod-123")
+    assert bound.provision_handle == "pod-123"
+    assert await repositories.approvals.bind_provision_handle(approval.id, "pod-123") == bound
+    with pytest.raises(ValueError, match="already bound"):
+        await repositories.approvals.bind_provision_handle(approval.id, "pod-other")
 
     credential = CredentialRecord("credential-1", "user-1", "runpod", b"encrypted", NOW)
     assert "encrypted" not in repr(credential)

@@ -1,0 +1,425 @@
+"""RunPod REST adapter with strict VerifierForge ownership filtering."""
+
+from __future__ import annotations
+
+from dataclasses import dataclass
+from datetime import datetime, timezone
+import math
+from typing import Any, Mapping
+
+import httpx
+
+from app.provisioning.errors import ProvisionProviderError
+from core.provisioning_contracts import (
+    DEFAULT_GPU_MAPPINGS,
+    ProvisionHandle,
+    ProvisionProvider,
+    ProvisionSpec,
+    ProvisionState,
+    ProvisionStatus,
+)
+
+
+RUNPOD_API_BASE_URL = "https://rest.runpod.io/v1"
+MANAGED_NAME_PREFIX = "vf-auto-"
+OWNER_MARKER_KEY = "VF_MANAGED_BY"
+OWNER_MARKER_VALUE = "verifierforge-p2"
+RUNPOD_IMAGE = "runpod/pytorch:1.0.2-cu1281-torch280-ubuntu2404"
+_ERROR_BODY_LIMIT = 4000
+
+
+@dataclass(frozen=True)
+class RunPodBilling:
+    amount_usd: float
+    time_billed_ms: int
+    records: tuple[dict[str, Any], ...]
+
+
+class RunPodAdapter:
+    """One-GPU RunPod adapter; API credentials never cross this local boundary."""
+
+    def __init__(
+        self,
+        api_key: str,
+        *,
+        client: httpx.AsyncClient | None = None,
+        base_url: str = RUNPOD_API_BASE_URL,
+        timeout_s: float = 30.0,
+    ) -> None:
+        if not api_key.strip():
+            raise ValueError("RUNPOD_API_KEY is required")
+        self._api_key = api_key.strip()
+        self.base_url = base_url.rstrip("/")
+        self._owns_client = client is None
+        self.client = client or httpx.AsyncClient(timeout=timeout_s)
+
+    async def __aenter__(self) -> "RunPodAdapter":
+        return self
+
+    async def __aexit__(self, *_args: object) -> None:
+        await self.aclose()
+
+    async def aclose(self) -> None:
+        if self._owns_client:
+            await self.client.aclose()
+
+    async def provision(self, spec: ProvisionSpec) -> ProvisionHandle:
+        if spec.provider is not ProvisionProvider.RUNPOD:
+            raise ValueError("RunPodAdapter only accepts provider=runpod")
+        gpu_ids = list(DEFAULT_GPU_MAPPINGS[ProvisionProvider.RUNPOD][spec.gpu_class])
+        payload: dict[str, Any] = {
+            "name": self._managed_name(spec.job_id),
+            "cloudType": "COMMUNITY",
+            "computeType": "GPU",
+            "gpuCount": 1,
+            "gpuTypeIds": gpu_ids,
+            "gpuTypePriority": "custom",
+            "imageName": spec.image,
+            "containerDiskInGb": spec.container_disk_gb,
+            "volumeInGb": 0,
+            "interruptible": False,
+            "supportPublicIp": True,
+            "ports": ["22/tcp"],
+            "env": {
+                **spec.env,
+                OWNER_MARKER_KEY: OWNER_MARKER_VALUE,
+                "VF_JOB_ID": spec.job_id,
+                "VF_APPROVAL_ID": spec.approval_id,
+                "PUBLIC_KEY": spec.ssh_pubkey,
+            },
+        }
+        if spec.region_pref:
+            payload["dataCenterIds"] = spec.region_pref
+        body = await self._request_json("POST", "/pods", json=payload, expected={201})
+        pod = _object(body, "RunPod create response")
+        external_id = _required_text(pod, "id")
+        if not self._is_managed(pod, expected_name=payload["name"]):
+            refreshed = await self.get_pod(external_id)
+            if refreshed is not None:
+                pod = refreshed
+        if not self._is_managed(pod, expected_name=payload["name"]):
+            # The provider response must echo enough identity to prove ownership.
+            try:
+                await self._request("DELETE", f"/pods/{external_id}", expected={204, 404})
+            finally:
+                raise ProvisionProviderError("RunPod create response failed ownership verification")
+        return self._handle_from_pod(pod, spec=spec)
+
+    async def status(self, handle: ProvisionHandle) -> ProvisionStatus:
+        pod = await self.get_pod(handle.external_id)
+        if pod is None:
+            return ProvisionStatus(
+                state=ProvisionState.TERMINATED,
+                detail="RunPod resource is absent",
+            )
+        if not self._is_managed(pod, expected_job_id=handle.job_id):
+            raise ProvisionProviderError("RunPod status response failed ownership verification")
+
+        desired = str(pod.get("desiredStatus") or pod.get("status") or "").upper()
+        uptime_seconds = _uptime_seconds(pod)
+        uptime_min = max(0, math.ceil(uptime_seconds / 60)) if uptime_seconds else 0
+        hourly = _hourly_price(pod)
+        cost = round(hourly * uptime_seconds / 3600, 6)
+        ssh = _ssh_endpoint(pod)
+        error_text = _provider_error(pod)
+        if error_text:
+            state = ProvisionState.FAILED
+        elif desired in {"EXITED", "TERMINATED", "STOPPED"}:
+            state = ProvisionState.TERMINATED
+        elif ssh is not None:
+            state = ProvisionState.BOOTSTRAPPING
+        else:
+            state = ProvisionState.PROVISIONING
+        return ProvisionStatus(
+            state=state,
+            ssh=ssh,
+            cost_accrued_usd=cost,
+            uptime_min=uptime_min,
+            detail=error_text or f"RunPod desiredStatus={desired or 'UNKNOWN'}",
+        )
+
+    async def terminate(self, handle: ProvisionHandle) -> None:
+        pod = await self.get_pod(handle.external_id)
+        if pod is None:
+            return
+        if not self._is_managed(pod, expected_job_id=handle.job_id):
+            raise ProvisionProviderError("refusing to terminate a RunPod resource without matching ownership")
+        await self._request("DELETE", f"/pods/{handle.external_id}", expected={204, 404})
+
+    async def list_active(self) -> list[ProvisionHandle]:
+        pods = await self.list_account_pods()
+        handles: list[ProvisionHandle] = []
+        for pod in pods:
+            if not self._is_managed(pod):
+                continue
+            desired = str(pod.get("desiredStatus") or pod.get("status") or "").upper()
+            if desired in {"EXITED", "TERMINATED", "STOPPED"}:
+                continue
+            job_id = _env(pod).get("VF_JOB_ID")
+            approval_id = _env(pod).get("VF_APPROVAL_ID")
+            if not job_id or not approval_id:
+                continue
+            handles.append(
+                ProvisionHandle(
+                    provider=ProvisionProvider.RUNPOD,
+                    external_id=_required_text(pod, "id"),
+                    job_id=job_id,
+                    approval_id=approval_id,
+                    region=_region(pod),
+                    ssh=_ssh_endpoint(pod),
+                    labels={"name": str(pod.get("name", "")), OWNER_MARKER_KEY: OWNER_MARKER_VALUE},
+                    created_at=_created_at(pod),
+                )
+            )
+        return handles
+
+    async def list_account_pods(self) -> list[dict[str, Any]]:
+        body = await self._request_json("GET", "/pods", expected={200})
+        if isinstance(body, list):
+            values = body
+        elif isinstance(body, dict):
+            values = body.get("pods") or body.get("items") or []
+        else:
+            raise ProvisionProviderError("RunPod list response is not an object or list")
+        if not isinstance(values, list) or not all(isinstance(item, dict) for item in values):
+            raise ProvisionProviderError("RunPod list response has an invalid pods collection")
+        return list(values)
+
+    async def get_pod(self, external_id: str) -> dict[str, Any] | None:
+        response = await self._request("GET", f"/pods/{external_id}", expected={200, 404})
+        if response.status_code == 404:
+            return None
+        return _object(_decode_json(response), "RunPod pod response")
+
+    async def billing(
+        self,
+        external_id: str,
+        *,
+        start_time: datetime,
+    ) -> RunPodBilling:
+        body = await self._request_json(
+            "GET",
+            "/billing/pods",
+            params={
+                "podId": external_id,
+                "startTime": start_time.astimezone(timezone.utc).isoformat().replace("+00:00", "Z"),
+                "grouping": "podId",
+                "bucketSize": "hour",
+            },
+            expected={200},
+        )
+        if isinstance(body, list):
+            records = body
+        elif isinstance(body, dict):
+            records = body.get("records") or body.get("billingRecords") or body.get("data") or []
+        else:
+            records = []
+        if not isinstance(records, list) or not all(isinstance(record, dict) for record in records):
+            raise ProvisionProviderError("RunPod billing response has invalid records")
+        amount = sum(_number(record, "amount", "cost", "amountUsd") for record in records)
+        billed_ms = int(sum(_number(record, "timeBilledMs", "time_billed_ms") for record in records))
+        return RunPodBilling(amount_usd=round(amount, 6), time_billed_ms=billed_ms, records=tuple(records))
+
+    def _handle_from_pod(self, pod: Mapping[str, Any], *, spec: ProvisionSpec) -> ProvisionHandle:
+        return ProvisionHandle(
+            provider=ProvisionProvider.RUNPOD,
+            external_id=_required_text(pod, "id"),
+            job_id=spec.job_id,
+            approval_id=spec.approval_id,
+            region=_region(pod),
+            ssh=_ssh_endpoint(pod),
+            labels={"name": str(pod.get("name", "")), OWNER_MARKER_KEY: OWNER_MARKER_VALUE},
+            created_at=_created_at(pod),
+        )
+
+    def _is_managed(
+        self,
+        pod: Mapping[str, Any],
+        *,
+        expected_name: str | None = None,
+        expected_job_id: str | None = None,
+    ) -> bool:
+        name = str(pod.get("name") or "")
+        environment = _env(pod)
+        if not name.startswith(MANAGED_NAME_PREFIX):
+            return False
+        if expected_name is not None and name != expected_name:
+            return False
+        if environment.get(OWNER_MARKER_KEY) != OWNER_MARKER_VALUE:
+            return False
+        if expected_job_id is not None and environment.get("VF_JOB_ID") != expected_job_id:
+            return False
+        return True
+
+    @staticmethod
+    def _managed_name(job_id: str) -> str:
+        return f"{MANAGED_NAME_PREFIX}{job_id}"
+
+    async def _request_json(
+        self,
+        method: str,
+        path: str,
+        *,
+        expected: set[int],
+        **kwargs: Any,
+    ) -> Any:
+        return _decode_json(await self._request(method, path, expected=expected, **kwargs))
+
+    async def _request(
+        self,
+        method: str,
+        path: str,
+        *,
+        expected: set[int],
+        **kwargs: Any,
+    ) -> httpx.Response:
+        headers = dict(kwargs.pop("headers", {}))
+        headers["Authorization"] = f"Bearer {self._api_key}"
+        headers["Content-Type"] = "application/json"
+        try:
+            response = await self.client.request(
+                method, f"{self.base_url}{path}", headers=headers, **kwargs
+            )
+        except httpx.HTTPError as error:
+            raise ProvisionProviderError(
+                f"RunPod {method} {path} transport failed: {type(error).__name__}"
+            ) from error
+        if response.status_code not in expected:
+            body = response.text[:_ERROR_BODY_LIMIT]
+            raise ProvisionProviderError(
+                f"RunPod {method} {path} returned HTTP {response.status_code}: {body}"
+            )
+        return response
+
+
+def _decode_json(response: httpx.Response) -> Any:
+    try:
+        return response.json()
+    except ValueError as error:
+        raise ProvisionProviderError("RunPod response was not valid JSON") from error
+
+
+def _object(value: Any, label: str) -> dict[str, Any]:
+    if not isinstance(value, dict):
+        raise ProvisionProviderError(f"{label} is not an object")
+    return value
+
+
+def _required_text(value: Mapping[str, Any], key: str) -> str:
+    result = value.get(key)
+    if not isinstance(result, str) or not result:
+        raise ProvisionProviderError(f"RunPod response is missing {key}")
+    return result
+
+
+def _env(pod: Mapping[str, Any]) -> dict[str, str]:
+    value = pod.get("env") or pod.get("environment") or {}
+    if isinstance(value, dict):
+        return {str(key): str(item) for key, item in value.items()}
+    if isinstance(value, list):
+        result: dict[str, str] = {}
+        for item in value:
+            if isinstance(item, dict) and item.get("key") is not None:
+                result[str(item["key"])] = str(item.get("value", ""))
+        return result
+    return {}
+
+
+def _ssh_endpoint(pod: Mapping[str, Any]) -> str | None:
+    public_ip = pod.get("publicIp") or pod.get("public_ip")
+    port: Any = None
+    mappings = pod.get("portMappings") or pod.get("port_mappings") or {}
+    if isinstance(mappings, dict):
+        port = mappings.get("22") or mappings.get(22) or mappings.get("22/tcp")
+    runtime = pod.get("runtime")
+    if (not public_ip or not port) and isinstance(runtime, dict):
+        for entry in runtime.get("ports") or []:
+            if not isinstance(entry, dict):
+                continue
+            if int(entry.get("privatePort") or 0) != 22:
+                continue
+            public_ip = public_ip or entry.get("ip")
+            port = port or entry.get("publicPort")
+            break
+    if not public_ip or not port:
+        return None
+    return f"root@{public_ip}:{int(port)}"
+
+
+def _uptime_seconds(pod: Mapping[str, Any]) -> float:
+    runtime = pod.get("runtime")
+    if isinstance(runtime, dict):
+        value = runtime.get("uptimeInSeconds") or runtime.get("uptime_seconds") or 0
+        return max(0.0, float(value or 0))
+    direct = pod.get("uptimeInSeconds")
+    if direct is not None:
+        return max(0.0, float(direct or 0))
+    started = pod.get("lastStartedAt")
+    if isinstance(started, str):
+        try:
+            value = datetime.fromisoformat(started.replace("Z", "+00:00"))
+            return max(0.0, (datetime.now(timezone.utc) - value).total_seconds())
+        except ValueError:
+            pass
+    return 0.0
+
+
+def _hourly_price(pod: Mapping[str, Any]) -> float:
+    for container in (pod, pod.get("gpu") or {}, pod.get("machine") or {}):
+        if not isinstance(container, Mapping):
+            continue
+        for key in ("adjustedCostPerHr", "costPerHr", "costPerHour", "communityPrice", "securePrice"):
+            value = container.get(key)
+            if value is not None:
+                return max(0.0, float(value))
+    return 0.0
+
+
+def _provider_error(pod: Mapping[str, Any]) -> str:
+    for key in ("error", "lastError", "message"):
+        value = pod.get(key)
+        if value:
+            return str(value)[:1000]
+    return ""
+
+
+def _region(pod: Mapping[str, Any]) -> str | None:
+    value = pod.get("dataCenterId") or pod.get("region")
+    if value:
+        return str(value)[:64]
+    machine = pod.get("machine")
+    if isinstance(machine, dict) and machine.get("dataCenterId"):
+        return str(machine["dataCenterId"])[:64]
+    return None
+
+
+def _created_at(pod: Mapping[str, Any]) -> datetime:
+    value = pod.get("createdAt") or pod.get("created_at") or pod.get("lastStartedAt")
+    if isinstance(value, str):
+        try:
+            return datetime.fromisoformat(value.replace("Z", "+00:00"))
+        except ValueError:
+            pass
+    return datetime.now(timezone.utc)
+
+
+def _number(value: Mapping[str, Any], *keys: str) -> float:
+    for key in keys:
+        raw = value.get(key)
+        if raw is not None:
+            try:
+                return float(raw)
+            except (TypeError, ValueError):
+                return 0.0
+    return 0.0
+
+
+__all__ = [
+    "MANAGED_NAME_PREFIX",
+    "OWNER_MARKER_KEY",
+    "OWNER_MARKER_VALUE",
+    "RUNPOD_API_BASE_URL",
+    "RUNPOD_IMAGE",
+    "RunPodAdapter",
+    "RunPodBilling",
+]

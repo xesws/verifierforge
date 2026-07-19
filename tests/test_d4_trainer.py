@@ -58,6 +58,16 @@ def test_d4_main_and_control_configs_are_explicit_and_separate(tmp_path: Path) -
     assert "reward.custom_reward_function.name=compute_random_score" in control_command
 
 
+def test_p2_profile_is_frozen_s3_delivery_shape() -> None:
+    config = GrpoSmokeConfig.load("grpo_v1_0p5b_p2")
+
+    assert config.model_path == "Qwen/Qwen2.5-0.5B-Instruct"
+    assert (config.total_steps, config.rollout_n, config.checkpoint_every) == (100, 8, 50)
+    assert config.dataset_mode == "frozen_training_pool"
+    assert config.reward_function_name == "compute_score"
+    assert config.save_hf_model is True
+
+
 def test_frozen_training_mode_uses_all_pool_rows_and_no_heldout(monkeypatch, tmp_path: Path) -> None:
     written: dict[str, list[dict[str, object]]] = {}
 

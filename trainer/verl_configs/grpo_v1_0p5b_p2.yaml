@@ -1,0 +1,21 @@
+# v0.28.0 approval-driven P2: frozen pool, S3-only state, serveable exports.
+model_path: Qwen/Qwen2.5-0.5B-Instruct
+total_steps: 100
+total_epochs: null
+train_batch_size: 4
+rollout_n: 8
+max_prompt_length: 1024
+max_response_length: 512
+lora_rank: 16
+lora_alpha: 32
+learning_rate: 1.0e-6
+kl_loss_coef: 0.001
+rollout_gpu_memory_utilization: 0.40
+enforce_eager: false
+vllm_attention_backend: null
+checkpoint_every: 50
+validation_every: 10
+dataset_mode: frozen_training_pool
+reward_mode: verifier
+save_hf_model: true
+entropy_brake: false

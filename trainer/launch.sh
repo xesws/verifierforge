@@ -23,7 +23,7 @@ case "$cfg" in
   fake_smoke)
     exec "$python" -m trainer.fake_train --job "$job" --steps 150 --interval 2
     ;;
-  grpo_v1_0p5b)
+  grpo_v1_0p5b|grpo_v1_0p5b_p2)
     exec "$python" -m trainer.grpo_train --job "$job" --config "$cfg"
     ;;
   grpo_v1_0p5b_preflight)

@@ -3,6 +3,7 @@ uvicorn[standard]>=0.27
 pydantic>=2,<3
 sqlparse>=0.5
 openai>=1,<3
+httpx>=0.27,<1
 python-dotenv>=1,<2
 # v0.16.0: S3 Storage contract tests use moto; the runtime backend uses boto3.
 boto3>=1.34,<2

@@ -19,5 +19,9 @@ class ProvisionCreateTimeout(ProvisionLifecycleError):
     """Raised when a provider does not return a handle in time."""
 
 
+class ProvisionProviderError(ProvisionLifecycleError):
+    """Raised for a bounded, secret-safe provider HTTP failure."""
+
+
 class ProvisionAuditError(ProvisioningError):
     """Raised when durable audit cannot be written."""

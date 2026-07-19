@@ -413,6 +413,34 @@ class SQLAlchemyApprovalStore:
             row = await session.scalar(statement)
             return _approval_record(row) if row else None
 
+    async def get(self, approval_id: str) -> ApprovalRecord | None:
+        _text(approval_id, "approval_id")
+        async with _transaction(self.sessions) as session:
+            row = await session.get(ApprovalRow, approval_id)
+            return _approval_record(row) if row else None
+
+    async def bind_provision_handle(
+        self, approval_id: str, provision_handle: str
+    ) -> ApprovalRecord:
+        """Bind an approval exactly once inside one database transaction."""
+        _text(approval_id, "approval_id")
+        _text(provision_handle, "provision_handle")
+        async with _transaction(self.sessions) as session:
+            statement = (
+                select(ApprovalRow)
+                .where(ApprovalRow.id == approval_id)
+                .with_for_update()
+            )
+            row = await session.scalar(statement)
+            if row is None:
+                raise ValueError("approval does not exist")
+            if row.provision_handle is None:
+                row.provision_handle = provision_handle
+                await session.flush()
+            elif row.provision_handle != provision_handle:
+                raise ValueError("approval is already bound to another provision handle")
+            return _approval_record(row)
+
 
 class SQLAlchemyProvisionAuditStore:
     def __init__(self, sessions: async_sessionmaker[AsyncSession]) -> None:

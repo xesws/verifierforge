@@ -161,7 +161,7 @@ class LifecycleOrchestrator:
             raise
 
         self._managed[self._key(handle)] = _ManagedProvision(
-            spec=spec, last_state=ProvisionState.REQUESTED
+            spec=spec, last_state=ProvisionState.PROVISIONING
         )
         return handle
 
@@ -185,6 +185,29 @@ class LifecycleOrchestrator:
             )
 
         observed = await self.adapter.status(handle)
+        return await self.observe(handle, observed)
+
+    async def observe(
+        self, handle: ProvisionHandle, observed: ProvisionStatus
+    ) -> ProvisionStatus:
+        """Apply lifecycle/fuse policy to a provider or workload observation."""
+        key = self._key(handle)
+        managed = self._managed.get(key)
+        if managed is None:
+            raise ProvisionLifecycleError(f"unmanaged provision handle: {handle.external_id}")
+        if managed.terminal_status is not None:
+            return managed.terminal_status
+        if self.kill_switch.active:
+            return await self._terminate_and_mark(
+                handle=handle,
+                managed=managed,
+                observed=observed,
+                terminal_state=ProvisionState.TERMINATED,
+                actor="system",
+                action="kill_switch.terminated",
+                reason=self.kill_switch.reason,
+            )
+
         if not self._is_legal_transition(managed.last_state, observed.state):
             return await self._terminate_and_mark(
                 handle=handle,
@@ -250,6 +273,29 @@ class LifecycleOrchestrator:
             return observed
 
         return observed
+
+    async def terminate(
+        self,
+        handle: ProvisionHandle,
+        *,
+        actor: str = "system",
+        reason: str = "termination requested",
+    ) -> ProvisionStatus:
+        """Terminate one managed handle and durably close its lifecycle."""
+        managed = self._managed.get(self._key(handle))
+        if managed is None:
+            raise ProvisionLifecycleError(f"unmanaged provision handle: {handle.external_id}")
+        if managed.terminal_status is not None:
+            return managed.terminal_status
+        return await self._terminate_and_mark(
+            handle=handle,
+            managed=managed,
+            observed=None,
+            terminal_state=ProvisionState.TERMINATED,
+            actor=actor,
+            action="lifecycle.terminated",
+            reason=reason,
+        )
 
     async def run_to_completion(self, spec: ProvisionSpec) -> ProvisionStatus:
         try:
