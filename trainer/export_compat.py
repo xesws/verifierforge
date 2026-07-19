@@ -54,6 +54,7 @@ class ConversionResult:
     lora_rank: int
     lora_alpha: int
     source_index_sha256: str
+    source_identity_file: str
     already_present: bool
 
     def as_dict(self) -> dict[str, object]:
@@ -155,10 +156,8 @@ def convert_prefixed_full_export(
         raise ExportCompatibilityError(
             f"expected prefixed_full export, found {inspection.layout!r} at {source}"
         )
-    source_index = source / "model.safetensors.index.json"
-    if not source_index.is_file():
-        raise ExportCompatibilityError(f"missing safetensors index: {source_index}")
-    source_index_sha256 = sha256_file(source_index)
+    source_identity = _source_weight_identity(source)
+    source_index_sha256 = sha256_file(source_identity)
 
     if destination.exists():
         if is_serveable_export(destination):
@@ -171,6 +170,9 @@ def convert_prefixed_full_export(
                     lora_rank=lora_rank,
                     lora_alpha=lora_alpha,
                     source_index_sha256=source_index_sha256,
+                    source_identity_file=str(
+                        manifest.get("source_identity_file", source_identity.name)
+                    ),
                     already_present=True,
                 )
         raise ExportCompatibilityError(f"refusing to overwrite non-matching serveable export: {destination}")
@@ -196,6 +198,7 @@ def convert_prefixed_full_export(
             lora_rank=lora_rank,
             lora_alpha=lora_alpha,
             source_index_sha256=source_index_sha256,
+            source_identity_file=source_identity.name,
             already_present=False,
         )
         _write_json_atomic(temporary / SERVEABLE_MANIFEST, result.as_dict())
@@ -385,6 +388,18 @@ def _safetensors_files(source: Path) -> list[Path]:
     if not files:
         raise ExportCompatibilityError(f"no safetensors files in {source}")
     return files
+
+
+def _source_weight_identity(source: Path) -> Path:
+    index = Path(source) / "model.safetensors.index.json"
+    if index.is_file():
+        return index
+    shards = _safetensors_files(source)
+    if len(shards) == 1:
+        return shards[0]
+    raise ExportCompatibilityError(
+        f"missing safetensors index for multi-shard export: {index}"
+    )
 
 
 def _safe_open():

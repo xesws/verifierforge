@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import argparse
 import asyncio
-from dataclasses import asdict
+from dataclasses import asdict, dataclass
 from datetime import datetime, timezone
 import json
 import os
@@ -68,6 +68,12 @@ class LiveExecutionError(RuntimeError):
     pass
 
 
+@dataclass(frozen=True)
+class FullRetryAdmission:
+    previous_external_id: str
+    prior_estimated_cost_usd: float
+
+
 class EvidenceLedger:
     """Atomic local evidence with no credential-bearing fields."""
 
@@ -107,7 +113,10 @@ async def execute_live(
     *,
     poll_seconds: int,
     resume_gold_evidence: Path | None = None,
+    resume_full_evidence: Path | None = None,
 ) -> dict[str, Any]:
+    if resume_gold_evidence is not None and resume_full_evidence is not None:
+        raise LiveExecutionError("gold resume and full-run retry are mutually exclusive")
     _require_local_environment()
     settings = DatabaseSettings.from_env()
     runtime = create_database_runtime(settings)
@@ -125,13 +134,16 @@ async def execute_live(
         approval = await repositories.approvals.get(approval_id)
         if approval is None:
             raise LiveExecutionError("approval does not exist")
-        if approval.provision_handle is not None:
+        if resume_full_evidence is None and approval.provision_handle is not None:
             raise LiveExecutionError("approval is already bound to a provision handle")
+        if resume_full_evidence is not None and approval.provision_handle is None:
+            raise LiveExecutionError("full-run retry requires an approval bound to the failed handle")
         decision = await repositories.agent_decisions.get(approval.decision_id)
         if decision is None or decision.decision != "forge" or decision.config_json is None:
             raise LiveExecutionError("approval does not reference a persisted forge decision")
         config = validate_p2_config(decision.config_json)
-        job_id = f"p2-{approval.id[:20]}"
+        base_job_id = f"p2-{approval.id[:20]}"
+        job_id = f"{base_job_id}-r2" if resume_full_evidence is not None else base_job_id
         evidence = EvidenceLedger(
             EVIDENCE_ROOT / job_id / f"lifecycle-{datetime.now(timezone.utc).strftime('%Y%m%dT%H%M%SZ')}.json",
             approval_id=approval.id,
@@ -151,7 +163,27 @@ async def execute_live(
             )
 
         public_key = _public_key()
-        if resume_gold_evidence is not None:
+        replacement_for_external_id: str | None = None
+        if resume_full_evidence is not None:
+            admission = await _resume_full_path(
+                adapter=adapter,
+                audit=audit,
+                provision_audit=repositories.provision_audit,
+                approval=approval,
+                previous_path=resume_full_evidence,
+                evidence=evidence,
+            )
+            replacement_for_external_id = admission.previous_external_id
+            wave_estimated_cost = admission.prior_estimated_cost_usd
+            _check_wave_budget(wave_estimated_cost)
+            _assert_clean_s3_prefix(
+                _s3_client(),
+                bucket=os.environ["VF_S3_BUCKET"],
+                prefix=os.environ.get("VF_S3_PREFIX", "vf"),
+                job_id=job_id,
+            )
+            evidence.event("training.retry-prefix-empty", s3_job_id=job_id)
+        elif resume_gold_evidence is not None:
             wave_estimated_cost += await _resume_gold_path(
                 adapter=adapter,
                 audit=audit,
@@ -171,21 +203,22 @@ async def execute_live(
                 evidence=evidence,
                 billing_schedule=billing_schedule,
             )
-        _check_wave_budget(wave_estimated_cost)
-        wave_estimated_cost += await _orphan_probe(
-            adapter=adapter,
-            orchestrator=orchestrator,
-            audit=audit,
-            registry=DatabaseActiveProvisionRegistry(
-                approvals=repositories.approvals,
-                provision_audit=repositories.provision_audit,
-            ),
-            approval_id=approval.id,
-            public_key=public_key,
-            evidence=evidence,
-            billing_schedule=billing_schedule,
-        )
-        _check_wave_budget(wave_estimated_cost)
+        if resume_full_evidence is None:
+            _check_wave_budget(wave_estimated_cost)
+            wave_estimated_cost += await _orphan_probe(
+                adapter=adapter,
+                orchestrator=orchestrator,
+                audit=audit,
+                registry=DatabaseActiveProvisionRegistry(
+                    approvals=repositories.approvals,
+                    provision_audit=repositories.provision_audit,
+                ),
+                approval_id=approval.id,
+                public_key=public_key,
+                evidence=evidence,
+                billing_schedule=billing_schedule,
+            )
+            _check_wave_budget(wave_estimated_cost)
 
         result = await _full_training(
             adapter=adapter,
@@ -200,6 +233,7 @@ async def execute_live(
             prior_estimated_cost=wave_estimated_cost,
             poll_seconds=poll_seconds,
             billing_schedule=billing_schedule,
+            replacement_for_external_id=replacement_for_external_id,
         )
         wave_estimated_cost += float(result["estimated_cost_usd"])
         _check_wave_budget(wave_estimated_cost)
@@ -216,7 +250,7 @@ async def execute_live(
             "billing_schedule": str(billing_schedule),
             "evidence": str(evidence.path),
         }
-    except Exception as error:
+    except BaseException as error:
         if "evidence" in locals():
             evidence.finish(
                 status="failed",
@@ -229,6 +263,123 @@ async def execute_live(
     finally:
         await adapter.aclose()
         await runtime.close()
+
+
+async def _resume_full_path(
+    *,
+    adapter: RunPodAdapter,
+    audit: DatabaseAuditLog,
+    provision_audit: Any,
+    approval: Any,
+    previous_path: Path,
+    evidence: EvidenceLedger,
+) -> FullRetryAdmission:
+    """Admit one fail-closed replacement without rebinding its approval."""
+    previous_path = Path(previous_path).expanduser().resolve()
+    try:
+        previous = json.loads(previous_path.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError) as error:
+        raise LiveExecutionError("full-run retry evidence is unreadable") from error
+    expected_job_id = f"p2-{approval.id[:20]}"
+    if previous.get("approval_id") != approval.id or previous.get("job_id") != expected_job_id:
+        raise LiveExecutionError("full-run retry evidence does not match the approval/job")
+    events = previous.get("events")
+    if not isinstance(events, list):
+        raise LiveExecutionError("full-run retry evidence has no event list")
+
+    required = (
+        "gold.cleanup-admitted",
+        "orphan.reaped",
+        "training.created",
+        "training.terminated",
+    )
+    selected: dict[str, dict[str, Any]] = {}
+    for action in required:
+        matches = [
+            item for item in events
+            if isinstance(item, dict) and item.get("action") == action
+        ]
+        if len(matches) != 1:
+            raise LiveExecutionError(
+                f"full-run retry evidence must contain exactly one {action!r} event"
+            )
+        selected[action] = matches[0]
+    if any(
+        isinstance(item, dict) and item.get("action") == "training.collected"
+        for item in events
+    ):
+        raise LiveExecutionError("completed training evidence is not eligible for retry")
+
+    external_id = str(selected["training.created"].get("external_id", ""))
+    terminated = selected["training.terminated"]
+    if (
+        not external_id
+        or terminated.get("external_id") != external_id
+        or approval.provision_handle != external_id
+    ):
+        raise LiveExecutionError("full-run retry provider identity is inconsistent")
+    deletion = terminated.get("deletion")
+    if not isinstance(deletion, dict) or not deletion.get("target_absent"):
+        raise LiveExecutionError("full-run retry evidence lacks target-absent deletion proof")
+    if deletion.get("vf_auto_prefix_count") != 0:
+        raise LiveExecutionError("full-run retry evidence lacks prefix-zero deletion proof")
+
+    audit_events = await provision_audit.list_for_approval(approval.id)
+    matching_actions = {
+        record.action
+        for record in audit_events
+        if record.detail_json.get("external_id") == external_id
+    }
+    if "provision.terminated" not in matching_actions:
+        raise LiveExecutionError("full-run retry has no matching terminal audit")
+    if "provider.deletion_confirmed" not in matching_actions:
+        raise LiveExecutionError("full-run retry has no matching deletion-confirmed audit")
+
+    created_at = _parse_datetime(str(previous.get("started_at", "")))
+    deleted_at = _parse_datetime(str(deletion.get("checked_at", "")))
+    elapsed_seconds = (deleted_at - created_at).total_seconds()
+    if elapsed_seconds <= 0:
+        raise LiveExecutionError("full-run retry evidence has an invalid elapsed interval")
+    prior_estimated_cost = (
+        elapsed_seconds / (P2_MAX_RUNTIME_MIN * 60) * P2_WAVE_BUDGET_USD
+    )
+    handle = ProvisionHandle(
+        provider=ProvisionProvider.RUNPOD,
+        external_id=external_id,
+        job_id=expected_job_id,
+        approval_id=approval.id,
+        created_at=created_at,
+    )
+    receipt = await _confirm_deleted(adapter, handle, timeout_s=0, poll_s=0)
+    evidence.event(
+        "training.retry-admitted",
+        previous_external_id=external_id,
+        previous_evidence=str(previous_path),
+        deletion=asdict(receipt),
+        elapsed_seconds=round(elapsed_seconds, 3),
+        prior_estimated_cost_usd=round(prior_estimated_cost, 6),
+    )
+    await audit.append(
+        ProvisionAuditEvent(
+            actor="p2-executor",
+            job_id=f"{expected_job_id}-r2",
+            approval_id=approval.id,
+            action="provision.retry-admitted",
+            provider=ProvisionProvider.RUNPOD,
+            external_id=external_id,
+            before_state=ProvisionState.TERMINATED,
+            after_state=ProvisionState.TERMINATED,
+            reason="fail-closed export compatibility retry admitted from deletion proof",
+            detail={
+                "previous_job_id": expected_job_id,
+                "prior_estimated_cost_usd": round(prior_estimated_cost, 6),
+            },
+        )
+    )
+    return FullRetryAdmission(
+        previous_external_id=external_id,
+        prior_estimated_cost_usd=prior_estimated_cost,
+    )
 
 
 async def _resume_gold_path(
@@ -449,6 +600,7 @@ async def _full_training(
     prior_estimated_cost: float,
     poll_seconds: int,
     billing_schedule: Path,
+    replacement_for_external_id: str | None = None,
 ) -> dict[str, Any]:
     s3_prefix = os.environ.get("VF_S3_PREFIX", "vf").strip("/")
     job = JobRecord(
@@ -458,7 +610,15 @@ async def _full_training(
         config_json=config.model_dump(mode="json"),
         created_at=datetime.now(timezone.utc),
         s3_prefix=f"{s3_prefix}/jobs/{job_id}",
-        summary_json={"approval_id": approval.id, "profile": P2_CONFIG_NAME},
+        summary_json={
+            "approval_id": approval.id,
+            "profile": P2_CONFIG_NAME,
+            **(
+                {"retry_of": replacement_for_external_id}
+                if replacement_for_external_id is not None
+                else {}
+            ),
+        },
     )
     await repositories.jobs.put(job)
     spec = _spec(
@@ -478,12 +638,36 @@ async def _full_training(
     estimated_cost = 0.0
     try:
         handle = await orchestrator.request(spec)
-        try:
-            await repositories.approvals.bind_provision_handle(approval.id, handle.external_id)
-        except Exception:
-            cleanup_trigger = time.monotonic()
-            raise
-        evidence.event("training.created", external_id=handle.external_id)
+        if replacement_for_external_id is None:
+            try:
+                await repositories.approvals.bind_provision_handle(approval.id, handle.external_id)
+            except Exception:
+                cleanup_trigger = time.monotonic()
+                raise
+            evidence.event("training.created", external_id=handle.external_id)
+        else:
+            if approval.provision_handle != replacement_for_external_id:
+                cleanup_trigger = time.monotonic()
+                raise LiveExecutionError("retry approval binding changed before provider create")
+            await audit.append(
+                ProvisionAuditEvent(
+                    actor="p2-executor",
+                    job_id=job_id,
+                    approval_id=approval.id,
+                    action="provision.retry",
+                    provider=ProvisionProvider.RUNPOD,
+                    external_id=handle.external_id,
+                    before_state=ProvisionState.PROVISIONING,
+                    after_state=ProvisionState.PROVISIONING,
+                    reason="replacement for a fail-closed checkpoint publication attempt",
+                    detail={"retry_of": replacement_for_external_id},
+                )
+            )
+            evidence.event(
+                "training.retry-created",
+                external_id=handle.external_id,
+                retry_of=replacement_for_external_id,
+            )
         await repositories.jobs.put(_job_status(job, "running", {"external_id": handle.external_id}))
         ready = await _wait_for_ssh(adapter, orchestrator, handle, timeout_s=SSH_READY_TIMEOUT_SECONDS)
         estimated_cost = max(estimated_cost, ready.cost_accrued_usd)
@@ -612,6 +796,11 @@ async def _full_training(
         "latest_step": P2_TOTAL_STEPS,
         "revision": revision,
         "collection_dir": str(EVIDENCE_ROOT / job_id / "collected"),
+        **(
+            {"retry_of": replacement_for_external_id}
+            if replacement_for_external_id is not None
+            else {}
+        ),
     }
 
 
@@ -894,6 +1083,19 @@ def _s3_client():
     return boto3.client("s3", region_name=os.environ.get("VF_S3_REGION") or os.environ.get("AWS_DEFAULT_REGION"))
 
 
+def _assert_clean_s3_prefix(client: Any, *, bucket: str, prefix: str, job_id: str) -> None:
+    job_prefix = "/".join(
+        part for part in (prefix.strip("/"), "jobs", job_id) if part
+    )
+    response = client.list_objects_v2(
+        Bucket=bucket,
+        Prefix=f"{job_prefix}/",
+        MaxKeys=1,
+    )
+    if response.get("Contents"):
+        raise LiveExecutionError(f"retry S3 prefix is not empty: {job_prefix}")
+
+
 def _now() -> str:
     return datetime.now(timezone.utc).isoformat()
 
@@ -905,6 +1107,7 @@ def parse_args() -> argparse.Namespace:
     action.add_argument("--reconcile-billing", type=Path)
     parser.add_argument("--approval-id")
     parser.add_argument("--resume-gold-evidence", type=Path)
+    parser.add_argument("--resume-full-evidence", type=Path)
     parser.add_argument("--billing-slot", choices=tuple(BILLING_SLOTS))
     parser.add_argument("--poll-seconds", type=int, default=TRAINING_POLL_SECONDS)
     args = parser.parse_args()
@@ -914,7 +1117,11 @@ def parse_args() -> argparse.Namespace:
         parser.error("--billing-slot is only valid with --reconcile-billing")
     if args.reconcile_billing and not args.billing_slot:
         parser.error("--billing-slot is required with --reconcile-billing")
-    if args.reconcile_billing and (args.approval_id or args.resume_gold_evidence):
+    if args.resume_gold_evidence and args.resume_full_evidence:
+        parser.error("--resume-gold-evidence and --resume-full-evidence are mutually exclusive")
+    if args.reconcile_billing and (
+        args.approval_id or args.resume_gold_evidence or args.resume_full_evidence
+    ):
         parser.error("approval/resume arguments are invalid with --reconcile-billing")
     if args.execute_live and args.poll_seconds < 30:
         parser.error("--poll-seconds must be at least 30")
@@ -934,6 +1141,7 @@ def main() -> None:
                 args.approval_id,
                 poll_seconds=args.poll_seconds,
                 resume_gold_evidence=args.resume_gold_evidence,
+                resume_full_evidence=args.resume_full_evidence,
             )
         )
     print(json.dumps(result, indent=2, sort_keys=True))

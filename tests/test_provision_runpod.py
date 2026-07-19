@@ -15,8 +15,10 @@ from core.provisioning_contracts import ProvisionHandle, ProvisionProvider
 from scripts.provision_runpod import (
     EvidenceLedger,
     LiveExecutionError,
+    _assert_clean_s3_prefix,
     _check_wave_budget,
     _confirm_deleted,
+    _resume_full_path,
     _resume_gold_path,
     _schedule_billing,
     reconcile_billing,
@@ -151,6 +153,150 @@ def test_resume_gold_preserves_failed_evidence_and_creates_no_second_gold(
     assert saved["resources"][0]["slots"]["plus-1h"]["due_at"] == (
         deleted_at + timedelta(hours=1)
     ).isoformat()
+
+
+def test_full_retry_requires_terminal_evidence_and_preserves_approval_binding(
+    tmp_path: Path,
+) -> None:
+    approval_id = "approval-12345678901234567890"
+    job_id = f"p2-{approval_id[:20]}"
+    external_id = "failed-training-pod"
+    started_at = datetime(2026, 7, 19, 10, tzinfo=timezone.utc)
+    deleted_at = started_at + timedelta(minutes=20)
+    previous = tmp_path / "failed-full-lifecycle.json"
+    previous.write_text(
+        json.dumps(
+            {
+                "approval_id": approval_id,
+                "job_id": job_id,
+                "started_at": started_at.isoformat(),
+                "events": [
+                    {"action": "gold.cleanup-admitted"},
+                    {"action": "orphan.reaped"},
+                    {"action": "training.created", "external_id": external_id},
+                    {
+                        "action": "training.terminated",
+                        "external_id": external_id,
+                        "deletion": {
+                            "checked_at": deleted_at.isoformat(),
+                            "target_absent": True,
+                            "vf_auto_prefix_count": 0,
+                        },
+                    },
+                ],
+            }
+        ),
+        encoding="utf-8",
+    )
+    before = previous.read_bytes()
+    records = [
+        SimpleNamespace(
+            action=action,
+            detail_json={"external_id": external_id},
+        )
+        for action in ("provision.terminated", "provider.deletion_confirmed")
+    ]
+    approval = SimpleNamespace(id=approval_id, provision_handle=external_id)
+    audit = InMemoryAuditLog()
+    ledger = EvidenceLedger(
+        tmp_path / "retry" / "lifecycle.json",
+        approval_id=approval_id,
+        job_id=f"{job_id}-r2",
+    )
+
+    admission = _run(
+        _resume_full_path(
+            adapter=_DeletionAdapter(inventory=[]),
+            audit=audit,
+            provision_audit=_AuditStore(records),
+            approval=approval,
+            previous_path=previous,
+            evidence=ledger,
+        )
+    )
+
+    assert admission.previous_external_id == external_id
+    assert admission.prior_estimated_cost_usd == pytest.approx(20 / 180 * 5)
+    assert approval.provision_handle == external_id
+    assert previous.read_bytes() == before
+    assert ledger.payload["events"][0]["action"] == "training.retry-admitted"
+    assert [event.action for event in audit.events] == ["provision.retry-admitted"]
+
+
+def test_full_retry_rejects_a_different_bound_provider_identity(tmp_path: Path) -> None:
+    approval_id = "approval-12345678901234567890"
+    job_id = f"p2-{approval_id[:20]}"
+    now = datetime(2026, 7, 19, 10, tzinfo=timezone.utc)
+    previous = tmp_path / "failed-full-lifecycle.json"
+    previous.write_text(
+        json.dumps(
+            {
+                "approval_id": approval_id,
+                "job_id": job_id,
+                "started_at": now.isoformat(),
+                "events": [
+                    {"action": "gold.cleanup-admitted"},
+                    {"action": "orphan.reaped"},
+                    {"action": "training.created", "external_id": "old-pod"},
+                    {
+                        "action": "training.terminated",
+                        "external_id": "old-pod",
+                        "deletion": {
+                            "checked_at": (now + timedelta(minutes=1)).isoformat(),
+                            "target_absent": True,
+                            "vf_auto_prefix_count": 0,
+                        },
+                    },
+                ],
+            }
+        ),
+        encoding="utf-8",
+    )
+    ledger = EvidenceLedger(
+        tmp_path / "retry" / "lifecycle.json",
+        approval_id=approval_id,
+        job_id=f"{job_id}-r2",
+    )
+
+    with pytest.raises(LiveExecutionError, match="provider identity is inconsistent"):
+        _run(
+            _resume_full_path(
+                adapter=_DeletionAdapter(inventory=[]),
+                audit=InMemoryAuditLog(),
+                provision_audit=_AuditStore([]),
+                approval=SimpleNamespace(id=approval_id, provision_handle="other-pod"),
+                previous_path=previous,
+                evidence=ledger,
+            )
+        )
+
+
+class _S3PrefixClient:
+    def __init__(self, contents):
+        self.contents = contents
+        self.call = None
+
+    def list_objects_v2(self, **kwargs):
+        self.call = kwargs
+        return {"Contents": self.contents}
+
+
+def test_retry_s3_prefix_must_be_empty() -> None:
+    empty = _S3PrefixClient([])
+    _assert_clean_s3_prefix(empty, bucket="bucket", prefix="vf", job_id="job-r2")
+    assert empty.call == {
+        "Bucket": "bucket",
+        "Prefix": "vf/jobs/job-r2/",
+        "MaxKeys": 1,
+    }
+
+    with pytest.raises(LiveExecutionError, match="retry S3 prefix is not empty"):
+        _assert_clean_s3_prefix(
+            _S3PrefixClient([{"Key": "vf/jobs/job-r2/metrics.jsonl/step_1.json"}]),
+            bucket="bucket",
+            prefix="vf",
+            job_id="job-r2",
+        )
 
 
 class _BillingAdapter:

@@ -2546,12 +2546,18 @@ is no longer a hard stop.
   staged export contained a single `model.safetensors`; disk had 70GB free.
 - [x] Cleanup finally executed: training pod `iqen85eumbjcld` reads absent and
   raw `vf-auto-*` count is `0` at `2026-07-19T10:42:22Z`.
-- [ ] Add single-safetensors conversion coverage and fail-closed multi-shard
+- [x] Add single-safetensors conversion coverage and fail-closed multi-shard
   behavior; preserve the vLLM serving smoke.
-- [ ] Add evidence-validated full-stage retry with clean `-r2` job/S3 prefix,
+- [x] Add evidence-validated full-stage retry with clean `-r2` job/S3 prefix,
   immutable approval binding and conservative prior-spend reservation.
 - [ ] Re-run only the mandatory 100-step full stage, then collect/delete and
   finish the P-2 DoD.
+
+Pre-live retry validation: focused export/serving/provisioning suite `35
+passed`; complete suite `398 passed, 1 skipped`; `git diff --check` passed.
+The tracked secret scan found only the intentional, constructed sanitizer test
+fixture and no credential value. No provider resource was created by this
+implementation/test wave.
 
 ## 2026-07-19 v0.28.1 — v1 reviewer narrative refresh
 

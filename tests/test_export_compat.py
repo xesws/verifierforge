@@ -17,7 +17,12 @@ from trainer.export_compat import (
 )
 
 
-def _write_prefixed_export(root: Path, *, complete_pair: bool = True) -> Path:
+def _write_prefixed_export(
+    root: Path,
+    *,
+    complete_pair: bool = True,
+    write_index: bool = True,
+) -> Path:
     torch = pytest.importorskip("torch")
     save_file = pytest.importorskip("safetensors.torch").save_file
     source = root / "actor" / "huggingface"
@@ -41,11 +46,13 @@ def _write_prefixed_export(root: Path, *, complete_pair: bool = True) -> Path:
         state["base_model.model.model.layers.0.mlp.down_proj.lora_B.default.weight"] = torch.tensor(
             [[3.0], [4.0]], dtype=torch.bfloat16
         )
-    save_file(state, str(source / "model-00001-of-00001.safetensors"), metadata={"format": "pt"})
-    index = {key: "model-00001-of-00001.safetensors" for key in state}
-    (source / "model.safetensors.index.json").write_text(
-        json.dumps({"metadata": {"total_size": 1}, "weight_map": index}), encoding="utf-8"
-    )
+    shard_name = "model-00001-of-00001.safetensors" if write_index else "model.safetensors"
+    save_file(state, str(source / shard_name), metadata={"format": "pt"})
+    if write_index:
+        index = {key: shard_name for key in state}
+        (source / "model.safetensors.index.json").write_text(
+            json.dumps({"metadata": {"total_size": 1}, "weight_map": index}), encoding="utf-8"
+        )
     (source / "config.json").write_text('{"model_type":"qwen2"}', encoding="utf-8")
     (source / "tokenizer.json").write_text("{}", encoding="utf-8")
     return source
@@ -122,6 +129,33 @@ def test_converter_rejects_incomplete_lora_pair_without_publishing_destination(t
 
     assert not destination.exists()
     assert (source / "model-00001-of-00001.safetensors").is_file()
+
+
+def test_converter_accepts_one_safetensors_file_without_source_index(tmp_path: Path) -> None:
+    source = _write_prefixed_export(tmp_path, write_index=False)
+    destination = serveable_export_path(tmp_path)
+
+    result = convert_prefixed_full_export(source, destination, lora_rank=1, lora_alpha=2)
+
+    assert result.source_identity_file == "model.safetensors"
+    assert result.source_index_sha256 == hashlib.sha256(
+        (source / "model.safetensors").read_bytes()
+    ).hexdigest()
+    assert (destination / "model.safetensors.index.json").is_file()
+    assert is_serveable_export(destination)
+
+
+def test_converter_rejects_multiple_safetensors_files_without_index(tmp_path: Path) -> None:
+    source = _write_prefixed_export(tmp_path, write_index=False)
+    (source / "model-copy.safetensors").write_bytes((source / "model.safetensors").read_bytes())
+
+    with pytest.raises(ExportCompatibilityError, match="multi-shard"):
+        convert_prefixed_full_export(
+            source,
+            serveable_export_path(tmp_path),
+            lora_rank=1,
+            lora_alpha=2,
+        )
 
 
 def test_batch_converter_writes_an_atomic_job_summary(tmp_path: Path) -> None:
