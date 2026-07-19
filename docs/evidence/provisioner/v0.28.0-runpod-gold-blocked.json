@@ -1,0 +1,31 @@
+{
+  "approval_bound": false,
+  "billing_queries": [
+    {
+      "amount_usd": 0,
+      "records": 0,
+      "window_hours": 1
+    },
+    {
+      "amount_usd": 0,
+      "records": 0,
+      "window_hours": 24
+    },
+    {
+      "amount_usd": 0,
+      "records": 0,
+      "window_hours": 168
+    }
+  ],
+  "billing_timeout_minutes": 15,
+  "create_observed_at": "2026-07-19T07:56:10.188815+00:00",
+  "error": "RunPod deletion/billing receipt was not confirmed within 15 minutes",
+  "existing_user_pods_mutated": 0,
+  "external_id": "r6zizmfp8faklt",
+  "managed_active_after_delete": 0,
+  "pod_absent_after_delete": true,
+  "ready_observed_at": "2026-07-19T07:56:42.967435+00:00",
+  "semantic_tag_created": false,
+  "status": "blocked",
+  "subsequent_paid_resources_created": 0
+}

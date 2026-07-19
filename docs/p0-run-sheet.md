@@ -2494,7 +2494,7 @@ commit and push.
 - [x] Official REST contract rechecked before implementation: `POST/GET/DELETE /v1/pods` and `GET /v1/billing/pods`; create payload uses Community on-demand, one GPU, 80 GB container disk, `volumeInGb=0`, public SSH, and no `networkVolumeId`.
 - [x] Zero-cost implementation: REST adapter, double ownership filter (`vf-auto-*` + `VF_MANAGED_BY=verifierforge-p2`), fresh SSH resolution per status read, atomic approval-handle binding, handle-specific active registry, provider-neutral workload observations, S3 completion collector, exact Git-bundle bootstrap, P2 config and explicit paid CLI gate.
 - [x] Zero-cost validation: 382 passed, 1 skipped; shell syntax and Python compile clean. No provider resource was created during this phase.
-- [ ] Paid gold create/status/delete/billing receipt.
+- [ ] Paid gold create/status/delete/billing receipt — **blocked at billing receipt**. Pod `r6zizmfp8faklt` was created at `2026-07-19T07:56:10Z`, exposed SSH at `07:56:42Z`, and was deleted; subsequent `GET /v1/pods/{id}` returned absent and managed-active inventory returned zero. `GET /v1/billing/pods` returned zero records for 1-hour, 24-hour and 168-hour windows through the hard 15-minute deadline. The CLI failed closed with `RunPod deletion/billing receipt was not confirmed within 15 minutes`; no second pod was created.
 - [ ] Live orphan-reaper proof.
 - [ ] Approval-driven 0.5B/100-step S3-only run, final SHA inventory and billing-stop receipt.
-- [ ] Tag `provisioner-p2-live` only after all three paid gates pass.
+- [ ] Tag `provisioner-p2-live` only after all three paid gates pass — correctly not created.
