@@ -71,6 +71,8 @@ class LiveExecutionError(RuntimeError):
 @dataclass(frozen=True)
 class FullRetryAdmission:
     previous_external_id: str
+    root_external_id: str
+    next_job_id: str
     prior_estimated_cost_usd: float
 
 
@@ -143,7 +145,11 @@ async def execute_live(
             raise LiveExecutionError("approval does not reference a persisted forge decision")
         config = validate_p2_config(decision.config_json)
         base_job_id = f"p2-{approval.id[:20]}"
-        job_id = f"{base_job_id}-r2" if resume_full_evidence is not None else base_job_id
+        job_id = (
+            _next_retry_job_id(approval.id, resume_full_evidence)
+            if resume_full_evidence is not None
+            else base_job_id
+        )
         evidence = EvidenceLedger(
             EVIDENCE_ROOT / job_id / f"lifecycle-{datetime.now(timezone.utc).strftime('%Y%m%dT%H%M%SZ')}.json",
             approval_id=approval.id,
@@ -164,6 +170,7 @@ async def execute_live(
 
         public_key = _public_key()
         replacement_for_external_id: str | None = None
+        retry_root_external_id: str | None = None
         if resume_full_evidence is not None:
             admission = await _resume_full_path(
                 adapter=adapter,
@@ -173,7 +180,10 @@ async def execute_live(
                 previous_path=resume_full_evidence,
                 evidence=evidence,
             )
+            if admission.next_job_id != job_id:
+                raise LiveExecutionError("full-run retry job identity changed during admission")
             replacement_for_external_id = admission.previous_external_id
+            retry_root_external_id = admission.root_external_id
             wave_estimated_cost = admission.prior_estimated_cost_usd
             _check_wave_budget(wave_estimated_cost)
             _assert_clean_s3_prefix(
@@ -234,6 +244,7 @@ async def execute_live(
             poll_seconds=poll_seconds,
             billing_schedule=billing_schedule,
             replacement_for_external_id=replacement_for_external_id,
+            retry_root_external_id=retry_root_external_id,
         )
         wave_estimated_cost += float(result["estimated_cost_usd"])
         _check_wave_budget(wave_estimated_cost)
@@ -280,18 +291,29 @@ async def _resume_full_path(
         previous = json.loads(previous_path.read_text(encoding="utf-8"))
     except (OSError, json.JSONDecodeError) as error:
         raise LiveExecutionError("full-run retry evidence is unreadable") from error
-    expected_job_id = f"p2-{approval.id[:20]}"
-    if previous.get("approval_id") != approval.id or previous.get("job_id") != expected_job_id:
+    base_job_id = f"p2-{approval.id[:20]}"
+    previous_job_id = str(previous.get("job_id", ""))
+    next_job_id = _next_retry_job_id(approval.id, previous_path)
+    if previous.get("approval_id") != approval.id:
         raise LiveExecutionError("full-run retry evidence does not match the approval/job")
     events = previous.get("events")
     if not isinstance(events, list):
         raise LiveExecutionError("full-run retry evidence has no event list")
 
+    is_initial_attempt = previous_job_id == base_job_id
     required = (
-        "gold.cleanup-admitted",
-        "orphan.reaped",
-        "training.created",
-        "training.terminated",
+        (
+            "gold.cleanup-admitted",
+            "orphan.reaped",
+            "training.created",
+            "training.terminated",
+        )
+        if is_initial_attempt
+        else (
+            "training.retry-admitted",
+            "training.retry-created",
+            "training.terminated",
+        )
     )
     selected: dict[str, dict[str, Any]] = {}
     for action in required:
@@ -310,13 +332,27 @@ async def _resume_full_path(
     ):
         raise LiveExecutionError("completed training evidence is not eligible for retry")
 
-    external_id = str(selected["training.created"].get("external_id", ""))
+    creation_action = "training.created" if is_initial_attempt else "training.retry-created"
+    external_id = str(selected[creation_action].get("external_id", ""))
     terminated = selected["training.terminated"]
-    if (
-        not external_id
-        or terminated.get("external_id") != external_id
-        or approval.provision_handle != external_id
-    ):
+    if not external_id or terminated.get("external_id") != external_id:
+        raise LiveExecutionError("full-run retry provider identity is inconsistent")
+    if is_initial_attempt:
+        root_external_id = external_id
+        carried_estimated_cost = 0.0
+    else:
+        retry_created = selected["training.retry-created"]
+        root_external_id = str(
+            retry_created.get("approval_root") or retry_created.get("retry_of") or ""
+        )
+        admitted = selected["training.retry-admitted"]
+        if admitted.get("previous_external_id") != root_external_id:
+            raise LiveExecutionError("full-run retry chain does not return to the bound root")
+        try:
+            carried_estimated_cost = float(admitted["prior_estimated_cost_usd"])
+        except (KeyError, TypeError, ValueError) as error:
+            raise LiveExecutionError("full-run retry chain lacks prior spend evidence") from error
+    if not root_external_id or approval.provision_handle != root_external_id:
         raise LiveExecutionError("full-run retry provider identity is inconsistent")
     deletion = terminated.get("deletion")
     if not isinstance(deletion, dict) or not deletion.get("target_absent"):
@@ -340,13 +376,14 @@ async def _resume_full_path(
     elapsed_seconds = (deleted_at - created_at).total_seconds()
     if elapsed_seconds <= 0:
         raise LiveExecutionError("full-run retry evidence has an invalid elapsed interval")
-    prior_estimated_cost = (
+    attempt_estimated_cost = (
         elapsed_seconds / (P2_MAX_RUNTIME_MIN * 60) * P2_WAVE_BUDGET_USD
     )
+    prior_estimated_cost = carried_estimated_cost + attempt_estimated_cost
     handle = ProvisionHandle(
         provider=ProvisionProvider.RUNPOD,
         external_id=external_id,
-        job_id=expected_job_id,
+        job_id=previous_job_id,
         approval_id=approval.id,
         created_at=created_at,
     )
@@ -357,12 +394,13 @@ async def _resume_full_path(
         previous_evidence=str(previous_path),
         deletion=asdict(receipt),
         elapsed_seconds=round(elapsed_seconds, 3),
+        attempt_estimated_cost_usd=round(attempt_estimated_cost, 6),
         prior_estimated_cost_usd=round(prior_estimated_cost, 6),
     )
     await audit.append(
         ProvisionAuditEvent(
             actor="p2-executor",
-            job_id=f"{expected_job_id}-r2",
+            job_id=next_job_id,
             approval_id=approval.id,
             action="provision.retry-admitted",
             provider=ProvisionProvider.RUNPOD,
@@ -371,15 +409,36 @@ async def _resume_full_path(
             after_state=ProvisionState.TERMINATED,
             reason="fail-closed export compatibility retry admitted from deletion proof",
             detail={
-                "previous_job_id": expected_job_id,
+                "previous_job_id": previous_job_id,
+                "root_external_id": root_external_id,
                 "prior_estimated_cost_usd": round(prior_estimated_cost, 6),
             },
         )
     )
     return FullRetryAdmission(
         previous_external_id=external_id,
+        root_external_id=root_external_id,
+        next_job_id=next_job_id,
         prior_estimated_cost_usd=prior_estimated_cost,
     )
+
+
+def _next_retry_job_id(approval_id: str, previous_path: Path) -> str:
+    try:
+        previous = json.loads(Path(previous_path).expanduser().resolve().read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError) as error:
+        raise LiveExecutionError("full-run retry evidence is unreadable") from error
+    if previous.get("approval_id") != approval_id:
+        raise LiveExecutionError("full-run retry evidence does not match the approval/job")
+    base_job_id = f"p2-{approval_id[:20]}"
+    previous_job_id = str(previous.get("job_id", ""))
+    if previous_job_id == base_job_id:
+        return f"{base_job_id}-r2"
+    prefix = f"{base_job_id}-r"
+    suffix = previous_job_id.removeprefix(prefix)
+    if not previous_job_id.startswith(prefix) or not suffix.isdigit() or int(suffix) < 2:
+        raise LiveExecutionError("full-run retry evidence has an invalid attempt job ID")
+    return f"{base_job_id}-r{int(suffix) + 1}"
 
 
 async def _resume_gold_path(
@@ -601,6 +660,7 @@ async def _full_training(
     poll_seconds: int,
     billing_schedule: Path,
     replacement_for_external_id: str | None = None,
+    retry_root_external_id: str | None = None,
 ) -> dict[str, Any]:
     s3_prefix = os.environ.get("VF_S3_PREFIX", "vf").strip("/")
     job = JobRecord(
@@ -646,7 +706,10 @@ async def _full_training(
                 raise
             evidence.event("training.created", external_id=handle.external_id)
         else:
-            if approval.provision_handle != replacement_for_external_id:
+            if (
+                retry_root_external_id is None
+                or approval.provision_handle != retry_root_external_id
+            ):
                 cleanup_trigger = time.monotonic()
                 raise LiveExecutionError("retry approval binding changed before provider create")
             await audit.append(
@@ -660,13 +723,17 @@ async def _full_training(
                     before_state=ProvisionState.PROVISIONING,
                     after_state=ProvisionState.PROVISIONING,
                     reason="replacement for a fail-closed checkpoint publication attempt",
-                    detail={"retry_of": replacement_for_external_id},
+                    detail={
+                        "retry_of": replacement_for_external_id,
+                        "approval_root": retry_root_external_id,
+                    },
                 )
             )
             evidence.event(
                 "training.retry-created",
                 external_id=handle.external_id,
                 retry_of=replacement_for_external_id,
+                approval_root=retry_root_external_id,
             )
         await repositories.jobs.put(_job_status(job, "running", {"external_id": handle.external_id}))
         ready = await _wait_for_ssh(adapter, orchestrator, handle, timeout_s=SSH_READY_TIMEOUT_SECONDS)
@@ -695,6 +762,11 @@ async def _full_training(
         )
         while True:
             snapshot = collector.snapshot()
+            if snapshot.failure_ready:
+                cleanup_trigger = time.monotonic()
+                raise LiveExecutionError(
+                    "remote trainer published checkpoint-publication-failure evidence"
+                )
             current = await adapter.status(handle)
             estimated_cost = max(estimated_cost, current.cost_accrued_usd)
             if current.state in {ProvisionState.FAILED, ProvisionState.TERMINATED}:

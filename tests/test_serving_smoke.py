@@ -125,3 +125,26 @@ def test_conversion_failure_is_evidence_before_any_vllm_launch(monkeypatch, tmp_
     assert payload["status"] == "failed"
     assert payload["phase"] == "conversion"
     assert payload["error"] == {"type": "ExportCompatibilityError", "message": "incomplete LoRA pair"}
+
+
+def test_vllm_command_reserves_memory_above_the_resident_trainer() -> None:
+    command = serving_smoke._vllm_command(
+        Path("/venv/bin/vllm"),
+        Path("/checkpoint/serveable_huggingface"),
+        19003,
+        "vf-smoke",
+    )
+
+    option = command.index("--gpu-memory-utilization")
+    assert command[option + 1] == "0.90"
+    assert "--enforce-eager" in command
+    assert command[command.index("--max-model-len") + 1] == "64"
+    assert command[command.index("--max-num-seqs") + 1] == "1"
+
+
+def test_vllm_failure_tail_keeps_a_root_cause_beyond_the_old_limit(tmp_path: Path) -> None:
+    log = tmp_path / "vllm.log"
+    marker = "ValueError: No available memory for the cache blocks."
+    log.write_text("x" * 10_000 + marker + "\n" + "y" * 3_000, encoding="utf-8")
+
+    assert marker in serving_smoke._tail(log)

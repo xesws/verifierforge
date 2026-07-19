@@ -2571,15 +2571,21 @@ implementation/test wave.
 - [x] Delete the failed retry: target absent, raw `vf-auto-*` count `0`;
   lifecycle closed with `training.terminated` and billing reconciliation
   remains asynchronous.
-- [ ] Raise the loopback smoke ceiling to bounded 0.90, retain complete root
+- [x] Raise the loopback smoke ceiling to bounded 0.90, retain complete root
   cause evidence, and detect the remote S3 failure artifact in the controller.
-- [ ] Validate a chained, immutable-binding `-r3` admission with cumulative
+- [x] Validate a chained, immutable-binding `-r3` admission with cumulative
   conservative spend and a clean S3 prefix; run full regression and push.
 - [ ] Run the one final 100-step full stage; collect/verify/delete, close the
   P-2 DoD, tag `provisioner-p2-live`, and leave delayed billing follow-ups.
 
 Stop conditions: the prior P-2 redlines plus any failure of `-r3`. There is no
 fourth attempt. Monitoring cadence remains five minutes.
+
+Implementation validation: focused suite `50 passed`; complete suite `402
+passed, 1 skipped`. The read-only real-evidence admission resolved previous
+handle `33rpq7bee28z9f`, root binding `iqen85eumbjcld`, next job suffix `-r3`,
+and cumulative conservative reservation `$1.174772`. No provider resource was
+created by validation.
 
 ## 2026-07-19 v0.28.1 — v1 reviewer narrative refresh
 

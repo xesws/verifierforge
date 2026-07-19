@@ -81,3 +81,25 @@ def test_s3_collector_requires_and_hashes_complete_step_100(tmp_path: Path) -> N
         assert (tmp_path / "collected" / "model.txt").read_bytes() == b"model"
         assert (tmp_path / "collected" / "curve.png").read_bytes() == b"png"
         assert len(inventory["objects"]) == 8
+
+
+def test_s3_collector_surfaces_checkpoint_publication_failure() -> None:
+    with mock_aws():
+        client = boto3.client("s3", region_name="us-east-1")
+        client.create_bucket(Bucket="p2-test")
+        root = "vf/jobs/p2-failed"
+        client.put_object(
+            Bucket="p2-test",
+            Key=f"{root}/artifacts/checkpoint-publication-failure.json.manifest.json",
+            Body=b"{}",
+        )
+
+        snapshot = S3RunCollector(
+            client,
+            bucket="p2-test",
+            prefix="vf",
+            job_id="p2-failed",
+        ).snapshot()
+
+        assert snapshot.failure_ready is True
+        assert snapshot.complete is False

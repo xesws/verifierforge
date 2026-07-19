@@ -34,6 +34,7 @@ class P2S3Snapshot:
     checkpoint_ready: bool
     final_model_ready: bool
     curve_ready: bool
+    failure_ready: bool = False
 
     @property
     def complete(self) -> bool:
@@ -92,6 +93,10 @@ class S3RunCollector:
             checkpoint_ready=f"{self.job_prefix}/ckpt/step_{P2_CHECKPOINT_STEP}/manifest.json" in keys,
             final_model_ready=f"{self.job_prefix}/artifacts/final/model.txt.manifest.json" in keys,
             curve_ready=f"{self.job_prefix}/artifacts/curve.png.manifest.json" in keys,
+            failure_ready=(
+                f"{self.job_prefix}/artifacts/"
+                "checkpoint-publication-failure.json.manifest.json"
+            ) in keys,
         )
 
     def collect(self, destination: Path) -> dict[str, Any]:

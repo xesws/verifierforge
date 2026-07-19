@@ -62,6 +62,7 @@ class _ServerHandle:
 
 ServerLauncher = Callable[[Path, int, str, Path], _ServerHandle]
 RequestJson = Callable[[str, Mapping[str, Any] | None], tuple[int, dict[str, Any]]]
+SERVING_SMOKE_GPU_MEMORY_UTILIZATION = 0.90
 
 
 def validate_checkpoint_for_serving(
@@ -219,29 +220,7 @@ def _launch_vllm(export_path: Path, port: int, model_name: str, evidence_path: P
         raise ServingSmokeError(f"vLLM executable is unavailable: {executable}")
     evidence_path.parent.mkdir(parents=True, exist_ok=True)
     log_path = evidence_path.with_name(f"{evidence_path.stem}.vllm.log")
-    command = [
-        str(executable),
-        "serve",
-        str(export_path),
-        "--served-model-name",
-        model_name,
-        "--host",
-        "127.0.0.1",
-        "--port",
-        str(port),
-        "--dtype",
-        "bfloat16",
-        "--gpu-memory-utilization",
-        "0.10",
-        "--max-model-len",
-        "64",
-        "--max-num-seqs",
-        "1",
-        "--tensor-parallel-size",
-        "1",
-        "--enforce-eager",
-        "--disable-log-stats",
-    ]
+    command = _vllm_command(executable, export_path, port, model_name)
     environment = os.environ.copy()
     environment.update(
         {
@@ -263,6 +242,37 @@ def _launch_vllm(export_path: Path, port: int, model_name: str, evidence_path: P
             start_new_session=True,
         )
     return _ServerHandle(process=process, command=command, log_path=log_path)
+
+
+def _vllm_command(
+    executable: Path,
+    export_path: Path,
+    port: int,
+    model_name: str,
+) -> list[str]:
+    return [
+        str(executable),
+        "serve",
+        str(export_path),
+        "--served-model-name",
+        model_name,
+        "--host",
+        "127.0.0.1",
+        "--port",
+        str(port),
+        "--dtype",
+        "bfloat16",
+        "--gpu-memory-utilization",
+        f"{SERVING_SMOKE_GPU_MEMORY_UTILIZATION:.2f}",
+        "--max-model-len",
+        "64",
+        "--max-num-seqs",
+        "1",
+        "--tensor-parallel-size",
+        "1",
+        "--enforce-eager",
+        "--disable-log-stats",
+    ]
 
 
 def _wait_for_models(
@@ -330,7 +340,7 @@ def _stop_server(handle: _ServerHandle) -> None:
             pass
 
 
-def _tail(path: Path, *, limit: int = 2_000) -> str:
+def _tail(path: Path, *, limit: int = 16_000) -> str:
     try:
         return Path(path).read_text(encoding="utf-8", errors="replace")[-limit:]
     except OSError:
@@ -338,7 +348,7 @@ def _tail(path: Path, *, limit: int = 2_000) -> str:
 
 
 def _error_payload(error: BaseException) -> dict[str, str]:
-    return {"type": type(error).__name__, "message": str(error)[:2_000]}
+    return {"type": type(error).__name__, "message": str(error)[:16_000]}
 
 
 def _write_json_atomic(path: Path, payload: object) -> None:

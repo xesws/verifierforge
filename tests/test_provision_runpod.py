@@ -216,11 +216,88 @@ def test_full_retry_requires_terminal_evidence_and_preserves_approval_binding(
     )
 
     assert admission.previous_external_id == external_id
+    assert admission.root_external_id == external_id
+    assert admission.next_job_id == f"{job_id}-r2"
     assert admission.prior_estimated_cost_usd == pytest.approx(20 / 180 * 5)
     assert approval.provision_handle == external_id
     assert previous.read_bytes() == before
     assert ledger.payload["events"][0]["action"] == "training.retry-admitted"
     assert [event.action for event in audit.events] == ["provision.retry-admitted"]
+
+
+def test_full_retry_chain_carries_prior_spend_and_keeps_root_binding(
+    tmp_path: Path,
+) -> None:
+    approval_id = "approval-12345678901234567890"
+    base_job_id = f"p2-{approval_id[:20]}"
+    root_external_id = "first-terminal-pod"
+    previous_external_id = "second-terminal-pod"
+    started_at = datetime(2026, 7, 19, 11, tzinfo=timezone.utc)
+    deleted_at = started_at + timedelta(minutes=18)
+    previous = tmp_path / "retry-two-lifecycle.json"
+    previous.write_text(
+        json.dumps(
+            {
+                "approval_id": approval_id,
+                "job_id": f"{base_job_id}-r2",
+                "started_at": started_at.isoformat(),
+                "events": [
+                    {
+                        "action": "training.retry-admitted",
+                        "previous_external_id": root_external_id,
+                        "prior_estimated_cost_usd": 0.6,
+                    },
+                    {
+                        "action": "training.retry-created",
+                        "external_id": previous_external_id,
+                        "retry_of": root_external_id,
+                    },
+                    {
+                        "action": "training.terminated",
+                        "external_id": previous_external_id,
+                        "deletion": {
+                            "checked_at": deleted_at.isoformat(),
+                            "target_absent": True,
+                            "vf_auto_prefix_count": 0,
+                        },
+                    },
+                ],
+            }
+        ),
+        encoding="utf-8",
+    )
+    records = [
+        SimpleNamespace(
+            action=action,
+            detail_json={"external_id": previous_external_id},
+        )
+        for action in ("provision.terminated", "provider.deletion_confirmed")
+    ]
+    ledger = EvidenceLedger(
+        tmp_path / "retry-three" / "lifecycle.json",
+        approval_id=approval_id,
+        job_id=f"{base_job_id}-r3",
+    )
+
+    admission = _run(
+        _resume_full_path(
+            adapter=_DeletionAdapter(inventory=[]),
+            audit=InMemoryAuditLog(),
+            provision_audit=_AuditStore(records),
+            approval=SimpleNamespace(
+                id=approval_id,
+                provision_handle=root_external_id,
+            ),
+            previous_path=previous,
+            evidence=ledger,
+        )
+    )
+
+    assert admission.previous_external_id == previous_external_id
+    assert admission.root_external_id == root_external_id
+    assert admission.next_job_id == f"{base_job_id}-r3"
+    assert admission.prior_estimated_cost_usd == pytest.approx(0.6 + 18 / 180 * 5)
+    assert ledger.payload["events"][0]["attempt_estimated_cost_usd"] == 0.5
 
 
 def test_full_retry_rejects_a_different_bound_provider_identity(tmp_path: Path) -> None:
