@@ -2617,6 +2617,35 @@ still empty. Seven detached `vf-billing-*` tmux sessions will perform the
 remaining idempotent +1h/+6h reads. Complete suite before live: `403 passed, 1
 skipped`; final raw account prefix count: `0`.
 
+## 2026-07-19 v0.28.5 — P-2 post-training serving gate and fifth attempt
+
+- [x] Reserve the patch and write version, model-trainer, infrastructure and
+  run-sheet intent before implementation.
+- [ ] Store step-50/100 training outputs as atomic candidate artifacts with
+  file SHA manifests; candidates must remain invisible to published-checkpoint
+  discovery and lifecycle completion.
+- [ ] After the verl process exits successfully, stop Ray, materialize selected
+  step 100 in a separate finalizer, run unchanged conversion plus vLLM models /
+  real-completion checks, then and only then publish checkpoint/final artifacts.
+- [ ] Prove the timing and fail-closed invariant in focused/full tests; push a
+  clean revision before paid execution.
+- [ ] Admit and run exactly one fresh `-r5` attempt while conservative cumulative
+  spend remains below `$4.5`; monitor no more frequently than every five minutes.
+- [ ] Collect and SHA-check 100 metrics, both candidate manifests, the accepted
+  step-100 checkpoint, service evidence, final marker and curve; terminate and
+  prove target absence plus raw `vf-auto-* = 0`.
+- [ ] Complete P-2 DoD and create `provisioner-p2-live` only if every prior item
+  passes.
+
+**Stop:** any budget, provider, bootstrap, training, candidate identity,
+serviceability, collection, deletion or raw-prefix failure. Do not attempt a
+sixth run and do not create the tag.
+
+**Documented future option, not implemented:** a requirement to service-test
+during training must use pause-verify: stop trainer, release GPU, test, then
+resume from Storage. It must never reintroduce concurrent same-GPU trainer and
+serving processes.
+
 ## 2026-07-19 v0.28.1 — v1 reviewer narrative refresh
 
 - [x] Reserved the docs-only patch and every affected area document before
