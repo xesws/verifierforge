@@ -128,6 +128,30 @@ def test_list_active_requires_prefix_and_owner_marker() -> None:
     _run(scenario())
 
 
+def test_raw_inventory_preserves_prefix_only_and_terminal_pods() -> None:
+    prefix_only = _pod(
+        id="prefix-only",
+        desiredStatus="EXITED",
+        env={"VF_JOB_ID": "p2-job-1"},
+    )
+    managed = _pod(id="managed")
+
+    async def scenario() -> None:
+        client = httpx.AsyncClient(
+            transport=httpx.MockTransport(
+                lambda _request: httpx.Response(200, json=[prefix_only, managed])
+            )
+        )
+        adapter = RunPodAdapter("key", client=client)
+        inventory = await adapter.list_account_pods()
+        active = await adapter.list_active()
+        assert [pod["id"] for pod in inventory] == ["prefix-only", "managed"]
+        assert [handle.external_id for handle in active] == ["managed"]
+        await client.aclose()
+
+    _run(scenario())
+
+
 def test_status_refreshes_ssh_and_refuses_foreign_delete() -> None:
     count = 0
 

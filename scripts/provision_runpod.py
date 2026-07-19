@@ -35,6 +35,15 @@ from app.provisioning.live import (
     validate_p2_config,
 )
 from app.provisioning.runpod import RUNPOD_IMAGE
+from app.provisioning.termination import (
+    BILLING_SLOTS,
+    audit_deletion as _audit_deletion,
+    confirm_deleted as _confirm_deleted,
+    parse_timestamp as _parse_datetime,
+    prefixed_pods as _prefixed_pods,
+    reconcile_billing_schedule,
+    schedule_billing as _schedule_billing,
+)
 from core.provisioning_contracts import (
     GPUClass,
     ProvisionAuditEvent,
@@ -48,11 +57,10 @@ from scripts.s3_job_env import local_payload
 
 
 ROOT = Path(__file__).resolve().parents[1]
-EVIDENCE_ROOT = ROOT / "runs" / "provisioning" / "v0.28.0"
+EVIDENCE_ROOT = ROOT / "runs" / "provisioning" / "v0.28.2"
 MODEL_ID = "Qwen/Qwen2.5-0.5B-Instruct"
 TRAINING_POLL_SECONDS = 300
 SSH_READY_TIMEOUT_SECONDS = 15 * 60
-BILLING_TIMEOUT_SECONDS = 15 * 60
 CLEANUP_SLA_SECONDS = 30 * 60
 
 
@@ -94,7 +102,12 @@ class EvidenceLedger:
         os.replace(temporary, self.path)
 
 
-async def execute_live(approval_id: str, *, poll_seconds: int) -> dict[str, Any]:
+async def execute_live(
+    approval_id: str,
+    *,
+    poll_seconds: int,
+    resume_gold_evidence: Path | None = None,
+) -> dict[str, Any]:
     _require_local_environment()
     settings = DatabaseSettings.from_env()
     runtime = create_database_runtime(settings)
@@ -107,7 +120,7 @@ async def execute_live(approval_id: str, *, poll_seconds: int) -> dict[str, Any]
         max_ticks=10_000,
     )
     orchestrator = LifecycleOrchestrator(adapter=adapter, audit_log=audit, policy=policy)
-    total_billed = 0.0
+    wave_estimated_cost = 0.0
     try:
         approval = await repositories.approvals.get(approval_id)
         if approval is None:
@@ -120,39 +133,46 @@ async def execute_live(approval_id: str, *, poll_seconds: int) -> dict[str, Any]
         config = validate_p2_config(decision.config_json)
         job_id = f"p2-{approval.id[:20]}"
         evidence = EvidenceLedger(
-            EVIDENCE_ROOT / job_id / "lifecycle.json",
+            EVIDENCE_ROOT / job_id / f"lifecycle-{datetime.now(timezone.utc).strftime('%Y%m%dT%H%M%SZ')}.json",
             approval_id=approval.id,
             job_id=job_id,
         )
+        billing_schedule = evidence.path.parent / "billing-schedule.json"
         inventory = await adapter.list_account_pods()
+        prefixed = _prefixed_pods(inventory)
         evidence.event(
             "account.inventory",
             pod_count=len(inventory),
-            managed_active_count=len(await adapter.list_active()),
-            # Names and IDs are operational metadata; env and provider payloads are omitted.
-            pods=[
-                {
-                    "id": str(pod.get("id", "")),
-                    "name": str(pod.get("name", "")),
-                    "status": str(pod.get("desiredStatus") or pod.get("status") or ""),
-                }
-                for pod in inventory
-            ],
+            vf_auto_prefix_count=len(prefixed),
         )
-        if await adapter.list_active():
-            raise LiveExecutionError("a VerifierForge-managed RunPod resource is already active")
+        if prefixed:
+            raise LiveExecutionError(
+                f"raw RunPod inventory contains {len(prefixed)} vf-auto-* resource(s)"
+            )
 
         public_key = _public_key()
-        total_billed += await _gold_path(
-            adapter=adapter,
-            orchestrator=orchestrator,
-            audit=audit,
-            approval_id=approval.id,
-            public_key=public_key,
-            evidence=evidence,
-        )
-        _check_wave_budget(total_billed)
-        total_billed += await _orphan_probe(
+        if resume_gold_evidence is not None:
+            wave_estimated_cost += await _resume_gold_path(
+                adapter=adapter,
+                audit=audit,
+                provision_audit=repositories.provision_audit,
+                approval_id=approval.id,
+                previous_path=resume_gold_evidence,
+                evidence=evidence,
+                billing_schedule=billing_schedule,
+            )
+        else:
+            wave_estimated_cost += await _gold_path(
+                adapter=adapter,
+                orchestrator=orchestrator,
+                audit=audit,
+                approval_id=approval.id,
+                public_key=public_key,
+                evidence=evidence,
+                billing_schedule=billing_schedule,
+            )
+        _check_wave_budget(wave_estimated_cost)
+        wave_estimated_cost += await _orphan_probe(
             adapter=adapter,
             orchestrator=orchestrator,
             audit=audit,
@@ -163,8 +183,9 @@ async def execute_live(approval_id: str, *, poll_seconds: int) -> dict[str, Any]
             approval_id=approval.id,
             public_key=public_key,
             evidence=evidence,
+            billing_schedule=billing_schedule,
         )
-        _check_wave_budget(total_billed)
+        _check_wave_budget(wave_estimated_cost)
 
         result = await _full_training(
             adapter=adapter,
@@ -176,25 +197,119 @@ async def execute_live(approval_id: str, *, poll_seconds: int) -> dict[str, Any]
             job_id=job_id,
             public_key=public_key,
             evidence=evidence,
-            prior_billed=total_billed,
+            prior_estimated_cost=wave_estimated_cost,
             poll_seconds=poll_seconds,
+            billing_schedule=billing_schedule,
         )
-        total_billed += float(result["billing_usd"])
-        _check_wave_budget(total_billed)
-        evidence.finish(status="done", wave_billing_usd=round(total_billed, 6), result=result)
-        return {**result, "wave_billing_usd": round(total_billed, 6)}
+        wave_estimated_cost += float(result["estimated_cost_usd"])
+        _check_wave_budget(wave_estimated_cost)
+        evidence.finish(
+            status="done",
+            billing_status="pending",
+            wave_estimated_cost_usd=round(wave_estimated_cost, 6),
+            result=result,
+        )
+        return {
+            **result,
+            "billing_status": "pending",
+            "wave_estimated_cost_usd": round(wave_estimated_cost, 6),
+            "billing_schedule": str(billing_schedule),
+            "evidence": str(evidence.path),
+        }
     except Exception as error:
         if "evidence" in locals():
             evidence.finish(
                 status="failed",
                 error_type=type(error).__name__,
                 error=str(error)[:2000],
-                wave_billing_usd=round(total_billed, 6),
+                billing_status="pending",
+                wave_estimated_cost_usd=round(wave_estimated_cost, 6),
             )
         raise
     finally:
         await adapter.aclose()
         await runtime.close()
+
+
+async def _resume_gold_path(
+    *,
+    adapter: RunPodAdapter,
+    audit: DatabaseAuditLog,
+    provision_audit: Any,
+    approval_id: str,
+    previous_path: Path,
+    evidence: EvidenceLedger,
+    billing_schedule: Path,
+) -> float:
+    previous_path = Path(previous_path).expanduser().resolve()
+    try:
+        previous = json.loads(previous_path.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError) as error:
+        raise LiveExecutionError("resume gold evidence is unreadable") from error
+    expected_job_id = f"p2-{approval_id[:20]}"
+    if previous.get("approval_id") != approval_id or previous.get("job_id") != expected_job_id:
+        raise LiveExecutionError("resume gold evidence does not match the approval/job")
+    if previous.get("status") != "failed" or "billing receipt" not in str(previous.get("error", "")):
+        raise LiveExecutionError("resume gold evidence is not the historical billing-delay failure")
+    events = previous.get("events")
+    if not isinstance(events, list):
+        raise LiveExecutionError("resume gold evidence has no event list")
+    if any(
+        str(event.get("action", "")).startswith(("orphan.", "training."))
+        for event in events
+        if isinstance(event, dict)
+    ):
+        raise LiveExecutionError("resume gold evidence advanced beyond the gold stage")
+    created = [
+        event for event in events
+        if isinstance(event, dict) and event.get("action") == "gold.created"
+    ]
+    ready = [
+        event for event in events
+        if isinstance(event, dict) and event.get("action") == "gold.ready"
+    ]
+    if len(created) != 1 or len(ready) != 1:
+        raise LiveExecutionError("resume gold evidence must contain exactly one create and ready event")
+    external_id = str(created[0].get("external_id", ""))
+    if not external_id or ready[0].get("external_id") != external_id:
+        raise LiveExecutionError("resume gold evidence has inconsistent provider identity")
+    created_at = _parse_datetime(str(created[0].get("timestamp", "")))
+    audit_events = await provision_audit.list_for_approval(approval_id)
+    terminated = [
+        record for record in audit_events
+        if record.action in {"provision.terminated", "lifecycle.terminated"}
+        and record.detail_json.get("external_id") == external_id
+    ]
+    if not terminated:
+        raise LiveExecutionError("resume gold evidence has no matching DELETE audit")
+    deleted_at = min(record.occurred_at for record in terminated)
+    handle = ProvisionHandle(
+        provider=ProvisionProvider.RUNPOD,
+        external_id=external_id,
+        job_id=f"p2-gold-{approval_id[:12]}",
+        approval_id=approval_id,
+        created_at=created_at,
+    )
+    receipt = await _confirm_deleted(adapter, handle, timeout_s=0, poll_s=0)
+    estimated_cost = float(
+        ready[0].get("estimated_cost_usd", ready[0].get("cost_accrued_usd", 0.0)) or 0.0
+    )
+    evidence.event(
+        "gold.cleanup-admitted",
+        external_id=external_id,
+        previous_evidence=str(previous_path),
+        historical_deleted_at=deleted_at.astimezone(timezone.utc).isoformat(),
+        deletion=asdict(receipt),
+        billing_status="pending",
+        estimated_cost_usd=round(estimated_cost, 6),
+    )
+    await _audit_deletion(audit, handle, receipt)
+    _schedule_billing(
+        billing_schedule,
+        handle,
+        deleted_at.astimezone(timezone.utc).isoformat(),
+    )
+    return estimated_cost
 
 
 async def _gold_path(
@@ -205,6 +320,7 @@ async def _gold_path(
     approval_id: str,
     public_key: str,
     evidence: EvidenceLedger,
+    billing_schedule: Path,
 ) -> float:
     spec = _spec(
         job_id=f"p2-gold-{approval_id[:12]}",
@@ -215,23 +331,21 @@ async def _gold_path(
     )
     handle: ProvisionHandle | None = None
     trigger = time.monotonic()
-    billing_amount: float | None = None
+    estimated_cost: float | None = None
     try:
         handle = await orchestrator.request(spec)
         evidence.event("gold.created", external_id=handle.external_id)
         status = await _wait_for_ssh(adapter, orchestrator, handle, timeout_s=SSH_READY_TIMEOUT_SECONDS)
+        estimated_cost = status.cost_accrued_usd
         evidence.event(
             "gold.ready",
             external_id=handle.external_id,
-            ssh=status.ssh,
-            cost_accrued_usd=status.cost_accrued_usd,
+            estimated_cost_usd=estimated_cost,
         )
     finally:
         if handle is not None:
             await orchestrator.terminate(handle, reason="P2 gold-path teardown")
-            billing = await _confirm_deleted_and_billed(
-                adapter, handle, start_time=handle.created_at
-            )
+            receipt = await _confirm_deleted(adapter, handle)
             cleanup_seconds = round(time.monotonic() - trigger, 3)
             if cleanup_seconds > CLEANUP_SLA_SECONDS:
                 raise LiveExecutionError("gold-path cleanup exceeded the 30-minute SLA")
@@ -239,14 +353,15 @@ async def _gold_path(
                 "gold.terminated",
                 external_id=handle.external_id,
                 cleanup_seconds=cleanup_seconds,
-                billing_usd=billing.amount_usd,
-                time_billed_ms=billing.time_billed_ms,
+                deletion=asdict(receipt),
+                billing_status="pending",
+                estimated_cost_usd=round(estimated_cost or 0.0, 6),
             )
-            await _audit_billing(audit, handle, billing.amount_usd, billing.time_billed_ms)
-            billing_amount = billing.amount_usd
-    if billing_amount is None:
+            await _audit_deletion(audit, handle, receipt)
+            _schedule_billing(billing_schedule, handle, receipt.checked_at)
+    if estimated_cost is None:
         raise LiveExecutionError("gold path failed before a RunPod handle was allocated")
-    return billing_amount
+    return estimated_cost
 
 
 async def _orphan_probe(
@@ -258,6 +373,7 @@ async def _orphan_probe(
     approval_id: str,
     public_key: str,
     evidence: EvidenceLedger,
+    billing_schedule: Path,
 ) -> float:
     spec = _spec(
         job_id=f"p2-orphan-{approval_id[:12]}",
@@ -268,6 +384,8 @@ async def _orphan_probe(
     )
     handle: ProvisionHandle | None = None
     trigger = time.monotonic()
+    estimated_cost = 0.0
+    deletion_recorded = False
     try:
         handle = await adapter.provision(spec)
         await audit.append(
@@ -284,12 +402,14 @@ async def _orphan_probe(
             )
         )
         evidence.event("orphan.created", external_id=handle.external_id)
+        before_reap = await adapter.status(handle)
+        estimated_cost = before_reap.cost_accrued_usd
         reaped = await orchestrator.reap_orphans(
             registry, actor="p2-orphan-probe", reason="intentional P2 orphan-reaper proof"
         )
         if [item.external_id for item in reaped] != [handle.external_id]:
             raise LiveExecutionError("orphan reaper did not terminate exactly its test resource")
-        billing = await _confirm_deleted_and_billed(adapter, handle, start_time=handle.created_at)
+        receipt = await _confirm_deleted(adapter, handle)
         cleanup_seconds = round(time.monotonic() - trigger, 3)
         if cleanup_seconds > CLEANUP_SLA_SECONDS:
             raise LiveExecutionError("orphan cleanup exceeded the 30-minute SLA")
@@ -297,14 +417,21 @@ async def _orphan_probe(
             "orphan.reaped",
             external_id=handle.external_id,
             cleanup_seconds=cleanup_seconds,
-            billing_usd=billing.amount_usd,
-            time_billed_ms=billing.time_billed_ms,
+            deletion=asdict(receipt),
+            billing_status="pending",
+            estimated_cost_usd=round(estimated_cost, 6),
         )
-        await _audit_billing(audit, handle, billing.amount_usd, billing.time_billed_ms)
-        return billing.amount_usd
+        await _audit_deletion(audit, handle, receipt)
+        _schedule_billing(billing_schedule, handle, receipt.checked_at)
+        deletion_recorded = True
+        return estimated_cost
     except Exception:
-        if handle is not None and await adapter.get_pod(handle.external_id) is not None:
-            await adapter.terminate(handle)
+        if handle is not None and not deletion_recorded:
+            if await adapter.get_pod(handle.external_id) is not None:
+                await adapter.terminate(handle)
+            receipt = await _confirm_deleted(adapter, handle)
+            await _audit_deletion(audit, handle, receipt)
+            _schedule_billing(billing_schedule, handle, receipt.checked_at)
         raise
 
 
@@ -319,8 +446,9 @@ async def _full_training(
     job_id: str,
     public_key: str,
     evidence: EvidenceLedger,
-    prior_billed: float,
+    prior_estimated_cost: float,
     poll_seconds: int,
+    billing_schedule: Path,
 ) -> dict[str, Any]:
     s3_prefix = os.environ.get("VF_S3_PREFIX", "vf").strip("/")
     job = JobRecord(
@@ -337,13 +465,17 @@ async def _full_training(
         job_id=job_id,
         approval_id=approval.id,
         public_key=public_key,
-        budget=min(float(config.budget_usd_cap), P2_WAVE_BUDGET_USD - prior_billed),
+        budget=min(
+            float(config.budget_usd_cap),
+            P2_WAVE_BUDGET_USD - prior_estimated_cost,
+        ),
         max_runtime=P2_MAX_RUNTIME_MIN,
     )
     handle: ProvisionHandle | None = None
     cleanup_trigger: float | None = None
     start_monotonic = time.monotonic()
     completed = False
+    estimated_cost = 0.0
     try:
         handle = await orchestrator.request(spec)
         try:
@@ -354,6 +486,7 @@ async def _full_training(
         evidence.event("training.created", external_id=handle.external_id)
         await repositories.jobs.put(_job_status(job, "running", {"external_id": handle.external_id}))
         ready = await _wait_for_ssh(adapter, orchestrator, handle, timeout_s=SSH_READY_TIMEOUT_SECONDS)
+        estimated_cost = max(estimated_cost, ready.cost_accrued_usd)
         if ready.ssh is None:
             raise LiveExecutionError("RunPod did not expose SSH")
         revision = _prepare_and_bootstrap(ready.ssh, evidence=evidence)
@@ -379,10 +512,11 @@ async def _full_training(
         while True:
             snapshot = collector.snapshot()
             current = await adapter.status(handle)
+            estimated_cost = max(estimated_cost, current.cost_accrued_usd)
             if current.state in {ProvisionState.FAILED, ProvisionState.TERMINATED}:
                 cleanup_trigger = time.monotonic()
                 raise LiveExecutionError(f"RunPod terminated during training: {current.detail}")
-            if prior_billed + current.cost_accrued_usd >= P2_WAVE_BUDGET_USD:
+            if prior_estimated_cost + current.cost_accrued_usd >= P2_WAVE_BUDGET_USD:
                 cleanup_trigger = time.monotonic()
                 raise LiveExecutionError("P2 wave budget fuse reached")
             if current.uptime_min >= P2_MAX_RUNTIME_MIN:
@@ -410,6 +544,7 @@ async def _full_training(
             await asyncio.sleep(poll_seconds)
 
         current = await adapter.status(handle)
+        estimated_cost = max(estimated_cost, current.cost_accrued_usd)
         await orchestrator.observe(
             handle,
             ProvisionStatus(
@@ -432,8 +567,6 @@ async def _full_training(
         completed = True
         cleanup_trigger = time.monotonic()
     finally:
-        billing_usd = 0.0
-        billed_ms = 0
         if handle is not None:
             try:
                 await orchestrator.terminate(
@@ -441,24 +574,22 @@ async def _full_training(
                     reason="P2 full-run completion" if completed else "P2 full-run failure cleanup",
                 )
             finally:
-                billing = await _confirm_deleted_and_billed(
-                    adapter, handle, start_time=handle.created_at
-                )
-                billing_usd = billing.amount_usd
-                billed_ms = billing.time_billed_ms
+                receipt = await _confirm_deleted(adapter, handle)
                 cleanup_seconds = round(
                     time.monotonic() - (cleanup_trigger or time.monotonic()), 3
                 )
                 evidence.event(
                     "training.terminated",
                     external_id=handle.external_id,
-                    billing_usd=billing_usd,
-                    time_billed_ms=billed_ms,
+                    deletion=asdict(receipt),
+                    billing_status="pending",
+                    estimated_cost_usd=round(estimated_cost, 6),
                     cleanup_seconds=cleanup_seconds,
                 )
                 if cleanup_seconds > CLEANUP_SLA_SECONDS:
                     raise LiveExecutionError("full-run cleanup exceeded the 30-minute SLA")
-                await _audit_billing(audit, handle, billing_usd, billed_ms)
+                await _audit_deletion(audit, handle, receipt)
+                _schedule_billing(billing_schedule, handle, receipt.checked_at)
     if not completed:
         raise LiveExecutionError("P2 full run did not complete")
     final_job = _job_status(
@@ -466,8 +597,8 @@ async def _full_training(
         "done",
         {
             "external_id": handle.external_id,
-            "billing_usd": billing_usd,
-            "time_billed_ms": billed_ms,
+            "billing_status": "pending",
+            "estimated_cost_usd": round(estimated_cost, 6),
             "latest_step": P2_TOTAL_STEPS,
             "collection": str(EVIDENCE_ROOT / job_id / "collected"),
         },
@@ -476,8 +607,8 @@ async def _full_training(
     return {
         "job_id": job_id,
         "external_id": handle.external_id,
-        "billing_usd": billing_usd,
-        "time_billed_ms": billed_ms,
+        "billing_status": "pending",
+        "estimated_cost_usd": round(estimated_cost, 6),
         "latest_step": P2_TOTAL_STEPS,
         "revision": revision,
         "collection_dir": str(EVIDENCE_ROOT / job_id / "collected"),
@@ -502,42 +633,37 @@ async def _wait_for_ssh(
     raise LiveExecutionError("RunPod SSH readiness timed out")
 
 
-async def _confirm_deleted_and_billed(
-    adapter: RunPodAdapter,
-    handle: ProvisionHandle,
+async def reconcile_billing(
+    path: Path,
+    slot: str,
     *,
-    start_time: datetime,
-):
-    deadline = time.monotonic() + BILLING_TIMEOUT_SECONDS
-    while time.monotonic() < deadline:
-        pod = await adapter.get_pod(handle.external_id)
-        billing = await adapter.billing(handle.external_id, start_time=start_time)
-        if pod is None and billing.records:
-            return billing
-        await asyncio.sleep(120)
-    raise LiveExecutionError("RunPod deletion/billing receipt was not confirmed within 15 minutes")
-
-
-async def _audit_billing(
-    audit: DatabaseAuditLog,
-    handle: ProvisionHandle,
-    amount_usd: float,
-    time_billed_ms: int,
-) -> None:
-    await audit.append(
-        ProvisionAuditEvent(
-            actor="p2-executor",
-            job_id=handle.job_id,
-            approval_id=handle.approval_id,
-            action="billing.confirmed",
-            provider=handle.provider,
-            external_id=handle.external_id,
-            before_state=ProvisionState.TERMINATED,
-            after_state=ProvisionState.TERMINATED,
-            reason="provider deletion observed and billing receipt returned",
-            detail={"amount_usd": amount_usd, "time_billed_ms": time_billed_ms},
+    now: datetime | None = None,
+    adapter: Any | None = None,
+    audit: Any | None = None,
+) -> dict[str, Any]:
+    owns_adapter = adapter is None
+    runtime = None
+    if adapter is None:
+        api_key = os.environ.get("RUNPOD_API_KEY", "")
+        if not api_key:
+            raise LiveExecutionError("missing required environment variable: RUNPOD_API_KEY")
+        adapter = RunPodAdapter(api_key)
+    if audit is None:
+        runtime = create_database_runtime(DatabaseSettings.from_env())
+        audit = DatabaseAuditLog(create_repositories(runtime).provision_audit)
+    try:
+        return await reconcile_billing_schedule(
+            path,
+            slot,
+            adapter=adapter,
+            audit=audit,
+            now=now,
         )
-    )
+    finally:
+        if owns_adapter:
+            await adapter.aclose()
+        if runtime is not None:
+            await runtime.close()
 
 
 def _spec(
@@ -774,13 +900,23 @@ def _now() -> str:
 
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--approval-id", required=True)
-    parser.add_argument("--execute-live", action="store_true")
+    action = parser.add_mutually_exclusive_group(required=True)
+    action.add_argument("--execute-live", action="store_true")
+    action.add_argument("--reconcile-billing", type=Path)
+    parser.add_argument("--approval-id")
+    parser.add_argument("--resume-gold-evidence", type=Path)
+    parser.add_argument("--billing-slot", choices=tuple(BILLING_SLOTS))
     parser.add_argument("--poll-seconds", type=int, default=TRAINING_POLL_SECONDS)
     args = parser.parse_args()
-    if not args.execute_live:
-        parser.error("paid provisioning requires the explicit --execute-live flag")
-    if args.poll_seconds < 30:
+    if args.execute_live and not args.approval_id:
+        parser.error("--approval-id is required with --execute-live")
+    if args.execute_live and args.billing_slot:
+        parser.error("--billing-slot is only valid with --reconcile-billing")
+    if args.reconcile_billing and not args.billing_slot:
+        parser.error("--billing-slot is required with --reconcile-billing")
+    if args.reconcile_billing and (args.approval_id or args.resume_gold_evidence):
+        parser.error("approval/resume arguments are invalid with --reconcile-billing")
+    if args.execute_live and args.poll_seconds < 30:
         parser.error("--poll-seconds must be at least 30")
     return args
 
@@ -788,7 +924,18 @@ def parse_args() -> argparse.Namespace:
 def main() -> None:
     load_dotenv(dotenv_path=ROOT / ".env")
     args = parse_args()
-    result = asyncio.run(execute_live(args.approval_id, poll_seconds=args.poll_seconds))
+    if args.reconcile_billing:
+        result = asyncio.run(
+            reconcile_billing(args.reconcile_billing, args.billing_slot)
+        )
+    else:
+        result = asyncio.run(
+            execute_live(
+                args.approval_id,
+                poll_seconds=args.poll_seconds,
+                resume_gold_evidence=args.resume_gold_evidence,
+            )
+        )
     print(json.dumps(result, indent=2, sort_keys=True))
 
 

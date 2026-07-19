@@ -2510,8 +2510,9 @@ and once at `+6h`; it does not block later P-2 stages or the semantic tag.
   historical gold `r6zizmfp8faklt` reads absent. No provider state changed.
 - [x] Approval `42436bb4c4a144d8980aa886fbb7b14f` remains unbound and resolves
   to the approved 0.5B / 100-step / k=8 / checkpoint-50 / RunPod / `$5` config.
-- [ ] Land and test the corrected deletion, resume, accounting and billing
-  reconciliation semantics.
+- [x] Land and test the corrected deletion, resume, accounting and billing
+  reconciliation semantics. Focused provisioning suite: `13 passed`; full
+  suite: `390 passed, 1 skipped`. Tests made no provider mutation.
 - [ ] Resume the historical gold proof without creating a second gold pod.
 - [ ] Run and safely reap the live orphan probe.
 - [ ] Complete and collect the approval-driven 100-step S3-only run.
