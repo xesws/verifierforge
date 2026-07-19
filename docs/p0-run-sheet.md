@@ -2457,3 +2457,33 @@ the only untracked paths were `docs/vllm-debug/`, `scripts/freeze_nl2sql.py`,
 No trainer, frozen dataset, GPU, provider-provisioning API, or paid LLM path
 was touched. The final worktree must be clean after the v0.26.2 documentation
 commit and push.
+
+## 2026-07-19 v0.27.0 — approved sample source and P2 approval
+
+- [x] Reserved v0.27.0 and landed the additive core contract wave first.
+  `ApprovedSampleSource` stores kind, repository URI, SHA-256, row count,
+  approver and timestamp only. Qwen2.5-0.5B was added to the generic whitelist;
+  the standard profile remains fixed to 1.5B.
+- [x] Applied Alembic `20260719_0002` to Supabase. The API recomputes the source
+  identity and validates JSONL shape/path/row count before persistence. The
+  approved source is `data/nl2sql/v0.10.0-training-pool.jsonl`, 50 rows, SHA-256
+  `c97a5adea789fae3be249bc9ac95a1902ae5a9769de9eefbc08277f056878e8c`.
+- [x] Real tools now inspect IDs `v1-001` through `v1-003` deterministically and
+  report `3/3` NL2SQLVerifier-v2 reference passes. Traffic storage still retains
+  only hashes/metrics; no request or response body entered SQLite/Supabase.
+- [x] The `p2_gate_b` schema and runtime guard both require 0.5B / 100 steps /
+  k=8 / checkpoint 50 / RunPod / budget `<= $5`. Invalid output is rejected,
+  never rewritten. Normal product caching is scoped by source identity and
+  execution profile; a fresh-run switch exists for evidence only.
+- [x] Production run 1 (`gpt-5.6-luna`, no retry) had no approved source and
+  returned `need_more_data`, confidence `0.99`, 6,860 input / 515 output tokens.
+  Decision `efaa3e0a096c41de999c04aa61c13618`; full S3 trace
+  `vf/agent-traces/f0c85587768d48bc8497e432b466b65e.json`.
+- [x] Production run 2 (`gpt-5.6-luna`, no retry) followed source attachment and
+  returned `forge`, confidence `0.98`, with the exact P2 config; 7,528 input /
+  514 output tokens. Decision `b118039e1bac4677924f456fd099ffa8`;
+  full S3 trace `vf/agent-traces/a93a29080242401783a93c6e3b94acba.json`.
+  Supabase approval `42436bb4c4a144d8980aa886fbb7b14f` records owner intent.
+- [x] Paid-LLM ledger: `$0.25 + $0.25 = $0.50` new reservation upper bound,
+  `$6.50 / $8.00` cumulative OpenAI ceiling; provider-reported cost absent.
+  Complete suite: `374 passed, 1 skipped`. No GPU/provider action occurred.
