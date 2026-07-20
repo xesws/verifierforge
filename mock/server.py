@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import os
 import sys
 from datetime import datetime, timezone
 from pathlib import Path
@@ -20,6 +21,7 @@ from core.contracts import (
     ArenaSample,
     Cluster,
     Job,
+    JobCreateRequest,
     JobStatus,
     LivePassRate,
     LivePassRatePoint,
@@ -33,6 +35,15 @@ from core.agent_contracts import (
     ApprovalRequest,
     TrainingConfig,
 )
+from core.p4_contracts import (
+    CredentialSource,
+    ForgeExecutionStatus,
+    ForgeLifecycle,
+    ProviderCredentialRequest,
+    ProviderCredentialStatus,
+    StartForgeRequest,
+)
+from core.provisioning_contracts import ProvisionProvider
 from app.api.agent import (
     AgentAnalyzeRequest,
     ApprovedSampleSourceRequest,
@@ -60,12 +71,13 @@ def _job(
     report: dict | None = None,
     endpoint: dict[str, str] | None = None,
     control: dict[str, list[float]] | None = None,
+    model: str = "Qwen/Qwen2.5-1.5B-Instruct",
 ) -> Job:
     return Job(
         job_id=job_id,
         template=template,
         status=status,
-        model="Qwen/Qwen2.5-1.5B-Instruct",
+        model=model,
         created_at="2026-07-14T03:00:00Z",
         metrics=Metrics.model_validate(metrics),
         control=control or {"pass_at_1": [0.18, 0.19, 0.2]},
@@ -278,11 +290,16 @@ _ROUTING_STATES: dict[str, RoutingState] = {
 
 _AGENT_DECISIONS: dict[str, AgentAnalysisResponse] = {}
 _AGENT_APPROVALS: dict[str, ApprovalRecord] = {}
+_PROVIDER_CREDENTIALS: set[tuple[str, ProvisionProvider]] = set()
+_FORGE_EXECUTIONS: dict[str, ForgeExecutionStatus] = {}
 
 
-@app.get("/jobs", response_model=list[Job])
-def list_jobs() -> list[Job]:
-    return JOBS
+@app.get("/jobs")
+def list_jobs() -> list[dict[str, str]]:
+    return [
+        {"job_id": job.job_id, "status": job.status.value}
+        for job in sorted(JOBS, key=lambda item: item.job_id)
+    ]
 
 
 @app.get("/jobs/{job_id}", response_model=Job)
@@ -299,12 +316,13 @@ def get_metrics(job_id: str) -> Metrics:
 
 
 @app.post("/jobs", response_model=Job, status_code=201)
-def create_job() -> Job:
+def create_job(request: JobCreateRequest) -> Job:
     """Fake-create a queued job in memory; never writes ``runs/``."""
     job = _job(
         job_id=f"mock-job-{uuid4().hex[:8]}",
-        template="nl2sql",
+        template=request.template,
         status=JobStatus.QUEUED.value,
+        model=request.model,
         metrics={
             "steps": [],
             "reward_mean": [],
@@ -319,14 +337,14 @@ def create_job() -> Job:
 
 @app.get("/clusters", response_model=list[Cluster])
 def list_clusters() -> list[Cluster]:
-    return CLUSTERS
+    return [_cluster_view(cluster) for cluster in CLUSTERS]
 
 
 @app.get("/clusters/{cluster_id}", response_model=Cluster)
 def get_cluster(cluster_id: str) -> Cluster:
     for cluster in CLUSTERS:
         if cluster.cluster_id == cluster_id:
-            return cluster
+            return _cluster_view(cluster)
     raise HTTPException(status_code=404, detail="Cluster not found")
 
 
@@ -386,6 +404,18 @@ def _require_cluster(cluster_id: str) -> Cluster:
         if cluster.cluster_id == cluster_id:
             return cluster
     raise HTTPException(status_code=404, detail="Cluster not found")
+
+
+def _cluster_view(cluster: Cluster) -> Cluster:
+    response = _AGENT_DECISIONS.get(f"{cluster.cluster_id}|p2_gate_b") or _AGENT_DECISIONS.get(
+        cluster.cluster_id
+    )
+    return cluster.model_copy(
+        update={
+            "routing": _ROUTING_STATES[cluster.cluster_id],
+            "analyzer_decision": response.decision if response is not None else None,
+        }
+    )
 
 
 @app.post(
@@ -471,6 +501,138 @@ def get_agent_approval(decision_id: str) -> ApprovalRecord:
     return approval
 
 
+@app.put(
+    "/settings/provider-credentials/{provider}",
+    response_model=ProviderCredentialStatus,
+)
+def put_provider_credential(
+    provider: ProvisionProvider,
+    request: ProviderCredentialRequest,
+) -> ProviderCredentialStatus:
+    """Record only credential presence; the deterministic mock never retains a key."""
+    _PROVIDER_CREDENTIALS.add((request.user_id, provider))
+    return ProviderCredentialStatus(
+        user_id=request.user_id,
+        provider=provider,
+        configured=True,
+        source=CredentialSource.STORED,
+        credential_id=f"mock-credential-{provider.value}",
+        updated_at="2026-07-19T12:00:00Z",
+    )
+
+
+@app.get(
+    "/settings/provider-credentials/{provider}",
+    response_model=ProviderCredentialStatus,
+)
+def get_provider_credential(
+    provider: ProvisionProvider,
+    user_id: str,
+) -> ProviderCredentialStatus:
+    stored = (user_id, provider) in _PROVIDER_CREDENTIALS
+    system = provider is ProvisionProvider.RUNPOD and bool(os.environ.get("RUNPOD_API_KEY"))
+    source = (
+        CredentialSource.STORED
+        if stored
+        else CredentialSource.SYSTEM_ENV
+        if system
+        else CredentialSource.MISSING
+    )
+    return ProviderCredentialStatus(
+        user_id=user_id,
+        provider=provider,
+        configured=stored or system,
+        source=source,
+        credential_id=f"mock-credential-{provider.value}" if stored else None,
+        updated_at="2026-07-19T12:00:00Z" if stored else None,
+    )
+
+
+@app.post(
+    "/approvals/{approval_id}/start-forge",
+    response_model=ForgeExecutionStatus,
+)
+def start_forge(approval_id: str, request: StartForgeRequest) -> ForgeExecutionStatus:
+    _require_execution_enabled()
+    approval, analysis = _approval_context(approval_id)
+    if approval.approved_by != request.requested_by:
+        raise HTTPException(status_code=409, detail="Start Forge requester must match approver")
+    existing = _FORGE_EXECUTIONS.get(approval_id)
+    if existing is not None:
+        return existing
+    config = analysis.decision.config
+    if config is None:
+        raise HTTPException(status_code=409, detail="Approved decision has no training config")
+    system_cap = float(os.environ.get("VF_PROVISION_SYSTEM_BUDGET_USD_CAP", "5"))
+    started = ForgeExecutionStatus(
+        approval_id=approval_id,
+        decision_id=approval.decision_id,
+        job_id=f"mock-forge-{approval_id}",
+        provider=ProvisionProvider.RUNPOD,
+        state=ForgeLifecycle.PROVISIONING,
+        budget_usd_cap=min(config.budget_usd_cap, system_cap),
+        credential_source=CredentialSource.SYSTEM_ENV,
+        detail="Mock provision requested",
+        created_at="2026-07-19T12:02:00Z",
+        updated_at="2026-07-19T12:02:00Z",
+    )
+    _FORGE_EXECUTIONS[approval_id] = started.model_copy(
+        update={
+            "state": ForgeLifecycle.DONE,
+            "provision_handle": "mock-0001",
+            "detail": "Mock lifecycle completed",
+            "updated_at": datetime(2026, 7, 19, 12, 3, tzinfo=timezone.utc),
+        }
+    )
+    return started
+
+
+@app.get(
+    "/approvals/{approval_id}/forge-execution",
+    response_model=ForgeExecutionStatus,
+)
+def forge_execution(approval_id: str) -> ForgeExecutionStatus:
+    _require_agent_enabled()
+    existing = _FORGE_EXECUTIONS.get(approval_id)
+    if existing is not None:
+        return existing
+    approval, analysis = _approval_context(approval_id)
+    config = analysis.decision.config
+    if config is None:
+        raise HTTPException(status_code=409, detail="Approved decision has no training config")
+    return ForgeExecutionStatus(
+        approval_id=approval_id,
+        decision_id=approval.decision_id,
+        job_id=f"mock-forge-{approval_id}",
+        provider=ProvisionProvider.RUNPOD,
+        state=ForgeLifecycle.APPROVED,
+        budget_usd_cap=config.budget_usd_cap,
+        detail="Approved; explicit Start Forge confirmation is still required",
+        created_at=approval.approved_at,
+        updated_at=approval.approved_at,
+    )
+
+
+def _approval_context(approval_id: str) -> tuple[ApprovalRecord, AgentAnalysisResponse]:
+    approval = next(
+        (value for value in _AGENT_APPROVALS.values() if value.approval_id == approval_id),
+        None,
+    )
+    if approval is None:
+        raise HTTPException(status_code=404, detail="Approval not found")
+    analysis = next(
+        (
+            value
+            for value in _AGENT_DECISIONS.values()
+            if value.decision_id == approval.decision_id
+        ),
+        None,
+    )
+    if analysis is None:
+        raise HTTPException(status_code=404, detail="Agent decision not found")
+    return approval, analysis
+
+
 def _mock_agent_decision(cluster_id: str, *, p2: bool = False) -> AgentDecision:
     if cluster_id == "data-pull-sql":
         return AgentDecision(
@@ -505,6 +667,12 @@ def _mock_agent_decision(cluster_id: str, *, p2: bool = False) -> AgentDecision:
 
 def _require_agent_enabled() -> None:
     if not agent_enabled():
+        raise HTTPException(status_code=404, detail="Not found")
+
+
+def _require_execution_enabled() -> None:
+    _require_agent_enabled()
+    if os.environ.get("VF_AUTOPROVISION", "false").strip().lower() != "true":
         raise HTTPException(status_code=404, detail="Not found")
 
 

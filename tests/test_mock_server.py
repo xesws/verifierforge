@@ -28,11 +28,16 @@ def test_done_job_includes_savings_and_arena() -> None:
 
 def test_post_jobs_creates_queued_in_memory() -> None:
     before = len(JOBS)
-    response = client.post("/jobs")
+    response = client.post(
+        "/jobs",
+        json={"template": "support-json", "model": "Qwen/Qwen2.5-0.5B-Instruct"},
+    )
     assert response.status_code == 201
     body = response.json()
     assert body["status"] == "queued"
     assert body["job_id"].startswith("mock-job-")
+    assert body["template"] == "support-json"
+    assert body["model"] == "Qwen/Qwen2.5-0.5B-Instruct"
     assert len(JOBS) == before + 1
 
 
@@ -59,7 +64,8 @@ def test_clusters_include_live_with_routing_and_pass_rate() -> None:
 
     discovered = clusters["invoice-field-extraction"]
     assert discovered["status"] == "discovered"
-    assert discovered["routing"] is None
+    assert discovered["routing"]["enabled"] is False
+    assert discovered["routing"]["canary_percent"] == 0
     assert discovered["live_pass_rate"] is None
 
 

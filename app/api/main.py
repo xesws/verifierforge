@@ -6,6 +6,7 @@ import json
 import os
 from datetime import datetime, timezone
 from pathlib import Path
+from uuid import uuid4
 
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
@@ -14,16 +15,20 @@ from app.api.artifacts import ArtifactDataError, ArtifactStore
 from app.api.agent import router as agent_router
 from app.api.copilot import router as copilot_router
 from app.api.provisioning import router as provisioning_router
-from app.db import repository_gateway
+from app.db import DatabaseOperationError, repository_gateway
 from app.db.records import ClusterRecord as DatabaseClusterRecord
 from app.db.records import JobRecord as DatabaseJobRecord
+from app.db.records import LivePassRateRecord as DatabaseLivePassRateRecord
+from app.db.records import RoutingRecord as DatabaseRoutingRecord
 from app.proxy.clusters import cluster_profile, list_cluster_profiles
 from app.proxy.routing import LivePassRateRecord, RouteRecord, get_route, list_live_pass_rate, put_route
+from core.agent_contracts import AgentDecision
 from core.contracts import (
     ApprovedSampleSource,
     Cluster,
     Control,
     Job,
+    JobCreateRequest,
     JobStatus,
     LivePassRate,
     LivePassRatePoint,
@@ -60,10 +65,6 @@ def _data_mode() -> str:
     return mode
 
 
-def _artifact_jobs_mode() -> bool:
-    return _data_mode() in {"artifacts", "hybrid"}
-
-
 def _artifact_store() -> ArtifactStore:
     root = Path(
         os.environ.get(
@@ -75,15 +76,6 @@ def _artifact_store() -> ArtifactStore:
         return ArtifactStore(root)
     except ArtifactDataError as error:
         raise HTTPException(status_code=503, detail="Demo artifacts are unavailable") from error
-
-
-def _job_dir(job_id: str) -> Path:
-    """Return a job directory while keeping path traversal out of runs/."""
-    root = _runs_dir().resolve()
-    candidate = (root / job_id).resolve()
-    if candidate.parent != root or not candidate.is_dir():
-        raise HTTPException(status_code=404, detail="Job not found")
-    return candidate
 
 
 def _status_for(job_dir: Path) -> str:
@@ -122,41 +114,87 @@ def _metrics_for(job_dir: Path) -> Metrics:
 @app.get("/jobs")
 def list_jobs() -> list[dict[str, str]]:
     """List local run IDs and their file-inferred status."""
-    if _artifact_jobs_mode():
+    mode = _data_mode()
+    if mode == "artifacts":
         return _artifact_store().list_jobs()
+    jobs = _artifact_store().list_jobs() if mode == "hybrid" else []
     root = _runs_dir()
-    if not root.is_dir():
-        return []
-    jobs = [
-        {"job_id": path.name, "status": _status_for(path)}
-        for path in sorted(root.iterdir())
-        if path.is_dir() and not path.name.startswith(".")
-    ]
-    for item in jobs:
-        _materialize_job_best_effort(
-            DatabaseJobRecord(
-                job_id=item["job_id"],
-                template="unknown",
-                status=item["status"],
-                config_json={},
-                created_at=datetime.fromtimestamp(
-                    (root / item["job_id"]).stat().st_mtime, tz=timezone.utc
-                ),
-                summary_json={"source": "local-runs"},
+    if mode == "runs" and root.is_dir():
+        local_jobs = [
+            {"job_id": path.name, "status": _status_for(path)}
+            for path in sorted(root.iterdir())
+            if path.is_dir() and not path.name.startswith(".")
+        ]
+        jobs.extend(local_jobs)
+        for item in local_jobs:
+            _materialize_job_best_effort(
+                DatabaseJobRecord(
+                    job_id=item["job_id"],
+                    template="unknown",
+                    status=item["status"],
+                    config_json={},
+                    created_at=datetime.fromtimestamp(
+                        (root / item["job_id"]).stat().st_mtime, tz=timezone.utc
+                    ),
+                    summary_json={"source": "local-runs"},
+                )
             )
-        )
-    return jobs
+    known = {item["job_id"] for item in jobs}
+    for record in _database_jobs_best_effort():
+        if record.job_id not in known:
+            jobs.append({"job_id": record.job_id, "status": record.status})
+    return sorted(jobs, key=lambda item: item["job_id"])
+
+
+@app.post("/jobs", response_model=Job, status_code=201)
+def create_job(request: JobCreateRequest) -> Job:
+    """Create queued job metadata without provisioning or starting training."""
+    if _data_mode() == "artifacts":
+        raise HTTPException(status_code=409, detail="Demo artifact mode is read-only")
+    job = Job(
+        job_id=f"job-{uuid4().hex[:12]}",
+        template=request.template,
+        status=JobStatus.QUEUED,
+        model=request.model,
+        created_at=datetime.now(timezone.utc),
+        metrics=Metrics(steps=[], reward_mean=[], pass_at_1=[], entropy=[]),
+        control=Control(pass_at_1=[]),
+    )
+    record = DatabaseJobRecord(
+        job_id=job.job_id,
+        template=job.template,
+        status=job.status.value,
+        config_json={"model": job.model},
+        created_at=job.created_at,
+        summary_json={"job": job.model_dump(mode="json")},
+    )
+    try:
+        repository_gateway().call(lambda repositories: repositories.jobs.put(record))
+    except (DatabaseOperationError, OSError, RuntimeError, ValueError):
+        raise HTTPException(status_code=503, detail="Job persistence is unavailable") from None
+    return job
 
 
 @app.get("/jobs/{job_id}", response_model=Job)
 def get_job(job_id: str) -> Job:
     """Return a minimal Job built from files already present under runs/."""
-    if _artifact_jobs_mode():
+    mode = _data_mode()
+    if mode in {"artifacts", "hybrid"}:
         try:
             return _artifact_store().job(job_id)
         except KeyError as error:
-            raise HTTPException(status_code=404, detail="Job not found") from error
-    job_dir = _job_dir(job_id)
+            if mode == "artifacts":
+                raise HTTPException(status_code=404, detail="Job not found") from error
+    root = _runs_dir().resolve()
+    candidate = (root / job_id).resolve()
+    if candidate.parent != root:
+        raise HTTPException(status_code=404, detail="Job not found")
+    if not candidate.is_dir():
+        database_job = _database_job(job_id)
+        if database_job is None:
+            raise HTTPException(status_code=404, detail="Job not found")
+        return database_job
+    job_dir = candidate
     created = datetime.fromtimestamp(job_dir.stat().st_mtime, tz=timezone.utc)
     job = Job(
         job_id=job_id,
@@ -193,12 +231,21 @@ def get_job(job_id: str) -> Job:
 @app.get("/jobs/{job_id}/metrics", response_model=Metrics)
 def job_metrics(job_id: str) -> Metrics:
     """Aggregate the append-only metric log into the shared Metrics shape."""
-    if _artifact_jobs_mode():
+    mode = _data_mode()
+    if mode in {"artifacts", "hybrid"}:
         try:
             return _artifact_store().metrics(job_id)
         except KeyError as error:
-            raise HTTPException(status_code=404, detail="Job not found") from error
-    return _metrics_for(_job_dir(job_id))
+            if mode == "artifacts":
+                raise HTTPException(status_code=404, detail="Job not found") from error
+    root = _runs_dir().resolve()
+    candidate = (root / job_id).resolve()
+    if candidate.parent == root and candidate.is_dir():
+        return _metrics_for(candidate)
+    database_job = _database_job(job_id)
+    if database_job is None:
+        raise HTTPException(status_code=404, detail="Job not found")
+    return database_job.metrics
 
 
 @app.get("/clusters", response_model=list[Cluster])
@@ -206,7 +253,7 @@ def list_clusters() -> list[Cluster]:
     """Return the stable product profiles used by Discover and the mock API."""
     profiles = list_cluster_profiles()
     _materialize_clusters_best_effort(profiles)
-    return [_cluster_with_database_source(profile) for profile in profiles]
+    return [_cluster_with_product_state(profile) for profile in profiles]
 
 
 @app.get("/clusters/{cluster_id}", response_model=Cluster)
@@ -215,7 +262,7 @@ def get_cluster(cluster_id: str) -> Cluster:
     try:
         profile = cluster_profile(cluster_id)
         _materialize_clusters_best_effort([profile])
-        return _cluster_with_database_source(profile)
+        return _cluster_with_product_state(profile)
     except KeyError as error:
         raise HTTPException(status_code=404, detail="Cluster not found") from error
 
@@ -271,17 +318,26 @@ def get_live_pass_rate(cluster_id: str) -> LivePassRate:
     return LivePassRate(cluster_id=cluster_id, points=[_live_point(point) for point in points])
 
 
-def _routing_state(route: RouteRecord) -> RoutingState:
+def _routing_state(route: RouteRecord | DatabaseRoutingRecord) -> RoutingState:
+    target_model = getattr(route, "target_upstream", None) or getattr(
+        route, "target_model"
+    )
     return RoutingState(
-        cluster_id=route.cluster_id,
-        enabled=route.enabled,
-        canary_percent=route.canary_percent,
-        target_model=route.target_upstream,
+        cluster_id=str(getattr(route, "cluster_id")),
+        enabled=bool(getattr(route, "enabled")),
+        canary_percent=int(getattr(route, "canary_percent")),
+        target_model=str(target_model),
     )
 
 
-def _live_point(point: LivePassRateRecord) -> LivePassRatePoint:
-    return LivePassRatePoint(timestamp=point.timestamp, pass_rate=point.pass_rate)
+def _live_point(
+    point: LivePassRateRecord | DatabaseLivePassRateRecord,
+) -> LivePassRatePoint:
+    timestamp = getattr(point, "timestamp", None) or getattr(point, "ts")
+    return LivePassRatePoint(
+        timestamp=timestamp,
+        pass_rate=float(getattr(point, "pass_rate")),
+    )
 
 
 def _materialize_clusters_best_effort(profiles: list[Cluster]) -> None:
@@ -319,22 +375,59 @@ def _materialize_clusters_best_effort(profiles: list[Cluster]) -> None:
         pass
 
 
-def _cluster_with_database_source(profile: Cluster) -> Cluster:
-    try:
-        record = repository_gateway().call(
-            lambda repositories: repositories.clusters.get(profile.cluster_id)
-        )
-    except (OSError, RuntimeError, ValueError):
-        return profile
-    if record is None or record.approved_sample_source is None:
-        return profile
-    return profile.model_copy(
-        update={
-            "approved_sample_source": ApprovedSampleSource.model_validate(
-                record.approved_sample_source
+def _cluster_with_product_state(profile: Cluster) -> Cluster:
+    if _data_mode() == "artifacts":
+        updates: dict[str, object] = {}
+        try:
+            updates["routing"] = _artifact_store().routing(profile.cluster_id)
+        except KeyError:
+            pass
+        try:
+            updates["live_pass_rate"] = _artifact_store().live_pass_rate(
+                profile.cluster_id
             )
-        }
-    )
+        except KeyError:
+            pass
+        return profile.model_copy(update=updates)
+
+    async def read(repositories):
+        return (
+            await repositories.clusters.get(profile.cluster_id),
+            await repositories.routing.get(profile.cluster_id),
+            await repositories.live_pass_rate.list_points(profile.cluster_id),
+            await repositories.agent_decisions.latest_for_cluster(profile.cluster_id),
+        )
+
+    try:
+        record, route, points, decision_record = repository_gateway().call(read)
+    except (DatabaseOperationError, OSError, RuntimeError, ValueError):
+        return profile
+    updates: dict[str, object] = {}
+    if record is not None and record.approved_sample_source is not None:
+        updates["approved_sample_source"] = ApprovedSampleSource.model_validate(
+            record.approved_sample_source
+        )
+    if route is not None:
+        updates["routing"] = _routing_state(route)
+    if points:
+        updates["live_pass_rate"] = LivePassRate(
+            cluster_id=profile.cluster_id,
+            points=[_live_point(point) for point in points],
+        )
+    if decision_record is not None and decision_record.decision is not None:
+        try:
+            updates["analyzer_decision"] = AgentDecision.model_validate(
+                {
+                    "decision": decision_record.decision,
+                    "rationale": decision_record.rationale,
+                    "confidence": decision_record.confidence,
+                    "config": decision_record.config_json,
+                }
+            )
+        except ValueError:
+            # A malformed audit row must not make the Discover catalog unavailable.
+            pass
+    return profile.model_copy(update=updates)
 
 
 def _materialize_job_best_effort(record: DatabaseJobRecord) -> None:
@@ -343,3 +436,41 @@ def _materialize_job_best_effort(record: DatabaseJobRecord) -> None:
     except (OSError, RuntimeError, ValueError):
         # File-backed development inspection remains available during DB outages.
         pass
+
+
+def _database_jobs_best_effort() -> list[DatabaseJobRecord]:
+    try:
+        return repository_gateway().call(lambda repositories: repositories.jobs.list())
+    except (DatabaseOperationError, OSError, RuntimeError, ValueError):
+        return []
+
+
+def _database_job(job_id: str) -> Job | None:
+    try:
+        record = repository_gateway().call(
+            lambda repositories: repositories.jobs.get(job_id)
+        )
+    except (DatabaseOperationError, OSError, RuntimeError, ValueError):
+        raise HTTPException(status_code=503, detail="Job persistence is unavailable") from None
+    if record is None:
+        return None
+    payload = record.summary_json.get("job")
+    if isinstance(payload, dict):
+        try:
+            return Job.model_validate(payload)
+        except ValueError:
+            pass
+    try:
+        status = JobStatus(record.status)
+    except ValueError:
+        status = JobStatus.FAILED
+    model = record.config_json.get("model", "unknown")
+    return Job(
+        job_id=record.job_id,
+        template=record.template,
+        status=status,
+        model=str(model),
+        created_at=record.created_at,
+        metrics=Metrics(steps=[], reward_mean=[], pass_at_1=[], entropy=[]),
+        control=Control(pass_at_1=[]),
+    )
