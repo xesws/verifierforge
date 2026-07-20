@@ -3079,3 +3079,45 @@ local/static fallback. No trainer or frozen-data work belongs to this patch.
   test-only corrections: do not assume a populated database sequence restarts
   at one, and use SAVEPOINTs so an expected failure cannot invalidate the
   outer rollback transaction.
+
+## 2026-07-20 v0.34.0 — scale-to-zero serving
+
+**Status:** in progress. This section is the sole operational context for SV.
+
+- [x] **SV-docs — reserve version and affected areas before implementation.**
+  Target `v0.34.0`; affected docs: versions, backend API, frontend,
+  infrastructure, provisioner, database, and evaluation-serving.
+- [ ] **SV0 — publish and verify step-350 in S3.** Local source is the 13-file
+  `runs/d4-m3-1p5b-r1-v0125/ckpt/step_350/global_step_350/actor/serveable_huggingface`
+  tree. Canonical identity: `7bde853af7c82405fd1356de9bad9b6c421de45a45ce747f63ea2f8a27eda658`.
+  A 2026-07-20 read-only bucket inventory found 619 objects and zero step-350
+  matches, so upload is required; do not claim the model is already in S3.
+- [ ] **SV1 — endpoint registry and dynamic proxy resolution.** Thirty-second
+  descriptor cache; plaintext endpoint keys are never cached. Cold/non-ready
+  state uses deterministic default fallback while artifact report/arena remain
+  complete. Public routing accepts only the logical `tuned` alias.
+- [ ] **SV2 — recoverable ServingSession.** Capacity-aware `small_ada`,
+  Blackwell blocked, database active-slot concurrency 1, `$5` session cap,
+  120-minute runtime cap, S3 identity gate, vLLM + cloudflared readiness gate,
+  durable reconcile and provider-side termination proof.
+- [ ] **SV3 — invite-protected wake/status and reviewer UI.** Independent
+  `VF_SERVING_WAKE_ENABLED=false` default; do not enable
+  `VF_AUTOPROVISION`. Real/mock contract count becomes 21.
+- [ ] **SV4 — cold-start acceleration.** Timebox 45 minutes. Preferred image:
+  official vLLM 0.10.2 linux-amd64 digest
+  `sha256:df2607b26bdda2875de4832f4d08da0055b4b6e3570347f3a849bcc652771dd6`.
+  Fall back to the verified install path without weakening gates.
+- [ ] **SV5-A — first live cycle.** Wake to ready, record cold-start duration,
+  canary 50%, send 200 SQL requests, require 40–60% tuned, no tuned fallback,
+  and at least one new Guardian point; restore canary to zero.
+- [ ] **SV5-B — idle and second wake.** Acceptance idle override 3 minutes,
+  drain/delete/list-zero/billing schedule, cold, wake to ready again, one real
+  completion, then clean termination back to cold.
+- [ ] **SV6 — closeout.** README/JUDGES/contract/run-sheet, full tests, secret
+  scan, `frontend-api-v1.2` and `serving-scale-to-zero` tags, push, then report
+  that only owner may decide whether to stop the old L4.
+
+Stop conditions: an item blocked over 30 minutes is recorded and skipped; an
+S3 identity mismatch, migration failure, leaked secret, budget/runtime fuse,
+readiness failure, or unproven provider deletion blocks live promotion and the
+semantic tag. Existing L4 service is out of scope and must remain untouched.
