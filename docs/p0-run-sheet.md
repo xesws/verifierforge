@@ -2912,21 +2912,53 @@ estimate was `$0.000290`; target GET absence and a new account inventory with
 
 - [x] Reserve the patch version and backend/database/frontend area documents
   before implementation.
-- [ ] Replace wildcard CORS with environment-controlled local defaults and
+- [x] Replace wildcard CORS with environment-controlled local defaults and
   add regression coverage.
-- [ ] Preserve Start Forge's disabled boundary while returning an explicit
+- [x] Preserve Start Forge's disabled boundary while returning an explicit
   disabled detail and proving zero provider/persistence action.
-- [ ] Start the true API on Postgres with mock Agent and autoprovision off.
-- [ ] Exercise the 16 frozen operations, validate fields, and record exact
+- [x] Start the true API on Postgres with mock Agent and autoprovision off.
+- [x] Exercise the 16 frozen operations, validate fields, and record exact
   HTTP status/provenance; separately note the three documented non-frozen GETs.
-- [ ] Verify three clusters, D4 before/after and curves, routing, Guardian,
+- [x] Verify three clusters, D4 before/after and curves, routing, Guardian,
   Analyze, Approve, and disabled Start; put anomalies first without inventing
   missing data.
-- [ ] Restore Supabase product state, remove bounded test fixtures, prove the
+- [x] Restore Supabase product values, remove bounded test fixtures, prove the
   SQLite sentinel was never created, and stop the local API.
-- [ ] Publish `docs/frontend/integration-cheatsheet.md`, run focused/full/
+- [x] Publish `docs/frontend/integration-cheatsheet.md`, run focused/full/
   Postgres tests plus secret scan, commit, push, and report final HEAD.
 
 Stop conditions: any secret in output, paid LLM/provider call, contract field
 drift, failed cleanup, or evidence that cannot distinguish Supabase from a
 local/static fallback. No trainer or frozen-data work belongs to this patch.
+
+### v0.32.1 observed result
+
+- Frozen operations: 15 returned 200/201; Start Forge returned the expected
+  `404 {"detail":"Start Forge is disabled because
+  VF_AUTOPROVISION=false"}`. All response models and direct-source checks
+  passed. The three documented non-frozen GETs returned 200.
+- Cluster truth: support `240000/$4800/skip`, invoice
+  `180000/$6000/forge`, SQL `95000/$5500/forge`. SQL routing restored to its
+  prior enabled 50% tuned state. LivePassRate had 128 Supabase points and ended
+  at 0.85.
+- D4 truth: artifact source, before `0.5833333333333334`, after
+  `0.7833333333333333`, main/control curve lengths 400/200, verdict
+  `real_gain`, but `arena=null` and `projected_monthly_savings_usd=null`.
+  These are reported gaps, not silently patched data.
+- CORS: six local origins returned 200 with exact allow-origin plus
+  Authorization/Content-Type; `https://untrusted.example` returned 400 with no
+  allow-origin header.
+- The first local audit harness reused one asyncpg engine across multiple
+  event loops and stopped after Job creation with raw error `RuntimeError:
+  ... got Future ... attached to a different loop`. The scoped template had
+  zero residue. The corrected single-loop harness completed all operations.
+- Final cleanup: self-check Jobs `0`, credentials `0`, approvals `0`; SQLite
+  sentinel `false`. Catalog GETs do update repository timestamps by current
+  design, so cleanup claims product-value restoration rather than pretending
+  those reads are side-effect free.
+- Validation: CORS/P4/frozen-contract focus `13 passed`; full suite `442
+  passed, 1 skipped`; rollback-only real Postgres repository suite `4 passed`;
+  secret scan and Python compilation passed. The Postgres suite required two
+  test-only corrections: do not assume a populated database sequence restarts
+  at one, and use SAVEPOINTs so an expected failure cannot invalidate the
+  outer rollback transaction.

@@ -73,7 +73,11 @@ async def repositories(request, tmp_path: Path):
             test_runtime = DatabaseRuntime(
                 settings=settings,
                 engine=runtime.engine,
-                sessions=async_sessionmaker(connection, expire_on_commit=False),
+                sessions=async_sessionmaker(
+                    connection,
+                    expire_on_commit=False,
+                    join_transaction_mode="create_savepoint",
+                ),
             )
             try:
                 yield create_repositories(test_runtime)
@@ -121,8 +125,10 @@ async def test_all_repository_contracts_round_trip(repositories) -> None:
         route_taken="default",
     )
     saved_traffic = await repositories.traffic.append(traffic)
-    assert saved_traffic.id == 1
-    assert saved_traffic == traffic.__class__(**{**traffic.__dict__, "id": 1})
+    assert saved_traffic.id is not None and saved_traffic.id > 0
+    assert saved_traffic == traffic.__class__(
+        **{**traffic.__dict__, "id": saved_traffic.id}
+    )
     assert await repositories.traffic.list_for_prompt_hash("a" * 64) == [saved_traffic]
     assert await repositories.traffic.count() == 1
 
