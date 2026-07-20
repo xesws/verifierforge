@@ -81,6 +81,30 @@ class RunPodGPUOffer:
     stock_status: str
 
 
+@dataclass(frozen=True)
+class RunPodRuntimeConfig:
+    """Ephemeral container launch details excluded from ProvisionSpec/audit."""
+
+    http_ports: tuple[int, ...] = ()
+    docker_entrypoint: tuple[str, ...] | None = None
+    docker_start_cmd: tuple[str, ...] | None = None
+    ephemeral_env_provider: Callable[[], Mapping[str, str]] | None = None
+
+    def __post_init__(self) -> None:
+        if len(set(self.http_ports)) != len(self.http_ports) or any(
+            port < 1 or port > 65535 for port in self.http_ports
+        ):
+            raise ValueError("http_ports must contain unique TCP ports")
+        command_values = (self.docker_entrypoint, self.docker_start_cmd)
+        if any(
+            not value
+            for values in command_values
+            if values is not None
+            for value in values
+        ):
+            raise ValueError("container command entries must be non-empty")
+
+
 class RunPodAdapter:
     """One-GPU RunPod adapter; API credentials never cross this local boundary."""
 
@@ -94,6 +118,7 @@ class RunPodAdapter:
         graphql_url: str = RUNPOD_GRAPHQL_URL,
         timeout_s: float = 30.0,
         create_timeout_s: float | None = None,
+        runtime: RunPodRuntimeConfig | None = None,
     ) -> None:
         if api_key_provider is not None and api_key is not None:
             raise ValueError("provide api_key or api_key_provider, not both")
@@ -107,6 +132,7 @@ class RunPodAdapter:
         self.base_url = base_url.rstrip("/")
         self.graphql_url = graphql_url
         self.create_timeout_s = create_timeout_s or timeout_s
+        self.runtime = runtime or RunPodRuntimeConfig()
         if self.create_timeout_s <= 0:
             raise ValueError("create_timeout_s must be positive")
         self._owns_client = client is None
@@ -199,6 +225,25 @@ class RunPodAdapter:
     def _create_payload(
         self, spec: ProvisionSpec, offer: RunPodGPUOffer
     ) -> dict[str, Any]:
+        ephemeral_env = (
+            dict(self.runtime.ephemeral_env_provider())
+            if self.runtime.ephemeral_env_provider is not None
+            else {}
+        )
+        if any(
+            not isinstance(key, str)
+            or not key
+            or not isinstance(value, str)
+            or not value
+            for key, value in ephemeral_env.items()
+        ):
+            raise ProvisionProviderError("ephemeral container environment is invalid")
+        ports = ["22/tcp"]
+        for port in spec.ports:
+            if port == 22:
+                continue
+            protocol = "http" if port in self.runtime.http_ports else "tcp"
+            ports.append(f"{port}/{protocol}")
         payload: dict[str, Any] = {
             "name": self._managed_name(spec.job_id),
             "cloudType": offer.cloud_type,
@@ -211,15 +256,20 @@ class RunPodAdapter:
             "volumeInGb": 0,
             "interruptible": False,
             "supportPublicIp": True,
-            "ports": ["22/tcp"],
+            "ports": ports,
             "env": {
                 **spec.env,
+                **ephemeral_env,
                 OWNER_MARKER_KEY: OWNER_MARKER_VALUE,
                 "VF_JOB_ID": spec.job_id,
                 "VF_APPROVAL_ID": spec.approval_id,
                 "PUBLIC_KEY": spec.ssh_pubkey,
             },
         }
+        if self.runtime.docker_entrypoint is not None:
+            payload["dockerEntrypoint"] = list(self.runtime.docker_entrypoint)
+        if self.runtime.docker_start_cmd is not None:
+            payload["dockerStartCmd"] = list(self.runtime.docker_start_cmd)
         if spec.region_pref:
             payload["dataCenterIds"] = spec.region_pref
         return payload
@@ -459,7 +509,7 @@ class RunPodAdapter:
                 f"RunPod capacity query transport failed: {type(error).__name__}"
             ) from error
         if response.status_code != 200:
-            body = response.text[:_ERROR_BODY_LIMIT].replace(api_key, "[REDACTED]")
+            body = self._redact(response.text[:_ERROR_BODY_LIMIT], api_key)
             raise ProvisionProviderError(
                 f"RunPod capacity query returned HTTP {response.status_code}: {body}",
                 status_code=response.status_code,
@@ -469,8 +519,10 @@ class RunPodAdapter:
         if not isinstance(decoded, dict):
             raise ProvisionProviderError("RunPod capacity response is not an object")
         if decoded.get("errors"):
-            body = json.dumps(decoded["errors"], ensure_ascii=True)[:_ERROR_BODY_LIMIT]
-            body = body.replace(api_key, "[REDACTED]")
+            body = self._redact(
+                json.dumps(decoded["errors"], ensure_ascii=True)[:_ERROR_BODY_LIMIT],
+                api_key,
+            )
             raise ProvisionProviderError(
                 f"RunPod capacity query returned GraphQL errors: {body}",
                 provider_body=body,
@@ -500,13 +552,21 @@ class RunPodAdapter:
                 f"RunPod {method} {path} transport failed: {type(error).__name__}"
             ) from error
         if response.status_code not in expected:
-            body = response.text[:_ERROR_BODY_LIMIT].replace(api_key, "[REDACTED]")
+            body = self._redact(response.text[:_ERROR_BODY_LIMIT], api_key)
             raise ProvisionProviderError(
                 f"RunPod {method} {path} returned HTTP {response.status_code}: {body}",
                 status_code=response.status_code,
                 provider_body=body,
             )
         return response
+
+    def _redact(self, value: str, api_key: str) -> str:
+        sanitized = value.replace(api_key, "[REDACTED]")
+        if self.runtime.ephemeral_env_provider is not None:
+            for secret in self.runtime.ephemeral_env_provider().values():
+                if secret:
+                    sanitized = sanitized.replace(secret, "[REDACTED]")
+        return sanitized
 
 
 def _decode_json(response: httpx.Response) -> Any:
@@ -685,4 +745,5 @@ __all__ = [
     "RUNPOD_IMAGE",
     "RunPodAdapter",
     "RunPodBilling",
+    "RunPodRuntimeConfig",
 ]

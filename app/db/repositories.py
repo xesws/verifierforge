@@ -142,6 +142,15 @@ class SQLAlchemyTrafficStore:
                 for prompt_hash, request_count, total_tokens, total_cost in rows
             ]
 
+    async def latest_route_at(self, route_taken: str) -> datetime | None:
+        _text(route_taken, "route_taken")
+        statement = select(func.max(TrafficRequestRow.ts)).where(
+            TrafficRequestRow.route_taken == route_taken
+        )
+        async with _transaction(self.sessions) as session:
+            observed = await session.scalar(statement)
+            return _utc(observed) if observed is not None else None
+
 
 class SQLAlchemyClusterStore:
     def __init__(self, sessions: async_sessionmaker[AsyncSession]) -> None:
@@ -555,6 +564,7 @@ class SQLAlchemyServingEndpointStore:
                 row.gpu_model = None
                 row.hourly_price_usd = None
                 row.cost_accrued_usd = 0.0
+                row.cold_start_seconds = None
                 row.requested_at = _utc(observed_at)
                 row.ready_at = None
                 row.updated_at = _utc(observed_at)
@@ -597,6 +607,7 @@ class SQLAlchemyServingEndpointStore:
             row.gpu_model = record.gpu_model
             row.hourly_price_usd = record.hourly_price_usd
             row.cost_accrued_usd = record.cost_accrued_usd
+            row.cold_start_seconds = record.cold_start_seconds
             row.requested_at = _utc(record.requested_at) if record.requested_at else None
             row.ready_at = _utc(record.ready_at) if record.ready_at else None
             row.updated_at = _utc(record.updated_at)
@@ -807,6 +818,7 @@ def _serving_endpoint_record(row: ServingEndpointRow) -> ServingEndpointRecord:
         gpu_model=row.gpu_model,
         hourly_price_usd=row.hourly_price_usd,
         cost_accrued_usd=row.cost_accrued_usd,
+        cold_start_seconds=row.cold_start_seconds,
         requested_at=_utc(row.requested_at) if row.requested_at else None,
         ready_at=_utc(row.ready_at) if row.ready_at else None,
         updated_at=_utc(row.updated_at),
@@ -942,6 +954,8 @@ def _serving_endpoint_valid(record: ServingEndpointRecord) -> None:
     if record.hourly_price_usd is not None:
         _nonnegative_number(record.hourly_price_usd, "hourly_price_usd")
     _nonnegative_number(record.cost_accrued_usd, "cost_accrued_usd")
+    if record.cold_start_seconds is not None:
+        _nonnegative_number(record.cold_start_seconds, "cold_start_seconds")
     if not isinstance(record.detail, str):
         raise ValueError("detail must be a string")
 

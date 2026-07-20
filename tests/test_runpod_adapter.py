@@ -13,6 +13,7 @@ from app.provisioning.runpod import (
     OWNER_MARKER_VALUE,
     RUNPOD_IMAGE,
     RunPodAdapter,
+    RunPodRuntimeConfig,
 )
 from core.provisioning_contracts import (
     GPUClass,
@@ -156,6 +157,51 @@ def test_create_status_delete_and_billing_contract() -> None:
 
     _run(scenario())
     assert all(request.headers["Authorization"] == "Bearer secret-test-key" for request in calls)
+
+
+def test_serving_runtime_honors_http_port_command_and_redacts_ephemeral_values() -> None:
+    observed: dict[str, object] = {}
+    secret_url = "https://s3.example.test/model?signature=secret"
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        if _is_capacity_query(request):
+            return httpx.Response(
+                200,
+                json=_capacity(
+                    {"NVIDIA RTX 2000 Ada Generation": ("COMMUNITY", 0.1, "High")}
+                ),
+            )
+        if request.method == "POST":
+            observed.update(json.loads(request.content))
+            return httpx.Response(
+                400,
+                text=f"bad launch env {secret_url}",
+            )
+        return httpx.Response(200, json=[])
+
+    async def scenario() -> None:
+        spec = _spec().model_copy(update={"ports": [8000]})
+        client = httpx.AsyncClient(transport=httpx.MockTransport(handler))
+        adapter = RunPodAdapter(
+            "key",
+            client=client,
+            runtime=RunPodRuntimeConfig(
+                http_ports=(8000,),
+                docker_entrypoint=("/bin/bash", "-lc"),
+                docker_start_cmd=("python /opt/vf/start.py",),
+                ephemeral_env_provider=lambda: {"VF_MODEL_MANIFEST_URL": secret_url},
+            ),
+        )
+        with pytest.raises(ProvisionNoCapacity) as captured:
+            await adapter.provision(spec)
+        assert secret_url not in str(captured.value)
+        await client.aclose()
+
+    _run(scenario())
+    assert observed["ports"] == ["22/tcp", "8000/http"]
+    assert observed["dockerEntrypoint"] == ["/bin/bash", "-lc"]
+    assert observed["dockerStartCmd"] == ["python /opt/vf/start.py"]
+    assert observed["env"]["VF_MODEL_MANIFEST_URL"] == secret_url
 
 
 def test_create_failure_reconciles_then_tries_next_ranked_model() -> None:

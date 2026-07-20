@@ -145,6 +145,7 @@ class ServingEndpointRecord:
     gpu_model: str | None = None
     hourly_price_usd: float | None = None
     cost_accrued_usd: float = 0.0
+    cold_start_seconds: float | None = None
     requested_at: datetime | None = None
     ready_at: datetime | None = None
     error_code: str | None = None

@@ -135,6 +135,8 @@ async def test_all_repository_contracts_round_trip(repositories) -> None:
     )
     assert await repositories.traffic.list_for_prompt_hash("a" * 64) == [saved_traffic]
     assert await repositories.traffic.count() == 1
+    assert await repositories.traffic.latest_route_at("default") == NOW
+    assert await repositories.traffic.latest_route_at("tuned") is None
 
     first_point = await repositories.live_pass_rate.record_score(
         GuardianScoreRecord(cluster.cluster_id, NOW, 1.0)

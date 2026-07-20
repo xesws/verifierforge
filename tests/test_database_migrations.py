@@ -70,7 +70,7 @@ async def test_alembic_upgrade_downgrade_upgrade_cycle(tmp_path: Path) -> None:
     }
     assert columns["serving_endpoints"] >= {
         "model_id", "session_id", "url", "api_key_ref", "state",
-        "external_id", "active_slot", "updated_at",
+        "external_id", "active_slot", "updated_at", "cold_start_seconds",
     }
     assert columns["serving_events"] >= {
         "id", "session_id", "model_id", "action", "state", "occurred_at",

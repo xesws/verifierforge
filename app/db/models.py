@@ -253,6 +253,7 @@ class ServingEndpointRow(Base):
     gpu_model: Mapped[str | None] = mapped_column(String(255))
     hourly_price_usd: Mapped[float | None] = mapped_column(Float)
     cost_accrued_usd: Mapped[float] = mapped_column(Float, nullable=False, default=0.0)
+    cold_start_seconds: Mapped[float | None] = mapped_column(Float)
     requested_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     ready_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
