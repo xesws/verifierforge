@@ -2715,9 +2715,9 @@ evidence is `docs/evidence/provisioner/v0.28.5-p2-live-pass.json`; semantic tag
   call-boundary decryption and documented local `RUNPOD_API_KEY` fallback.
 - [x] P4-2: preserve approval-only semantics; add separately confirmed Start
   Forge, bounded config translation and pollable lifecycle states.
-- [ ] P4-3: prove mock full lifecycle, then one real RunPod create/terminate
+- [x] P4-3: prove mock full lifecycle, then one real RunPod create/terminate
   smoke under `$1`; archive sanitized provider evidence.
-- [ ] Full regression and secret scan; commit, push and tag
+- [x] Full regression and secret scan; commit, push and tag
   `provisioner-p4-complete` only after every P-4 gate passes.
 
 Hard stops: any secret exposure, config/budget mismatch, provider cleanup
@@ -2733,3 +2733,14 @@ config/system budget. The FastAPI demo hides the second action while
 `VF_AUTOPROVISION` is false. Mock execution completed the full state path.
 Validation: `423 passed, 1 skipped`; secret scan and JavaScript/shell syntax
 checks passed.
+
+P4-3 live result: passed. The product path used a mock Agent decision, wrote
+approval `1dd1909c9215444ba35357bcb395a229` without provider mutation, then
+accepted a separate literal spend confirmation. RunPod handle
+`as0km86lszjvdb` reached SSH readiness and was terminated immediately; no
+trainer or LLM ran. The status endpoint ended at `done` with a provider estimate
+of `$0.000623` under a `$1` effective cap. The synchronous termination receipt
+states target absent and raw `vf-auto-* = 0`. Billing remains unsettled; local
+tmux sessions `vf-billing-p4-1h` and `vf-billing-p4-6h` will perform the
+supporting reads if the laptop remains awake. Sanitized tracked evidence:
+`docs/evidence/provisioner/v0.29.0-p4-live-pass.json`.

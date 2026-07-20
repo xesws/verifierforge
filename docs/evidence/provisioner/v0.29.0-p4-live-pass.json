@@ -1,0 +1,38 @@
+{
+  "accepted_state": "provisioning",
+  "approval_id": "1dd1909c9215444ba35357bcb395a229",
+  "audit_actions": [
+    "provision.requested",
+    "provision.created",
+    "state.transition",
+    "provision.terminated",
+    "lifecycle.terminated",
+    "provider.deletion_confirmed"
+  ],
+  "billing": {
+    "plus_1h": "scheduled",
+    "plus_6h": "scheduled",
+    "settled_amount_usd": null
+  },
+  "decision_id": "faa59efe08a64b639d8681dda7245297",
+  "finished_at": "2026-07-20T01:00:55.873060+00:00",
+  "provider": "runpod",
+  "provider_handle": "as0km86lszjvdb",
+  "result": {
+    "budget_usd_cap": 1.0,
+    "cost_accrued_usd_estimate": 0.000623,
+    "detail": "provider DELETE accepted; target absent; raw vf-auto-* inventory zero",
+    "state": "done"
+  },
+  "schema_version": 1,
+  "stage": "provisioner-p4-live",
+  "started_at": "2026-07-20T01:00:23.123064+00:00",
+  "status": "passed",
+  "training_started": false,
+  "wave_budget": {
+    "conservative_prior_estimate_usd": 2.36358,
+    "cumulative_reserved_usd": 3.36358,
+    "reservation_usd": 1.0,
+    "wave_cap_usd": 5.0
+  }
+}

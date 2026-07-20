@@ -32,7 +32,7 @@ Other completed gates are equally explicit:
 | Product decision | A source-less production Analyze returned `need_more_data`; after a human-approved 50-row source, a fresh run returned `forge` at confidence `0.98` and created an approval in Supabase. |
 | Database | SQLite remains local default; the same async SQLAlchemy repositories and Alembic schema passed a real Supabase Postgres migration, reconciliation, and product smoke. |
 | Delivery | A public Cloudflare quick tunnel served the selected model; 200 canary requests split 120 default / 80 tuned and produced Guardian LivePassRate `0.85`, then canary zero sent 20 / 20 requests to default. |
-| Provisioning | P-1 mock lifecycle/fuses pass. P-2 then executed an approved 0.5B/100-step S3 run on RunPod, service-tested step 100 after trainer exit, SHA-collected it, and deleted the pod; tag `provisioner-p2-live` records the gate. |
+| Provisioning | P-1 mock lifecycle/fuses pass. P-2 executed an approved 0.5B/100-step S3 run and deleted the pod. P-4 then proved the separate web approval → explicit Start Forge → real RunPod readiness → delete wiring; provider estimate `$0.000623`, billing still asynchronous. |
 
 ## Architecture
 
@@ -67,9 +67,11 @@ source of truth.
    tools. Its only terminal actions are `forge`, `skip`, or `need_more_data`.
 4. `Approve & Forge` writes durable human intent. It does not hide a GPU side
    effect inside the web request.
-5. The training path freezes data/verifier identity, runs the main job and a
+5. A separate `Start Forge` action requires a second literal confirmation,
+   applies the lower config/system budget cap, and exposes provisioning status.
+6. The training path freezes data/verifier identity, runs the main job and a
    random-reward control, and selects only on held-out evidence.
-6. The proxy canaries the tuned endpoint while a non-blocking guardian scores
+7. The proxy canaries the tuned endpoint while a non-blocking guardian scores
    sampled SQL output; setting canary to zero restores the default path.
 
 ## Quickstart
@@ -105,7 +107,8 @@ interrupted upload invisible.
 Forge Agent is advisory. It has bounded turns/tokens/time, read-only tools,
 strict structured submission, and no provisioning or training handle. Gate C
 passed, but `VF_AGENT_ENABLED` stays false unless an operator opts in. The web
-approval remains a database write; the separate P-2 CLI is the execution seam.
+approval remains a database write. `Start Forge` is a separate endpoint behind
+the stricter default-off `VF_AUTOPROVISION` flag; approval alone never spends.
 
 ## Database operations
 
@@ -136,15 +139,21 @@ python -c "from cryptography.fernet import Fernet; print(Fernet.generate_key().d
 python -m scripts.scan_secrets
 ```
 
+The Settings API stores a user's RunPod key only as Fernet ciphertext and never
+returns it. Decryption happens afresh at each provider HTTP call. For local and
+reviewer demos only, a user without a stored credential may fall back to the
+system process's `.env` `RUNPOD_API_KEY`; production deployments should supply
+BYO credentials through Settings and keep that fallback unset.
+
 ## Limitations
 
 - The demonstrated quality result is one NL→SQL task family with 50 training
   rows and a 60-row held-out set; it is not a broad benchmark claim.
 - The successful public model proof used an ephemeral Cloudflare quick tunnel,
   not a durable production hostname or SLA.
-- P-2 proves one bounded, separately authorized RunPod execution path, not
-  unattended provisioning from the web button. Its fifth training attempt cost
-  estimate was `$0.177846`; final provider billing remains asynchronous.
+- P-4 proves real approval/Start/provision/delete wiring, not a second complete
+  training run from the web. `VF_AUTOPROVISION` remains default-off. The P-4
+  smoke estimate was `$0.000623`; final provider billing remains asynchronous.
 - Agent Gate C covers a frozen 12-scenario evaluator. It is not evidence that
   arbitrary business traffic should auto-train; the flag remains default-off
   and approval is required.
