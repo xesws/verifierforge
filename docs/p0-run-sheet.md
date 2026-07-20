@@ -3136,6 +3136,14 @@ local/static fallback. No trainer or frozen-data work belongs to this patch.
     502 because port 8000 had no listener. Before another paid attempt, add a
     redacted phase/error callback so vLLM startup failures are evidence-bearing
     and fail fast; SSH is deliberately not part of the runtime contract.
+  - [x] Evidence-bearing experiment `sv-4619b7d4656d41cfac8e0574` failed fast
+    with return code 1 and the original redacted exception:
+    `AttributeError: Qwen2Tokenizer has no attribute all_special_tokens_extended`.
+    Root cause is dependency drift from installing vLLM alone. Identity-gated
+    cleanup confirmed `target_absent=true` and `vf_auto_prefix_count=0` at
+    `2026-07-20T11:16:17Z`. Corrective scope: install the already-proven
+    Transformers 4.57.6 / tokenizers 0.22.2 / huggingface-hub 0.36.2 locks with
+    vLLM 0.10.2; no gate relaxation.
 - [ ] **SV5-A — first live cycle.** Wake to ready, record cold-start duration,
   canary 50%, send 200 SQL requests, require 40–60% tuned, no tuned fallback,
   and at least one new Guardian point; restore canary to zero.
