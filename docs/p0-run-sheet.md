@@ -2750,10 +2750,10 @@ supporting reads if the laptop remains awake. Sanitized tracked evidence:
 - [x] Reserve version plus infrastructure/submission/provisioner area docs.
 - [x] Preserve default artifact/fake fallback and add one authenticated
   full-mode composite: Supabase + real tuned endpoint + mock Agent + mock Start.
-- [ ] Capture a Cloudflare quick-tunnel URL, verify invite rejection/acceptance,
+- [x] Capture a Cloudflare quick-tunnel URL, verify invite rejection/acceptance,
   and record the ephemeral URL without committing the invite code.
 - [x] Align JUDGES and README; mark `NebiusAdapter` as next, not implemented.
-- [ ] Full regression, secret scan, commit/push, tag `reviewer-sandbox-full`.
+- [x] Full regression, secret scan, commit/push, tag `reviewer-sandbox-full`.
 
 Stop without weakening the boundary if database, public model health,
 invitation auth or cloudflared readiness fails. This stage performs zero GPU,
@@ -2775,3 +2775,15 @@ requests returned vLLM HTTP 404 because the frontend label
 requires `VF_PROXY_TUNED_MODEL` or falls back to `VF_ENDPOINT_MODEL`, and
 rewrites only the tuned request copy. Focused tests and the full suite passed
 after the repair (`427 passed, 1 skipped`).
+
+Public gate result: passed. The detached `vf-reviewer-full` session serves
+`https://functioning-become-revelation-meanwhile.trycloudflare.com`; it is an
+ephemeral quick tunnel, not a named domain. Unauthenticated product access
+returned 401. Authenticated readback returned three clusters and two committed
+artifact jobs. The public product chain produced `forge`, persisted approval
+`8fafa4bc17d244a5af48a26d0bc36e62`, accepted Start at `provisioning`, and
+polled to `done` through the mock provisioner. The 50% route produced two
+default responses then a real tuned HTTP 200/non-empty completion. Follow-up
+traffic added Guardian point 127 from 126; final rolling pass rate remained
+0.85. The invitation remains only in ignored mode-0600 runtime storage.
+Tracked proof: `docs/evidence/reviewer/v0.30.0-full-public-proof.json`.

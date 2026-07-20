@@ -45,6 +45,11 @@ The launcher never prints the code; it records it only in the ignored runtime
 path it reports. A request without auth returns 401. This full path calls no
 paid LLM and provisions no GPU.
 
+Current owner-hosted quick URL:
+`https://functioning-become-revelation-meanwhile.trycloudflare.com`. Because it
+is a quick tunnel, verify availability with the owner and request the separate
+invitation code before review.
+
 ## 3. Inspect the training result (about 2 minutes)
 
 ```bash

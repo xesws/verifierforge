@@ -1,0 +1,46 @@
+{
+  "approval_id": "8fafa4bc17d244a5af48a26d0bc36e62",
+  "auth": {
+    "basic_username": "judge",
+    "invite_committed": false,
+    "unauthenticated_status": 401
+  },
+  "clusters": {
+    "count": 3,
+    "status": 200
+  },
+  "forge_chain": {
+    "decision": "forge",
+    "final_state": "done",
+    "start_accepted_state": "provisioning"
+  },
+  "guardian": {
+    "final_pass_rate": 0.85,
+    "new_point": true,
+    "points_after": 127,
+    "points_before": 126,
+    "status": 200
+  },
+  "jobs": {
+    "count": 2,
+    "status": 200
+  },
+  "proxy": {
+    "initial_routes": [
+      "default",
+      "default",
+      "tuned"
+    ],
+    "tuned_completion_nonempty": true
+  },
+  "public_url": "https://functioning-become-revelation-meanwhile.trycloudflare.com",
+  "routing": {
+    "canary_percent": 50,
+    "cluster_id": "data-pull-sql",
+    "enabled": true,
+    "target_model": "tuned"
+  },
+  "schema_version": 1,
+  "status": "passed",
+  "tunnel_kind": "cloudflare_quick"
+}
