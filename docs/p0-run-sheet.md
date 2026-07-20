@@ -2895,7 +2895,7 @@ failure to preserve the two pre-existing provisioning billing modifications.
   its fixed public subdomain.
 - [x] H3: only after H2 green, retire old sandbox processes while preserving
   vLLM; establish fixed-port or one-variable tunnel rotation.
-- [ ] H4: update JUDGES/README/frontend/infrastructure handoff, validate,
+- [x] H4: update JUDGES/README/frontend/infrastructure handoff, validate,
   commit/tag/push, and write the owner checklist.
 
 Stop conditions: any secret in repository/log output, duplicate hosted service,
@@ -2972,6 +2972,14 @@ entire H2 gate and were retired only after public acceptance.
 4. **5 minutes when the GPU tunnel rotates — update one variable.** Set Railway
    `VF_PROXY_TUNED_UPSTREAM=https://<new-tunnel>/v1` and restart the sole
    service; reports remain available during the degraded interval.
+
+### H wave commit and tag ledger
+
+- `f34af98` — `v0.33.0 Hosting: package lightweight reviewer backend`
+- `bba31eb` — `v0.33.0 Hosting: publish fixed reviewer endpoint`
+- `hosted-backend-v1` — public 19-operation/auth/CORS/tuned/Guardian acceptance
+- Final validation: `455 passed, 1 skipped`; secret scan, shell syntax, diff
+  check, Railway `/healthz`, and explicit no-runs staging gate passed.
 
 ## 2026-07-19 v0.32.0 — P-2.5 capacity-aware RunPod selection
 
