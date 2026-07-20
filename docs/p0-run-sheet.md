@@ -3087,11 +3087,16 @@ local/static fallback. No trainer or frozen-data work belongs to this patch.
 - [x] **SV-docs — reserve version and affected areas before implementation.**
   Target `v0.34.0`; affected docs: versions, backend API, frontend,
   infrastructure, provisioner, database, and evaluation-serving.
-- [ ] **SV0 — publish and verify step-350 in S3.** Local source is the 13-file
+- [x] **SV0 — publish and verify step-350 in S3.** Local source is the 13-file
   `runs/d4-m3-1p5b-r1-v0125/ckpt/step_350/global_step_350/actor/serveable_huggingface`
   tree. Canonical identity: `7bde853af7c82405fd1356de9bad9b6c421de45a45ce747f63ea2f8a27eda658`.
   A 2026-07-20 read-only bucket inventory found 619 objects and zero step-350
   matches, so upload is required; do not claim the model is already in S3.
+  Upload then completed in 203.055 seconds. A clean download verified all 13
+  file names, byte sizes, individual SHA-256 values, and canonical tree hash in
+  1,251.578 total seconds. Published manifest:
+  `vf/jobs/d4-m3-1p5b-r1-v0125/artifacts/serving/step_350.manifest.json`;
+  sanitized evidence: `docs/evidence/serving/v0.34.0-sv0-s3.json`.
 - [ ] **SV1 — endpoint registry and dynamic proxy resolution.** Thirty-second
   descriptor cache; plaintext endpoint keys are never cached. Cold/non-ready
   state uses deterministic default fallback while artifact report/arena remain

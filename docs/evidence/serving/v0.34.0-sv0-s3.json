@@ -1,0 +1,13 @@
+{
+  "artifact_manifest_key": "vf/jobs/d4-m3-1p5b-r1-v0125/artifacts/serving/step_350.manifest.json",
+  "canonical_tree_sha256": "7bde853af7c82405fd1356de9bad9b6c421de45a45ce747f63ea2f8a27eda658",
+  "clean_download_file_count": 13,
+  "clean_download_verified": true,
+  "identity_manifest_key": "vf/jobs/d4-m3-1p5b-r1-v0125/artifacts/serving/step_350-identity.json.manifest.json",
+  "local_file_count": 13,
+  "published_atomically": true,
+  "schema_version": 1,
+  "total_seconds": 1251.578,
+  "upload_seconds": 203.055,
+  "verified_at": "2026-07-20"
+}
