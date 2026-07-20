@@ -1,0 +1,31 @@
+{
+  "resources": [
+    {
+      "approval_id": "42436bb4c4a144d8980aa886fbb7b14f",
+      "deleted_confirmed_at": "2026-07-19T11:12:43.169608+00:00",
+      "external_id": "33rpq7bee28z9f",
+      "job_id": "p2-42436bb4c4a144d8980a-r2",
+      "provider": "runpod",
+      "slots": {
+        "plus-1h": {
+          "amount_usd": 0.126926,
+          "attempted_at": "2026-07-19T12:12:47.748512+00:00",
+          "due_at": "2026-07-19T12:12:43.169608+00:00",
+          "record_count": 2,
+          "status": "confirmed",
+          "time_billed_ms": 1145984
+        },
+        "plus-6h": {
+          "amount_usd": 0.126926,
+          "attempted_at": "2026-07-19T17:12:47.915883+00:00",
+          "due_at": "2026-07-19T17:12:43.169608+00:00",
+          "record_count": 2,
+          "status": "confirmed",
+          "time_billed_ms": 1145984
+        }
+      },
+      "start_time": "2026-07-19T10:50:58.636000+00:00"
+    }
+  ],
+  "schema_version": 1
+}

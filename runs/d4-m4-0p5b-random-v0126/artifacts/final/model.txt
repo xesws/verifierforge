@@ -1,0 +1,8 @@
+job_id: d4-m4-0p5b-random-v0126
+model: Qwen/Qwen2.5-0.5B-Instruct
+completed_step: 200
+storage_checkpoint: runs/d4-m4-0p5b-random-v0126/ckpt/step_200/global_step_200
+checkpoint_contents: ['model','optimizer','extra']
+generated_at: 2026-07-17T03:57:22.676561+00:00
+config: {'model_path': 'Qwen/Qwen2.5-0.5B-Instruct', 'total_steps': 200, 'total_epochs': None, 'train_batch_size': 4, 'rollout_n': 8, 'max_prompt_length': 1024, 'max_response_length': 512, 'lora_rank': 16, 'lora_alpha': 32, 'learning_rate': 1e-06, 'kl_loss_coef': 0.001, 'rollout_gpu_memory_utilization': 0.4, 'enforce_eager': False, 'vllm_attention_backend': None, 'checkpoint_every': 50, 'validation_every': 50, 'dataset_mode': 'frozen_training_pool', 'reward_mode': 'random_bernoulli', 'save_hf_model': False, 'entropy_brake': False}
+weights remain in ckpt/ and are intentionally not synced by vf watch.

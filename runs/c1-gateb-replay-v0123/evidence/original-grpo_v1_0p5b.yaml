@@ -1,0 +1,15 @@
+# D2's deliberately small real-GRPO smoke configuration.  trainer.grpo_config
+# loads this file and converts it into the overrides accepted by verl 0.8.0.
+model_path: Qwen/Qwen2.5-0.5B-Instruct
+total_steps: 100
+train_batch_size: 4
+rollout_n: 8
+max_prompt_length: 1024
+max_response_length: 512
+lora_rank: 16
+lora_alpha: 32
+learning_rate: 1.0e-6
+kl_loss_coef: 0.001
+rollout_gpu_memory_utilization: 0.40
+checkpoint_every: 50
+validation_every: 10

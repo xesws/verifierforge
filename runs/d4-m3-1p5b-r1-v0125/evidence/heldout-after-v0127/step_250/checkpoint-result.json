@@ -1,0 +1,13 @@
+{
+  "checkpoint_sha256": "a1ad92fef42926fa74d7dd191f450919abf5ab51544cd659f0487a5d6fa9d544",
+  "detail": null,
+  "evidence_sha256": "5ea48259927c4e6080a4efccd091a742c03b5f78a219a8ab9aa70e9ba9cd4978",
+  "metrics": {
+    "mixed_fraction": 0.38333333333333336,
+    "pass_at_1": 0.6333333333333333,
+    "pass_at_8": 0.8333333333333334
+  },
+  "samples_sha256": "157259b06fd656920977b093b1863f9944ac45157faac126e2301ebf930e4a4c",
+  "status": "completed",
+  "step": 250
+}

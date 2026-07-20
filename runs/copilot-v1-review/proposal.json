@@ -1,0 +1,1099 @@
+{
+  "model": "x-ai/grok-4.5",
+  "verifier_code": "def verify_case(conn, expected_sql, expected_results):\n    cur = conn.execute(expected_sql)\n    got = [list(r) for r in cur.fetchall()]\n    return got == expected_results\n",
+  "test_code": "def test_batch(cases):\n    assert len(cases) == 10\n    for c in cases:\n        assert set(c.keys()) == {'case_id', 'prompt', 'expected_sql', 'expected_results'}\n        assert isinstance(c['expected_results'], list)\n    return True\n",
+  "tiers": {
+    "0.2": "References correct base tables from the schema",
+    "0.5": "Applies correct filters, joins, or grouping keys",
+    "0.8": "Produces correct aggregates or ordering clauses",
+    "1.0": "Exact match of result rows including values and order"
+  },
+  "cases": [
+    {
+      "case_id": "1",
+      "prompt": "List the name and location of every department ordered by name.",
+      "expected_sql": "SELECT name, location FROM departments ORDER BY name;",
+      "expected_results": [
+        [
+          "Design",
+          "Remote"
+        ],
+        [
+          "Engineering",
+          "San Francisco"
+        ],
+        [
+          "Operations",
+          "Austin"
+        ],
+        [
+          "Research",
+          "New York"
+        ],
+        [
+          "Sales",
+          "Chicago"
+        ]
+      ]
+    },
+    {
+      "case_id": "2",
+      "prompt": "Show the names of all inactive employees.",
+      "expected_sql": "SELECT name FROM employees WHERE active = 0;",
+      "expected_results": [
+        [
+          "Edsger"
+        ]
+      ]
+    },
+    {
+      "case_id": "3",
+      "prompt": "What is the total number of employees?",
+      "expected_sql": "SELECT COUNT(*) FROM employees;",
+      "expected_results": [
+        [
+          12
+        ]
+      ]
+    },
+    {
+      "case_id": "4",
+      "prompt": "List employee names and their department names for employees hired after 2020-01-01, ordered by hire date.",
+      "expected_sql": "SELECT e.name, d.name FROM employees e JOIN departments d ON e.department_id = d.id WHERE e.hire_date > '2020-01-01' ORDER BY e.hire_date;",
+      "expected_results": [
+        [
+          "Ada",
+          "Engineering"
+        ],
+        [
+          "Donald",
+          "Operations"
+        ],
+        [
+          "Margaret",
+          "Research"
+        ],
+        [
+          "Edsger",
+          "Operations"
+        ],
+        [
+          "Frances",
+          "Engineering"
+        ],
+        [
+          "Claude",
+          "Research"
+        ]
+      ]
+    },
+    {
+      "case_id": "5",
+      "prompt": "Find the names of projects with budget over 100000 that are active, ordered by name.",
+      "expected_sql": "SELECT name FROM projects WHERE budget > 100000 AND status = 'active' ORDER BY name;",
+      "expected_results": [
+        [
+          "Atlas"
+        ],
+        [
+          "Beacon"
+        ],
+        [
+          "Delta"
+        ],
+        [
+          "Forge"
+        ]
+      ]
+    },
+    {
+      "case_id": "6",
+      "prompt": "How many projects does each department have? List department name and project count ordered by department name.",
+      "expected_sql": "SELECT d.name, COUNT(p.id) FROM departments d LEFT JOIN projects p ON d.id = p.department_id GROUP BY d.id ORDER BY d.name;",
+      "expected_results": [
+        [
+          "Design",
+          1
+        ],
+        [
+          "Engineering",
+          2
+        ],
+        [
+          "Operations",
+          1
+        ],
+        [
+          "Research",
+          2
+        ],
+        [
+          "Sales",
+          2
+        ]
+      ]
+    },
+    {
+      "case_id": "7",
+      "prompt": "List the total hours worked by each employee on projects for those with more than 50 total hours, ordered by total hours descending then name.",
+      "expected_sql": "SELECT e.name, SUM(ep.hours) AS total_hours FROM employees e JOIN employee_projects ep ON e.id = ep.employee_id GROUP BY e.id HAVING SUM(ep.hours) > 50 ORDER BY total_hours DESC, e.name;",
+      "expected_results": [
+        [
+          "Margaret",
+          130
+        ],
+        [
+          "Ada",
+          120
+        ],
+        [
+          "Donald",
+          120
+        ],
+        [
+          "Linus",
+          120
+        ],
+        [
+          "Grace",
+          110
+        ],
+        [
+          "Alan",
+          100
+        ],
+        [
+          "Barbara",
+          100
+        ],
+        [
+          "Ken",
+          100
+        ],
+        [
+          "Frances",
+          90
+        ],
+        [
+          "Hedy",
+          60
+        ]
+      ]
+    },
+    {
+      "case_id": "8",
+      "prompt": "Who is the lead of the project named Atlas?",
+      "expected_sql": "SELECT e.name FROM employees e JOIN projects p ON e.id = p.lead_employee_id WHERE p.name = 'Atlas';",
+      "expected_results": [
+        [
+          "Grace"
+        ]
+      ]
+    },
+    {
+      "case_id": "9",
+      "prompt": "List all employee names who work on project Forge along with their hours, ordered by employee name.",
+      "expected_sql": "SELECT e.name, ep.hours FROM employees e JOIN employee_projects ep ON e.id = ep.employee_id JOIN projects p ON ep.project_id = p.id WHERE p.name = 'Forge' ORDER BY e.name;",
+      "expected_results": [
+        [
+          "Ada",
+          70
+        ],
+        [
+          "Frances",
+          60
+        ],
+        [
+          "Grace",
+          30
+        ]
+      ]
+    },
+    {
+      "case_id": "10",
+      "prompt": "What is the highest salary in the company and who earns it?",
+      "expected_sql": "SELECT name, salary FROM employees ORDER BY salary DESC LIMIT 1;",
+      "expected_results": [
+        [
+          "Grace",
+          170000
+        ]
+      ]
+    },
+    {
+      "case_id": "11",
+      "prompt": "List the names of all employees in the Engineering department, ordered alphabetically.",
+      "expected_sql": "SELECT e.name FROM employees e JOIN departments d ON e.department_id = d.id WHERE d.name = 'Engineering' ORDER BY e.name;",
+      "expected_results": [
+        [
+          "Ada"
+        ],
+        [
+          "Frances"
+        ],
+        [
+          "Grace"
+        ]
+      ]
+    },
+    {
+      "case_id": "12",
+      "prompt": "What is the total budget across all departments?",
+      "expected_sql": "SELECT SUM(budget) FROM departments;",
+      "expected_results": [
+        [
+          1650000
+        ]
+      ]
+    },
+    {
+      "case_id": "13",
+      "prompt": "Find the names and budgets of active projects with a budget greater than 150000, ordered by name.",
+      "expected_sql": "SELECT name, budget FROM projects WHERE status = 'active' AND budget > 150000 ORDER BY name;",
+      "expected_results": [
+        [
+          "Atlas",
+          200000
+        ],
+        [
+          "Forge",
+          180000
+        ]
+      ]
+    },
+    {
+      "case_id": "14",
+      "prompt": "Which employees have logged more than 50 hours on at least one project? List their names alphabetically.",
+      "expected_sql": "SELECT DISTINCT e.name FROM employees e JOIN employee_projects ep ON e.id = ep.employee_id WHERE ep.hours > 50 ORDER BY e.name;",
+      "expected_results": [
+        [
+          "Ada"
+        ],
+        [
+          "Alan"
+        ],
+        [
+          "Barbara"
+        ],
+        [
+          "Donald"
+        ],
+        [
+          "Frances"
+        ],
+        [
+          "Grace"
+        ],
+        [
+          "Hedy"
+        ],
+        [
+          "Ken"
+        ],
+        [
+          "Linus"
+        ],
+        [
+          "Margaret"
+        ]
+      ]
+    },
+    {
+      "case_id": "15",
+      "prompt": "What is the name of the department with the highest budget?",
+      "expected_sql": "SELECT name FROM departments ORDER BY budget DESC LIMIT 1;",
+      "expected_results": [
+        [
+          "Engineering"
+        ]
+      ]
+    },
+    {
+      "case_id": "16",
+      "prompt": "How many active employees are there?",
+      "expected_sql": "SELECT COUNT(*) FROM employees WHERE active = 1;",
+      "expected_results": [
+        [
+          11
+        ]
+      ]
+    },
+    {
+      "case_id": "17",
+      "prompt": "List the project name and lead employee name for all completed projects, ordered by project name.",
+      "expected_sql": "SELECT p.name, e.name FROM projects p JOIN employees e ON p.lead_employee_id = e.id WHERE p.status = 'complete' ORDER BY p.name;",
+      "expected_results": [
+        [
+          "Echo",
+          "Ken"
+        ],
+        [
+          "Horizon",
+          "Alan"
+        ]
+      ]
+    },
+    {
+      "case_id": "18",
+      "prompt": "List the names of employees in the Design department ordered by salary from highest to lowest.",
+      "expected_sql": "SELECT e.name FROM employees e JOIN departments d ON e.department_id = d.id WHERE d.name = 'Design' ORDER BY e.salary DESC;",
+      "expected_results": [
+        [
+          "Ken"
+        ],
+        [
+          "Hedy"
+        ]
+      ]
+    },
+    {
+      "case_id": "19",
+      "prompt": "Find the names of active employees hired after 2020, ordered alphabetically.",
+      "expected_sql": "SELECT name FROM employees WHERE hire_date > '2020-12-31' AND active = 1 ORDER BY name;",
+      "expected_results": [
+        [
+          "Claude"
+        ],
+        [
+          "Frances"
+        ],
+        [
+          "Margaret"
+        ]
+      ]
+    },
+    {
+      "case_id": "20",
+      "prompt": "What is the total number of hours spent on the Forge project?",
+      "expected_sql": "SELECT SUM(ep.hours) FROM employee_projects ep JOIN projects p ON ep.project_id = p.id WHERE p.name = 'Forge';",
+      "expected_results": [
+        [
+          160
+        ]
+      ]
+    },
+    {
+      "case_id": "b3_01",
+      "prompt": "List the names of all departments ordered by id.",
+      "expected_sql": "SELECT name FROM departments ORDER BY id;",
+      "expected_results": [
+        [
+          "Engineering"
+        ],
+        [
+          "Research"
+        ],
+        [
+          "Sales"
+        ],
+        [
+          "Operations"
+        ],
+        [
+          "Design"
+        ]
+      ]
+    },
+    {
+      "case_id": "b3_02",
+      "prompt": "Find active employees with salary at least 150000; return name and salary ordered by salary descending.",
+      "expected_sql": "SELECT name, salary FROM employees WHERE active = 1 AND salary >= 150000 ORDER BY salary DESC;",
+      "expected_results": [
+        [
+          "Grace",
+          170000
+        ],
+        [
+          "Linus",
+          160000
+        ],
+        [
+          "Margaret",
+          155000
+        ],
+        [
+          "Ada",
+          150000
+        ]
+      ]
+    },
+    {
+      "case_id": "b3_03",
+      "prompt": "Show employee names and department locations for people in Engineering or Research, ordered by employee name.",
+      "expected_sql": "SELECT e.name, d.location FROM employees e JOIN departments d ON e.department_id = d.id WHERE d.name IN ('Engineering', 'Research') ORDER BY e.name;",
+      "expected_results": [
+        [
+          "Ada",
+          "San Francisco"
+        ],
+        [
+          "Claude",
+          "New York"
+        ],
+        [
+          "Frances",
+          "San Francisco"
+        ],
+        [
+          "Grace",
+          "San Francisco"
+        ],
+        [
+          "Linus",
+          "New York"
+        ],
+        [
+          "Margaret",
+          "New York"
+        ]
+      ]
+    },
+    {
+      "case_id": "b3_04",
+      "prompt": "How many employees are in each department? Return department name and count ordered by count descending then name.",
+      "expected_sql": "SELECT d.name, COUNT(*) FROM employees e JOIN departments d ON e.department_id = d.id GROUP BY d.id, d.name ORDER BY COUNT(*) DESC, d.name;",
+      "expected_results": [
+        [
+          "Engineering",
+          3
+        ],
+        [
+          "Research",
+          3
+        ],
+        [
+          "Design",
+          2
+        ],
+        [
+          "Operations",
+          2
+        ],
+        [
+          "Sales",
+          2
+        ]
+      ]
+    },
+    {
+      "case_id": "b3_05",
+      "prompt": "What is the total budget of all projects with status active?",
+      "expected_sql": "SELECT SUM(budget) FROM projects WHERE status = 'active';",
+      "expected_results": [
+        [
+          640000
+        ]
+      ]
+    },
+    {
+      "case_id": "b3_06",
+      "prompt": "List names of projects whose lead employee belongs to the Engineering department, ordered by project name.",
+      "expected_sql": "SELECT p.name FROM projects p JOIN employees e ON p.lead_employee_id = e.id WHERE e.department_id = 1 ORDER BY p.name;",
+      "expected_results": [
+        [
+          "Atlas"
+        ],
+        [
+          "Forge"
+        ]
+      ]
+    },
+    {
+      "case_id": "b3_07",
+      "prompt": "For employees who logged more than 50 hours on at least one project, show name and total hours across all projects, ordered by total hours descending then name.",
+      "expected_sql": "SELECT e.name, SUM(ep.hours) AS total FROM employees e JOIN employee_projects ep ON e.id = ep.employee_id GROUP BY e.id, e.name HAVING MAX(ep.hours) > 50 ORDER BY total DESC, e.name;",
+      "expected_results": [
+        [
+          "Margaret",
+          130
+        ],
+        [
+          "Ada",
+          120
+        ],
+        [
+          "Donald",
+          120
+        ],
+        [
+          "Linus",
+          120
+        ],
+        [
+          "Grace",
+          110
+        ],
+        [
+          "Alan",
+          100
+        ],
+        [
+          "Barbara",
+          100
+        ],
+        [
+          "Ken",
+          100
+        ],
+        [
+          "Frances",
+          90
+        ],
+        [
+          "Hedy",
+          60
+        ]
+      ]
+    },
+    {
+      "case_id": "b3_08",
+      "prompt": "Which departments have budget under 300000? Return name and budget ordered by budget ascending.",
+      "expected_sql": "SELECT name, budget FROM departments WHERE budget < 300000 ORDER BY budget;",
+      "expected_results": [
+        [
+          "Design",
+          200000
+        ],
+        [
+          "Operations",
+          250000
+        ]
+      ]
+    },
+    {
+      "case_id": "b3_09",
+      "prompt": "List project names and lead employee names for all complete projects, ordered by project name.",
+      "expected_sql": "SELECT p.name, e.name FROM projects p JOIN employees e ON p.lead_employee_id = e.id WHERE p.status = 'complete' ORDER BY p.name;",
+      "expected_results": [
+        [
+          "Echo",
+          "Ken"
+        ],
+        [
+          "Horizon",
+          "Alan"
+        ]
+      ]
+    },
+    {
+      "case_id": "b3_10",
+      "prompt": "What is the average salary of employees hired after 2020-01-01, rounded to the nearest integer?",
+      "expected_sql": "SELECT CAST(ROUND(AVG(salary)) AS INTEGER) FROM employees WHERE hire_date > '2020-01-01';",
+      "expected_results": [
+        [
+          125
+        ]
+      ]
+    },
+    {
+      "case_id": "4-01",
+      "prompt": "List the names of all departments in alphabetical order.",
+      "expected_sql": "SELECT name FROM departments ORDER BY name;",
+      "expected_results": [
+        [
+          "Design"
+        ],
+        [
+          "Engineering"
+        ],
+        [
+          "Operations"
+        ],
+        [
+          "Research"
+        ],
+        [
+          "Sales"
+        ]
+      ]
+    },
+    {
+      "case_id": "4-02",
+      "prompt": "Find the names and salaries of active employees who earn more than 140000, ordered by salary descending.",
+      "expected_sql": "SELECT name, salary FROM employees WHERE active = 1 AND salary > 140000 ORDER BY salary DESC;",
+      "expected_results": [
+        [
+          "Grace",
+          170000
+        ],
+        [
+          "Linus",
+          160000
+        ],
+        [
+          "Margaret",
+          155000
+        ],
+        [
+          "Ada",
+          150000
+        ],
+        [
+          "Barbara",
+          145000
+        ]
+      ]
+    },
+    {
+      "case_id": "4-03",
+      "prompt": "List each employee's name and their department name, ordered by employee name.",
+      "expected_sql": "SELECT e.name, d.name FROM employees e JOIN departments d ON e.department_id = d.id ORDER BY e.name;",
+      "expected_results": [
+        [
+          "Ada",
+          "Engineering"
+        ],
+        [
+          "Alan",
+          "Sales"
+        ],
+        [
+          "Barbara",
+          "Sales"
+        ],
+        [
+          "Claude",
+          "Research"
+        ],
+        [
+          "Donald",
+          "Operations"
+        ],
+        [
+          "Edsger",
+          "Operations"
+        ],
+        [
+          "Frances",
+          "Engineering"
+        ],
+        [
+          "Grace",
+          "Engineering"
+        ],
+        [
+          "Hedy",
+          "Design"
+        ],
+        [
+          "Ken",
+          "Design"
+        ],
+        [
+          "Linus",
+          "Research"
+        ],
+        [
+          "Margaret",
+          "Research"
+        ]
+      ]
+    },
+    {
+      "case_id": "4-04",
+      "prompt": "How many employees are in each department? Return department name and employee count, ordered by count descending then name.",
+      "expected_sql": "SELECT d.name, COUNT(*) FROM departments d JOIN employees e ON d.id = e.department_id GROUP BY d.id, d.name ORDER BY COUNT(*) DESC, d.name;",
+      "expected_results": [
+        [
+          "Engineering",
+          3
+        ],
+        [
+          "Research",
+          3
+        ],
+        [
+          "Design",
+          2
+        ],
+        [
+          "Operations",
+          2
+        ],
+        [
+          "Sales",
+          2
+        ]
+      ]
+    },
+    {
+      "case_id": "4-05",
+      "prompt": "List the names and budgets of all active projects, ordered by budget descending.",
+      "expected_sql": "SELECT name, budget FROM projects WHERE status = 'active' ORDER BY budget DESC;",
+      "expected_results": [
+        [
+          "Atlas",
+          200000
+        ],
+        [
+          "Forge",
+          180000
+        ],
+        [
+          "Beacon",
+          150000
+        ],
+        [
+          "Delta",
+          110000
+        ]
+      ]
+    },
+    {
+      "case_id": "4-06",
+      "prompt": "For each employee who has worked on projects, show their name and total hours worked, ordered by total hours descending then name.",
+      "expected_sql": "SELECT e.name, SUM(ep.hours) AS total_hours FROM employees e JOIN employee_projects ep ON e.id = ep.employee_id GROUP BY e.id, e.name ORDER BY total_hours DESC, e.name;",
+      "expected_results": [
+        [
+          "Margaret",
+          130
+        ],
+        [
+          "Ada",
+          120
+        ],
+        [
+          "Donald",
+          120
+        ],
+        [
+          "Linus",
+          120
+        ],
+        [
+          "Grace",
+          110
+        ],
+        [
+          "Alan",
+          100
+        ],
+        [
+          "Barbara",
+          100
+        ],
+        [
+          "Ken",
+          100
+        ],
+        [
+          "Frances",
+          90
+        ],
+        [
+          "Hedy",
+          60
+        ],
+        [
+          "Edsger",
+          20
+        ],
+        [
+          "Claude",
+          10
+        ]
+      ]
+    },
+    {
+      "case_id": "4-07",
+      "prompt": "Show each project name along with the name of its lead employee, ordered by project name.",
+      "expected_sql": "SELECT p.name, e.name FROM projects p JOIN employees e ON p.lead_employee_id = e.id ORDER BY p.name;",
+      "expected_results": [
+        [
+          "Atlas",
+          "Grace"
+        ],
+        [
+          "Beacon",
+          "Linus"
+        ],
+        [
+          "Comet",
+          "Barbara"
+        ],
+        [
+          "Delta",
+          "Donald"
+        ],
+        [
+          "Echo",
+          "Ken"
+        ],
+        [
+          "Forge",
+          "Ada"
+        ],
+        [
+          "Genome",
+          "Margaret"
+        ],
+        [
+          "Horizon",
+          "Alan"
+        ]
+      ]
+    },
+    {
+      "case_id": "4-08",
+      "prompt": "Which departments have a budget greater than 300000? List name and location ordered by name.",
+      "expected_sql": "SELECT name, location FROM departments WHERE budget > 300000 ORDER BY name;",
+      "expected_results": [
+        [
+          "Engineering",
+          "San Francisco"
+        ],
+        [
+          "Research",
+          "New York"
+        ]
+      ]
+    },
+    {
+      "case_id": "4-09",
+      "prompt": "List names and hire dates of active employees hired after '2020-01-01', ordered by hire date.",
+      "expected_sql": "SELECT name, hire_date FROM employees WHERE active = 1 AND hire_date > '2020-01-01' ORDER BY hire_date;",
+      "expected_results": [
+        [
+          "Ada",
+          "2020-01-15"
+        ],
+        [
+          "Donald",
+          "2020-08-08"
+        ],
+        [
+          "Margaret",
+          "2021-03-20"
+        ],
+        [
+          "Frances",
+          "2023-01-05"
+        ],
+        [
+          "Claude",
+          "2024-05-01"
+        ]
+      ]
+    },
+    {
+      "case_id": "4-10",
+      "prompt": "Find the total project budget for each department that has projects, ordered by total budget descending.",
+      "expected_sql": "SELECT d.name, SUM(p.budget) FROM departments d JOIN projects p ON d.id = p.department_id GROUP BY d.id, d.name ORDER BY SUM(p.budget) DESC;",
+      "expected_results": [
+        [
+          "Engineering",
+          380000
+        ],
+        [
+          "Research",
+          360000
+        ],
+        [
+          "Sales",
+          150000
+        ],
+        [
+          "Operations",
+          110000
+        ],
+        [
+          "Design",
+          75000
+        ]
+      ]
+    },
+    {
+      "case_id": "5-1",
+      "prompt": "List the names of all departments ordered alphabetically by name.",
+      "expected_sql": "SELECT name FROM departments ORDER BY name;",
+      "expected_results": [
+        [
+          "Design"
+        ],
+        [
+          "Engineering"
+        ],
+        [
+          "Operations"
+        ],
+        [
+          "Research"
+        ],
+        [
+          "Sales"
+        ]
+      ]
+    },
+    {
+      "case_id": "5-2",
+      "prompt": "What are the names and titles of all active employees in the Sales department?",
+      "expected_sql": "SELECT e.name, e.title FROM employees e JOIN departments d ON e.department_id = d.id WHERE d.name = 'Sales' AND e.active = 1 ORDER BY e.name;",
+      "expected_results": [
+        [
+          "Alan",
+          "Account Executive"
+        ],
+        [
+          "Barbara",
+          "Sales Manager"
+        ]
+      ]
+    },
+    {
+      "case_id": "5-3",
+      "prompt": "How many projects are there for each status value?",
+      "expected_sql": "SELECT status, COUNT(*) FROM projects GROUP BY status ORDER BY status;",
+      "expected_results": [
+        [
+          "active",
+          4
+        ],
+        [
+          "complete",
+          2
+        ],
+        [
+          "planned",
+          2
+        ]
+      ]
+    },
+    {
+      "case_id": "5-4",
+      "prompt": "What is the total budget of all projects whose lead employee works in the Engineering department?",
+      "expected_sql": "SELECT SUM(p.budget) FROM projects p JOIN employees e ON p.lead_employee_id = e.id JOIN departments d ON e.department_id = d.id WHERE d.name = 'Engineering';",
+      "expected_results": [
+        [
+          380000
+        ]
+      ]
+    },
+    {
+      "case_id": "5-5",
+      "prompt": "List the names of employees and the hours for every assignment where the employee worked more than 50 hours on a single project, ordered by employee name then hours.",
+      "expected_sql": "SELECT e.name, ep.hours FROM employee_projects ep JOIN employees e ON ep.employee_id = e.id WHERE ep.hours > 50 ORDER BY e.name, ep.hours;",
+      "expected_results": [
+        [
+          "Ada",
+          70
+        ],
+        [
+          "Alan",
+          75
+        ],
+        [
+          "Barbara",
+          100
+        ],
+        [
+          "Donald",
+          120
+        ],
+        [
+          "Frances",
+          60
+        ],
+        [
+          "Grace",
+          80
+        ],
+        [
+          "Hedy",
+          60
+        ],
+        [
+          "Ken",
+          100
+        ],
+        [
+          "Linus",
+          100
+        ],
+        [
+          "Margaret",
+          90
+        ]
+      ]
+    },
+    {
+      "case_id": "5-6",
+      "prompt": "List each active project's name together with the name of its lead employee, ordered by project name.",
+      "expected_sql": "SELECT p.name, e.name FROM projects p JOIN employees e ON p.lead_employee_id = e.id WHERE p.status = 'active' ORDER BY p.name;",
+      "expected_results": [
+        [
+          "Atlas",
+          "Grace"
+        ],
+        [
+          "Beacon",
+          "Linus"
+        ],
+        [
+          "Delta",
+          "Donald"
+        ],
+        [
+          "Forge",
+          "Ada"
+        ]
+      ]
+    },
+    {
+      "case_id": "5-7",
+      "prompt": "What is the average salary across all employees, returned as an integer?",
+      "expected_sql": "SELECT CAST(AVG(salary) AS INTEGER) FROM employees;",
+      "expected_results": [
+        [
+          135000
+        ]
+      ]
+    },
+    {
+      "case_id": "5-8",
+      "prompt": "Which departments have more than one project? Return the department names ordered alphabetically.",
+      "expected_sql": "SELECT d.name FROM departments d JOIN projects p ON d.id = p.department_id GROUP BY d.id HAVING COUNT(*) > 1 ORDER BY d.name;",
+      "expected_results": [
+        [
+          "Engineering"
+        ],
+        [
+          "Research"
+        ],
+        [
+          "Sales"
+        ]
+      ]
+    },
+    {
+      "case_id": "5-9",
+      "prompt": "List the names and hours of employees assigned to the Atlas project, ordered by hours descending.",
+      "expected_sql": "SELECT e.name, ep.hours FROM employee_projects ep JOIN employees e ON ep.employee_id = e.id WHERE ep.project_id = 1 ORDER BY ep.hours DESC;",
+      "expected_results": [
+        [
+          "Grace",
+          80
+        ],
+        [
+          "Ada",
+          50
+        ],
+        [
+          "Frances",
+          30
+        ]
+      ]
+    },
+    {
+      "case_id": "5-10",
+      "prompt": "Which department has the highest budget and what is that budget amount?",
+      "expected_sql": "SELECT name, budget FROM departments ORDER BY budget DESC LIMIT 1;",
+      "expected_results": [
+        [
+          "Engineering",
+          500000
+        ]
+      ]
+    }
+  ],
+  "review_required": true
+}

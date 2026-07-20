@@ -1,0 +1,54 @@
+{
+  "approval": {
+    "approval_id": "42436bb4c4a144d8980aa886fbb7b14f",
+    "approved_at": "2026-07-19T07:39:06.536109Z",
+    "approved_by": "owner",
+    "decision_id": "b118039e1bac4677924f456fd099ffa8"
+  },
+  "approved_sample_source": {
+    "approved_at": "2026-07-19T07:38:46.474119Z",
+    "approved_by": "owner",
+    "kind": "repository_jsonl",
+    "row_count": 50,
+    "sha256": "c97a5adea789fae3be249bc9ac95a1902ae5a9769de9eefbc08277f056878e8c",
+    "uri": "data/nl2sql/v0.10.0-training-pool.jsonl"
+  },
+  "cluster_id": "data-pull-sql",
+  "completed_at": "2026-07-19T07:39:07.355747+00:00",
+  "model": "gpt-5.6-luna",
+  "new_spend_cap_usd": 0.5,
+  "runs": [
+    {
+      "confidence": 0.99,
+      "config": null,
+      "decision": "need_more_data",
+      "decision_id": "efaa3e0a096c41de999c04aa61c13618",
+      "input_tokens": 6860,
+      "output_tokens": 515,
+      "phase": "no-approved-source",
+      "rationale": "Traffic economics are attractive (95,000 monthly calls, $5,500 current monthly cost, estimated $3,850 monthly savings for a $0.50 training run), but no approved request/response samples are available and verifiability confidence is 0.0. Without samples, the task cannot establish that a trained model can be programmatically verified or safely replace the SQL-pull behavior. Obtain approved redacted samples and rerun verifiability assessment before forging.",
+      "reservation_usd": 0.25,
+      "trace_s3_key": "vf/agent-traces/f0c85587768d48bc8497e432b466b65e.json"
+    },
+    {
+      "confidence": 0.98,
+      "config": {
+        "base_model": "Qwen/Qwen2.5-0.5B-Instruct",
+        "budget_usd_cap": 5.0,
+        "checkpoint_interval": 50,
+        "k": 8,
+        "provider_pref": "runpod",
+        "steps": 100
+      },
+      "decision": "forge",
+      "decision_id": "b118039e1bac4677924f456fd099ffa8",
+      "input_tokens": 7528,
+      "output_tokens": 514,
+      "phase": "approved-source",
+      "rationale": "Forge is recommended: the cluster has 95,000 monthly calls and $5,500 current monthly cost, with estimated $3,850 monthly savings and only $0.50 training cost under the stated assumptions. The inspected SQL samples are strongly verifiable (5/5 pass NL2SQLVerifier v2) and include deterministic expected results, supporting reliable training and evaluation. Growth is flat, but the existing volume and cost justify the low-risk run.",
+      "reservation_usd": 0.25,
+      "trace_s3_key": "vf/agent-traces/a93a29080242401783a93c6e3b94acba.json"
+    }
+  ],
+  "version": "v0.27.0"
+}

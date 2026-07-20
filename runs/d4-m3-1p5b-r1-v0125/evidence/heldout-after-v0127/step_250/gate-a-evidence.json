@@ -1,0 +1,63 @@
+{
+  "base_url": "http://127.0.0.1:8015/v1",
+  "candidate_count": 60,
+  "candidate_path": "/workspace/verifierforge/data/nl2sql/v0.10.0-heldout.jsonl",
+  "input_sha256": "482f0e7678e7603311f72aeead381364cd92f0596c20745cc58c96916a9177e8",
+  "k": 8,
+  "max_in_flight": 8,
+  "mixed_fraction": 0.38333333333333336,
+  "mode": "reference",
+  "model": "vf-heldout-step-250",
+  "pass_at_1": 0.6333333333333333,
+  "pass_at_8": 0.8333333333333334,
+  "pass_at_k": 0.8333333333333334,
+  "passed": false,
+  "resolved_config": {
+    "base_url": "http://127.0.0.1:8015/v1",
+    "model": "vf-heldout-step-250"
+  },
+  "sample_count": 480,
+  "sample_evidence": {
+    "path": "runs/d4-m3-1p5b-r1-v0125/evidence/heldout-after-v0127/step_250/gate-a-samples.jsonl",
+    "sample_count": 480,
+    "sha256": "157259b06fd656920977b093b1863f9944ac45157faac126e2301ebf930e4a4c"
+  },
+  "sample_taxonomy": {
+    "D_parse_failure_fraction": 0.0,
+    "categories": {
+      "executable_not_full_pass": {
+        "count": 98,
+        "fraction_of_failed": 0.5798816568047337
+      },
+      "execution_error": {
+        "count": 71,
+        "fraction_of_failed": 0.42011834319526625
+      },
+      "parse_failure": {
+        "count": 0,
+        "fraction_of_failed": 0.0
+      }
+    },
+    "failed_sample_count": 169,
+    "length_penalized_exact_result_count": 0,
+    "parse_failure_completions": []
+  },
+  "schema_version": 3,
+  "status": "completed",
+  "thresholds": {
+    "baseline_pass_at_1": [
+      0.2,
+      0.6
+    ],
+    "mixed_fraction_min": 0.3,
+    "pass_at_8_min": 0.85
+  },
+  "timestamp": "2026-07-17T05:21:32.553002+00:00",
+  "verifier": {
+    "full_pass_score": 1.0,
+    "identity": "core.rewards.nl2sql.NL2SQLVerifier",
+    "source_sha256": "b76707e5c0603d227393d03ffc0bdc7c66ec072a139c6aa717c282f4082de47f",
+    "version": 2
+  },
+  "workers": 8
+}

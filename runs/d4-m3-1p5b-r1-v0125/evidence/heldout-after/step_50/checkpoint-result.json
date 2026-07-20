@@ -1,0 +1,9 @@
+{
+  "checkpoint_sha256": "d3f825d71b9682b221d169e0a1d889180babdf172116c939b6c2201da9d27395",
+  "detail": "HeldoutEvaluationError: vLLM exited before readiness: 6m(APIServer pid=73556)\u001b[0;0m     return cls(\n\u001b[1;36m(APIServer pid=73556)\u001b[0;0m            ^^^^\n\u001b[1;36m(APIServer pid=73556)\u001b[0;0m   File \"/workspace/verifierforge/.venv/lib/python3.12/site-packages/vllm/v1/engine/async_llm.py\", line 136, in __init__\n\u001b[1;36m(APIServer pid=73556)\u001b[0;0m     self.engine_core = EngineCoreClient.make_async_mp_client(\n\u001b[1;36m(APIServer pid=73556)\u001b[0;0m                        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n\u001b[1;36m(APIServer pid=73556)\u001b[0;0m   File \"/workspace/verifierforge/.venv/lib/python3.12/site-packages/vllm/v1/engine/core_client.py\", line 102, in make_async_mp_client\n\u001b[1;36m(APIServer pid=73556)\u001b[0;0m     return AsyncMPClient(*client_args)\n\u001b[1;36m(APIServer pid=73556)\u001b[0;0m            ^^^^^^^^^^^^^^^^^^^^^^^^^^^\n\u001b[1;36m(APIServer pid=73556)\u001b[0;0m   File \"/workspace/verifierforge/.venv/lib/python3.12/site-packages/vllm/v1/engine/core_client.py\", line 769, in __init__\n\u001b[1;36m(APIServer pid=73556)\u001b[0;0m     super().__i",
+  "evidence_sha256": null,
+  "metrics": null,
+  "samples_sha256": null,
+  "status": "unavailable",
+  "step": 50
+}

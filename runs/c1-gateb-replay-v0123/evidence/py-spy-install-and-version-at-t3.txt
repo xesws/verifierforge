@@ -1,0 +1,5 @@
+started_at_utc=2026-07-16T22:01:41Z
+Requirement already satisfied: py-spy in /workspace/verifierforge/.venv/lib/python3.12/site-packages (0.4.2)
+pip_install_exit=0
+py-spy 0.4.2
+py_spy_version_exit=0

@@ -1,0 +1,2 @@
+{"event": "gate_a_started", "resolved_base_url": "http://127.0.0.1:8000/v1", "resolved_model": "Qwen2.5-1.5B-Instruct"}
+{"mixed_fraction": 0.36, "pass_at_1": 0.08, "pass_at_8": 0.36}

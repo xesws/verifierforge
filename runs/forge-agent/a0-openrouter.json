@@ -1,0 +1,10 @@
+{
+  "base_url": "https://openrouter.ai/api/v1",
+  "charged_usd": 0.25,
+  "cost_basis": "reservation_upper_bound",
+  "error_type": "LLMResponseError",
+  "http_status": null,
+  "model": "z-ai/glm-5.2",
+  "provider": "openrouter",
+  "status": "failed"
+}

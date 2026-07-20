@@ -1,0 +1,73 @@
+{
+  "approval_id": "42436bb4c4a144d8980aa886fbb7b14f",
+  "error": "RunPod deletion/billing receipt was not confirmed within 15 minutes",
+  "error_type": "LiveExecutionError",
+  "events": [
+    {
+      "action": "account.inventory",
+      "managed_active_count": 0,
+      "pod_count": 8,
+      "pods": [
+        {
+          "id": "1vyhakqcu7n9x8",
+          "name": "exceptional_aquamarine_dingo-migration",
+          "status": "EXITED"
+        },
+        {
+          "id": "ehi1ns6nfzdict",
+          "name": "exceptional_aquamarine_dingo",
+          "status": "EXITED"
+        },
+        {
+          "id": "j1poicpbiabtpf",
+          "name": "grim_lime_meerkat",
+          "status": "EXITED"
+        },
+        {
+          "id": "34fjd85xfpqpo6",
+          "name": "OPENAI",
+          "status": "RUNNING"
+        },
+        {
+          "id": "ya9vau150sawz7",
+          "name": "resonant_tomato_silkworm",
+          "status": "EXITED"
+        },
+        {
+          "id": "ovwd08tn5rakn4",
+          "name": "convenient_blue_crawdad",
+          "status": "EXITED"
+        },
+        {
+          "id": "ohld8gp5nmkcu7",
+          "name": "brainy_beige_bee",
+          "status": "EXITED"
+        },
+        {
+          "id": "eyledvf8bqd3pz",
+          "name": "realistic_apricot_wolf",
+          "status": "EXITED"
+        }
+      ],
+      "timestamp": "2026-07-19T07:56:04.628188+00:00"
+    },
+    {
+      "action": "gold.created",
+      "external_id": "r6zizmfp8faklt",
+      "timestamp": "2026-07-19T07:56:10.188815+00:00"
+    },
+    {
+      "action": "gold.ready",
+      "cost_accrued_usd": 0.0,
+      "external_id": "r6zizmfp8faklt",
+      "ssh": "root@87.197.119.40:40350",
+      "timestamp": "2026-07-19T07:56:42.967435+00:00"
+    }
+  ],
+  "finished_at": "2026-07-19T08:12:52.608996+00:00",
+  "job_id": "p2-42436bb4c4a144d8980a",
+  "schema_version": 1,
+  "started_at": "2026-07-19T07:56:03.019467+00:00",
+  "status": "failed",
+  "wave_billing_usd": 0.0
+}

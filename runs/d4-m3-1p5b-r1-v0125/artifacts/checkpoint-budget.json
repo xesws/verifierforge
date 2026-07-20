@@ -1,0 +1,13 @@
+{
+  "allowed_bytes": 118849960987852,
+  "checkpoint_count": 8,
+  "free_bytes": 148562451234816,
+  "full_checkpoint_bytes": 14529215725,
+  "generated_at": "2026-07-17T02:34:21.528095+00:00",
+  "hf_export_bytes": 7198276706,
+  "job_id": "d4-m3-1p5b-r1-v0125",
+  "policy": "checkpoint_count * hf_export_bytes + 3 * full_checkpoint_bytes",
+  "projected_peak_bytes": 101173860823,
+  "source": "resume:runs/d4-m3-1p5b-r1-v0125/ckpt/step_100/global_step_100",
+  "status": "accepted"
+}

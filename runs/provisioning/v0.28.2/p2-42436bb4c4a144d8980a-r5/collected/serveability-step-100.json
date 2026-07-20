@@ -1,0 +1,106 @@
+{
+  "command": [
+    "/workspace/verifierforge/.venv/bin/vllm",
+    "serve",
+    "/tmp/verifierforge-s3-cache/p2-42436bb4c4a144d8980a-r5/p2-42436bb4c4a144d8980a-r5/.post-training-finalizer/.vf-candidate-step-100-xslgiojs/wrapper/global_step_100/actor/serveable_huggingface",
+    "--served-model-name",
+    "vf-serving-smoke-global_step_100",
+    "--host",
+    "127.0.0.1",
+    "--port",
+    "50497",
+    "--dtype",
+    "bfloat16",
+    "--gpu-memory-utilization",
+    "0.70",
+    "--max-model-len",
+    "64",
+    "--max-num-seqs",
+    "1",
+    "--tensor-parallel-size",
+    "1",
+    "--enforce-eager",
+    "--disable-log-stats"
+  ],
+  "completion": {
+    "choices": [
+      {
+        "finish_reason": "length",
+        "index": 0,
+        "logprobs": null,
+        "prompt_logprobs": null,
+        "prompt_token_ids": null,
+        "stop_reason": null,
+        "text": " \n\nSELECT 2;\n\nSELECT 3",
+        "token_ids": null
+      }
+    ],
+    "created": 1784484744,
+    "id": "cmpl-aa9aec5de0904de194e3b461896cc0a9",
+    "kv_transfer_params": null,
+    "model": "vf-serving-smoke-global_step_100",
+    "object": "text_completion",
+    "service_tier": null,
+    "system_fingerprint": null,
+    "usage": {
+      "completion_tokens": 8,
+      "prompt_tokens": 7,
+      "prompt_tokens_details": null,
+      "total_tokens": 15
+    }
+  },
+  "completion_status": 200,
+  "export_path": "/tmp/verifierforge-s3-cache/p2-42436bb4c4a144d8980a-r5/p2-42436bb4c4a144d8980a-r5/.post-training-finalizer/.vf-candidate-step-100-xslgiojs/wrapper/global_step_100/actor/serveable_huggingface",
+  "metadata": {
+    "conversion": {
+      "already_present": false,
+      "destination": "/tmp/verifierforge-s3-cache/p2-42436bb4c4a144d8980a-r5/p2-42436bb4c4a144d8980a-r5/.post-training-finalizer/.vf-candidate-step-100-xslgiojs/wrapper/global_step_100/actor/serveable_huggingface",
+      "layout": "prefixed_full",
+      "lora_alpha": 32,
+      "lora_rank": 16,
+      "source": "/tmp/verifierforge-s3-cache/p2-42436bb4c4a144d8980a-r5/p2-42436bb4c4a144d8980a-r5/.post-training-finalizer/.vf-candidate-step-100-xslgiojs/wrapper/global_step_100/actor/huggingface",
+      "source_identity_file": "model.safetensors",
+      "source_index_sha256": "27208c89b36a6966588204e0ee65a1b16e62dd1c6cca034b2d1b2f47996b292c"
+    },
+    "native_checkpoint": "/tmp/verifierforge-s3-cache/p2-42436bb4c4a144d8980a-r5/p2-42436bb4c4a144d8980a-r5/.post-training-finalizer/.vf-candidate-step-100-xslgiojs/wrapper/global_step_100",
+    "source_export": "/tmp/verifierforge-s3-cache/p2-42436bb4c4a144d8980a-r5/p2-42436bb4c4a144d8980a-r5/.post-training-finalizer/.vf-candidate-step-100-xslgiojs/wrapper/global_step_100/actor/huggingface"
+  },
+  "model_name": "vf-serving-smoke-global_step_100",
+  "models": {
+    "data": [
+      {
+        "created": 1784484744,
+        "id": "vf-serving-smoke-global_step_100",
+        "max_model_len": 64,
+        "object": "model",
+        "owned_by": "vllm",
+        "parent": null,
+        "permission": [
+          {
+            "allow_create_engine": false,
+            "allow_fine_tuning": false,
+            "allow_logprobs": true,
+            "allow_sampling": true,
+            "allow_search_indices": false,
+            "allow_view": true,
+            "created": 1784484744,
+            "group": null,
+            "id": "modelperm-03515dc9a41e4ed3b41bc0dffbe73813",
+            "is_blocking": false,
+            "object": "model_permission",
+            "organization": "*"
+          }
+        ],
+        "root": "/tmp/verifierforge-s3-cache/p2-42436bb4c4a144d8980a-r5/p2-42436bb4c4a144d8980a-r5/.post-training-finalizer/.vf-candidate-step-100-xslgiojs/wrapper/global_step_100/actor/serveable_huggingface"
+      }
+    ],
+    "object": "list"
+  },
+  "models_status": 200,
+  "phase": "serving",
+  "port": 50497,
+  "schema_version": 1,
+  "server_log_path": "/tmp/verifierforge-s3-cache/p2-42436bb4c4a144d8980a-r5/p2-42436bb4c4a144d8980a-r5/evidence/serveability/step_100.vllm.log",
+  "server_log_tail": "INFO 07-19 18:12:00 [__init__.py:216] Automatically detected platform cuda.\n\u001b[1;36m(APIServer pid=7972)\u001b[0;0m INFO 07-19 18:12:03 [api_server.py:1896] vLLM API server version 0.10.2\n\u001b[1;36m(APIServer pid=7972)\u001b[0;0m INFO 07-19 18:12:03 [utils.py:328] non-default args: {'model_tag': '/tmp/verifierforge-s3-cache/p2-42436bb4c4a144d8980a-r5/p2-42436bb4c4a144d8980a-r5/.post-training-finalizer/.vf-candidate-step-100-xslgiojs/wrapper/global_step_100/actor/serveable_huggingface', 'host': '127.0.0.1', 'port': 50497, 'model': '/tmp/verifierforge-s3-cache/p2-42436bb4c4a144d8980a-r5/p2-42436bb4c4a144d8980a-r5/.post-training-finalizer/.vf-candidate-step-100-xslgiojs/wrapper/global_step_100/actor/serveable_huggingface', 'dtype': 'bfloat16', 'max_model_len': 64, 'enforce_eager': True, 'served_model_name': ['vf-serving-smoke-global_step_100'], 'gpu_memory_utilization': 0.7, 'max_num_seqs': 1, 'disable_log_stats': True}\n\u001b[1;36m(APIServer pid=7972)\u001b[0;0m INFO 07-19 18:12:03 [arg_utils.py:486] HF_HUB_OFFLINE is True, replace model_id [/tmp/verifierforge-s3-cache/p2-42436bb4c4a144d8980a-r5/p2-42436bb4c4a144d8980a-r5/.post-training-finalizer/.vf-candidate-step-100-xslgiojs/wrapper/global_step_100/actor/serveable_huggingface] to model_path [/tmp/verifierforge-s3-cache/p2-42436bb4c4a144d8980a-r5/p2-42436bb4c4a144d8980a-r5/.post-training-finalizer/.vf-candidate-step-100-xslgiojs/wrapper/global_step_100/actor/serveable_huggingface]\n\u001b[1;36m(APIServer pid=7972)\u001b[0;0m INFO 07-19 18:12:09 [__init__.py:742] Resolved architecture: Qwen2ForCausalLM\n\u001b[1;36m(APIServer pid=7972)\u001b[0;0m `torch_dtype` is deprecated! Use `dtype` instead!\n\u001b[1;36m(APIServer pid=7972)\u001b[0;0m INFO 07-19 18:12:09 [__init__.py:1815] Using max model len 64\n\u001b[1;36m(APIServer pid=7972)\u001b[0;0m INFO 07-19 18:12:11 [scheduler.py:222] Chunked prefill is enabled with max_num_batched_tokens=2048.\n\u001b[1;36m(APIServer pid=7972)\u001b[0;0m WARNING 07-19 18:12:11 [scheduler.py:269] max_num_batched_tokens (2048) exceeds max_num_seqs * max_model_len (64). This may lead to unexpected behavior.\n\u001b[1;36m(APIServer pid=7972)\u001b[0;0m WARNING 07-19 18:12:11 [scheduler.py:269] max_num_batched_tokens (2048) exceeds max_num_seqs * max_model_len (64). This may lead to unexpected behavior.\n\u001b[1;36m(APIServer pid=7972)\u001b[0;0m INFO 07-19 18:12:11 [__init__.py:3400] Cudagraph is disabled under eager mode\n\u001b[1;36m(APIServer pid=7972)\u001b[0;0m The tokenizer you are loading from '/tmp/verifierforge-s3-cache/p2-42436bb4c4a144d8980a-r5/p2-42436bb4c4a144d8980a-r5/.post-training-finalizer/.vf-candidate-step-100-xslgiojs/wrapper/global_step_100/actor/serveable_huggingface' with an incorrect regex pattern: https://huggingface.co/mistralai/Mistral-Small-3.1-24B-Instruct-2503/discussions/84#69121093e8b480e709447d5e. This will lead to incorrect tokenization. You should set the `fix_mistral_regex=True` flag when loading this tokenizer to fix this issue.\nINFO 07-19 18:12:14 [__init__.py:216] Automatically detected platform cuda.\n\u001b[1;36m(EngineCore_DP0 pid=8172)\u001b[0;0m INFO 07-19 18:12:17 [core.py:654] Waiting for init message from front-end.\n\u001b[1;36m(EngineCore_DP0 pid=8172)\u001b[0;0m INFO 07-19 18:12:17 [core.py:76] Initializing a V1 LLM engine (v0.10.2) with config: model='/tmp/verifierforge-s3-cache/p2-42436bb4c4a144d8980a-r5/p2-42436bb4c4a144d8980a-r5/.post-training-finalizer/.vf-candidate-step-100-xslgiojs/wrapper/global_step_100/actor/serveable_huggingface', speculative_config=None, tokenizer='/tmp/verifierforge-s3-cache/p2-42436bb4c4a144d8980a-r5/p2-42436bb4c4a144d8980a-r5/.post-training-finalizer/.vf-candidate-step-100-xslgiojs/wrapper/global_step_100/actor/serveable_huggingface', skip_tokenizer_init=False, tokenizer_mode=auto, revision=None, tokenizer_revision=None, trust_remote_code=False, dtype=torch.bfloat16, max_seq_len=64, download_dir=None, load_format=auto, tensor_parallel_size=1, pipeline_parallel_size=1, data_parallel_size=1, disable_custom_all_reduce=False, quantization=None, enforce_eager=True, kv_cache_dtype=auto, device_config=cuda, decoding_config=DecodingConfig(backend='auto', disable_fallback=False, disable_any_whitespace=False, disable_additional_properties=False, reasoning_backend=''), observability_config=ObservabilityConfig(show_hidden_metrics_for_version=None, otlp_traces_endpoint=None, collect_detailed_traces=None), seed=0, served_model_name=vf-serving-smoke-global_step_100, enable_prefix_caching=True, chunked_prefill_enabled=True, use_async_output_proc=True, pooler_config=None, compilation_config={\"level\":0,\"debug_dump_path\":\"\",\"cache_dir\":\"\",\"backend\":\"\",\"custom_ops\":[],\"splitting_ops\":null,\"use_inductor\":true,\"compile_sizes\":[],\"inductor_compile_config\":{\"enable_auto_functionalized_v2\":false},\"inductor_passes\":{},\"cudagraph_mode\":0,\"use_cudagraph\":true,\"cudagraph_num_of_warmups\":0,\"cudagraph_capture_sizes\":[],\"cudagraph_copy_inputs\":false,\"full_cuda_graph\":false,\"pass_config\":{},\"max_capture_size\":0,\"local_cache_dir\":null}\n[W719 18:12:20.619891998 ProcessGroupNCCL.cpp:981] Warning: TORCH_NCCL_AVOID_RECORD_STREAMS is the default now, this environment variable is thus deprecated. (function operator())\n[Gloo] Rank 0 is connected to 0 peer ranks. Expected number of connected peer ranks is : 0\n[Gloo] Rank 0 is connected to 0 peer ranks. Expected number of connected peer ranks is : 0\n[Gloo] Rank 0 is connected to 0 peer ranks. Expected number of connected peer ranks is : 0\n[Gloo] Rank 0 is connected to 0 peer ranks. Expected number of connected peer ranks is : 0\n[Gloo] Rank 0 is connected to 0 peer ranks. Expected number of connected peer ranks is : 0\n[Gloo] Rank 0 is connected to 0 peer ranks. Expected number of connected peer ranks is : 0\n\u001b[1;36m(EngineCore_DP0 pid=8172)\u001b[0;0m INFO 07-19 18:12:20 [parallel_state.py:1165] rank 0 in world size 1 is assigned as DP rank 0, PP rank 0, TP rank 0, EP rank 0\n\u001b[1;36m(EngineCore_DP0 pid=8172)\u001b[0;0m WARNING 07-19 18:12:20 [topk_topp_sampler.py:69] FlashInfer is not available. Falling back to the PyTorch-native implementation of top-p & top-k sampling. For the best performance, please install FlashInfer.\n\u001b[1;36m(EngineCore_DP0 pid=8172)\u001b[0;0m INFO 07-19 18:12:20 [gpu_model_runner.py:2338] Starting to load model /tmp/verifierforge-s3-cache/p2-42436bb4c4a144d8980a-r5/p2-42436bb4c4a144d8980a-r5/.post-training-finalizer/.vf-candidate-step-100-xslgiojs/wrapper/global_step_100/actor/serveable_huggingface...\n\u001b[1;36m(EngineCore_DP0 pid=8172)\u001b[0;0m INFO 07-19 18:12:20 [gpu_model_runner.py:2370] Loading model from scratch...\n\u001b[1;36m(EngineCore_DP0 pid=8172)\u001b[0;0m INFO 07-19 18:12:21 [cuda.py:362] Using Flash Attention backend on V1 engine.\n\u001b[1;36m(EngineCore_DP0 pid=8172)\u001b[0;0m \nLoading safetensors checkpoint shards:   0% Completed | 0/1 [00:00<?, ?it/s]\n\u001b[1;36m(EngineCore_DP0 pid=8172)\u001b[0;0m \nLoading safetensors checkpoint shards: 100% Completed | 1/1 [00:00<00:00,  9.77it/s]\n\u001b[1;36m(EngineCore_DP0 pid=8172)\u001b[0;0m \nLoading safetensors checkpoint shards: 100% Completed | 1/1 [00:00<00:00,  9.75it/s]\n\u001b[1;36m(EngineCore_DP0 pid=8172)\u001b[0;0m \n\u001b[1;36m(EngineCore_DP0 pid=8172)\u001b[0;0m INFO 07-19 18:12:21 [default_loader.py:268] Loading weights took 0.13 seconds\n\u001b[1;36m(EngineCore_DP0 pid=8172)\u001b[0;0m INFO 07-19 18:12:21 [gpu_model_runner.py:2392] Model loading took 0.9267 GiB and 0.228445 seconds\n\u001b[1;36m(EngineCore_DP0 pid=8172)\u001b[0;0m INFO 07-19 18:12:22 [gpu_worker.py:298] Available KV cache memory: 12.67 GiB\n\u001b[1;36m(EngineCore_DP0 pid=8172)\u001b[0;0m INFO 07-19 18:12:23 [kv_cache_utils.py:864] GPU KV cache size: 1,107,136 tokens\n\u001b[1;36m(EngineCore_DP0 pid=8172)\u001b[0;0m INFO 07-19 18:12:23 [kv_cache_utils.py:868] Maximum concurrency for 64 tokens per request: 17299.00x\n\u001b[1;36m(EngineCore_DP0 pid=8172)\u001b[0;0m INFO 07-19 18:12:23 [gpu_worker.py:391] Free memory on device (19.37/19.56 GiB) on startup. Desired GPU memory utilization is (0.7, 13.69 GiB). Actual usage is 0.93 GiB for weight, 0.08 GiB for peak activation, 0.02 GiB for non-torch memory, and 0.0 GiB for CUDAGraph memory. Replace gpu_memory_utilization config with `--kv-cache-memory=13447378944` to fit into requested memory, or `--kv-cache-memory=19548551168` to fully utilize gpu memory. Current kv cache memory in use is 13604665344 bytes.\n\u001b[1;36m(EngineCore_DP0 pid=8172)\u001b[0;0m INFO 07-19 18:12:23 [core.py:218] init engine (profile, create kv cache, warmup model) took 1.40 seconds\n\u001b[1;36m(EngineCore_DP0 pid=8172)\u001b[0;0m The tokenizer you are loading from '/tmp/verifierforge-s3-cache/p2-42436bb4c4a144d8980a-r5/p2-42436bb4c4a144d8980a-r5/.post-training-finalizer/.vf-candidate-step-100-xslgiojs/wrapper/global_step_100/actor/serveable_huggingface' with an incorrect regex pattern: https://huggingface.co/mistralai/Mistral-Small-3.1-24B-Instruct-2503/discussions/84#69121093e8b480e709447d5e. This will lead to incorrect tokenization. You should set the `fix_mistral_regex=True` flag when loading this tokenizer to fix this issue.\n\u001b[1;36m(EngineCore_DP0 pid=8172)\u001b[0;0m INFO 07-19 18:12:23 [__init__.py:3400] Cudagraph is disabled under eager mode\n\u001b[1;36m(APIServer pid=7972)\u001b[0;0m INFO 07-19 18:12:23 [async_llm.py:180] Torch profiler disabled. AsyncLLM CPU traces will not be collected.\n\u001b[1;36m(APIServer pid=7972)\u001b[0;0m INFO 07-19 18:12:23 [api_server.py:1692] Supported_tasks: ['generate']\n\u001b[1;36m(APIServer pid=7972)\u001b[0;0m WARNING 07-19 18:12:23 [__init__.py:1695] Default sampling parameters have been overridden by the model's Hugging Face generation config recommended from the model creator. If this is not intended, please relaunch vLLM instance with `--generation-config vllm`.\n\u001b[1;36m(APIServer pid=7972)\u001b[0;0m INFO 07-19 18:12:23 [serving_responses.py:130] Using default chat sampling params from model: {'repetition_penalty': 1.1, 'temperature': 0.7, 'top_k': 20, 'top_p': 0.8}\n\u001b[1;36m(APIServer pid=7972)\u001b[0;0m INFO 07-19 18:12:23 [serving_chat.py:137] Using default chat sampling params from model: {'repetition_penalty': 1.1, 'temperature': 0.7, 'top_k': 20, 'top_p': 0.8}\n\u001b[1;36m(APIServer pid=7972)\u001b[0;0m INFO 07-19 18:12:23 [serving_completion.py:76] Using default completion sampling params from model: {'repetition_penalty': 1.1, 'temperature': 0.7, 'top_k': 20, 'top_p': 0.8}\n\u001b[1;36m(APIServer pid=7972)\u001b[0;0m INFO 07-19 18:12:23 [api_server.py:1971] Starting vLLM API server 0 on http://127.0.0.1:50497\n\u001b[1;36m(APIServer pid=7972)\u001b[0;0m INFO 07-19 18:12:23 [launcher.py:36] Available routes are:\n\u001b[1;36m(APIServer pid=7972)\u001b[0;0m INFO 07-19 18:12:23 [launcher.py:44] Route: /openapi.json, Methods: HEAD, GET\n\u001b[1;36m(APIServer pid=7972)\u001b[0;0m INFO 07-19 18:12:23 [launcher.py:44] Route: /docs, Methods: HEAD, GET\n\u001b[1;36m(APIServer pid=7972)\u001b[0;0m INFO 07-19 18:12:23 [launcher.py:44] Route: /docs/oauth2-redirect, Methods: HEAD, GET\n\u001b[1;36m(APIServer pid=7972)\u001b[0;0m INFO 07-19 18:12:23 [launcher.py:44] Route: /redoc, Methods: HEAD, GET\n\u001b[1;36m(APIServer pid=7972)\u001b[0;0m INFO 07-19 18:12:23 [launcher.py:44] Route: /metrics, Methods: GET\n\u001b[1;36m(APIServer pid=7972)\u001b[0;0m INFO:     Started server process [7972]\n\u001b[1;36m(APIServer pid=7972)\u001b[0;0m INFO:     Waiting for application startup.\n\u001b[1;36m(APIServer pid=7972)\u001b[0;0m INFO:     Application startup complete.\n\u001b[1;36m(APIServer pid=7972)\u001b[0;0m INFO:     127.0.0.1:45148 - \"GET /v1/models HTTP/1.1\" 200 OK\n\u001b[1;36m(EngineCore_DP0 pid=8172)\u001b[0;0m WARNING 07-19 18:12:24 [cudagraph_dispatcher.py:102] cudagraph dispatching keys are not initialized. No cudagraph will be used.\n\u001b[1;36m(APIServer pid=7972)\u001b[0;0m INFO:     127.0.0.1:45154 - \"POST /v1/completions HTTP/1.1\" 200 OK\n\u001b[1;36m(APIServer pid=7972)\u001b[0;0m WARNING 07-19 18:12:24 [launcher.py:98] port 50497 is used by process psutil.Process(pid=7972, name='vllm', status='running') launched with command:\n\u001b[1;36m(APIServer pid=7972)\u001b[0;0m WARNING 07-19 18:12:24 [launcher.py:98] /workspace/verifierforge/.venv/bin/python /workspace/verifierforge/.venv/bin/vllm serve /tmp/verifierforge-s3-cache/p2-42436bb4c4a144d8980a-r5/p2-42436bb4c4a144d8980a-r5/.post-training-finalizer/.vf-candidate-step-100-xslgiojs/wrapper/global_step_100/actor/serveable_huggingface --served-model-name vf-serving-smoke-global_step_100 --host 127.0.0.1 --port 50497 --dtype bfloat16 --gpu-memory-utilization 0.70 --max-model-len 64 --max-num-seqs 1 --tensor-parallel-size 1 --enforce-eager --disable-log-stats\n\u001b[1;36m(APIServer pid=7972)\u001b[0;0m INFO 07-19 18:12:24 [launcher.py:101] Shutting down FastAPI HTTP server.\n\u001b[1;36m(APIServer pid=7972)\u001b[0;0m INFO:     Shutting down\n\u001b[1;36m(APIServer pid=7972)\u001b[0;0m INFO:     Waiting for application shutdown.\n\u001b[1;36m(APIServer pid=7972)\u001b[0;0m INFO:     Application shutdown complete.\n",
+  "status": "completed"
+}

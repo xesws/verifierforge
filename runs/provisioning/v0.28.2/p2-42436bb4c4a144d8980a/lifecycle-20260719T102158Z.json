@@ -1,0 +1,111 @@
+{
+  "approval_id": "42436bb4c4a144d8980aa886fbb7b14f",
+  "events": [
+    {
+      "action": "account.inventory",
+      "pod_count": 8,
+      "timestamp": "2026-07-19T10:21:59.497915+00:00",
+      "vf_auto_prefix_count": 0
+    },
+    {
+      "action": "gold.cleanup-admitted",
+      "billing_status": "pending",
+      "deletion": {
+        "checked_at": "2026-07-19T10:22:01.221277+00:00",
+        "external_id": "r6zizmfp8faklt",
+        "target_absent": true,
+        "vf_auto_prefix_count": 0
+      },
+      "estimated_cost_usd": 0.0,
+      "external_id": "r6zizmfp8faklt",
+      "historical_deleted_at": "2026-07-19T07:56:44.169648+00:00",
+      "previous_evidence": "/Users/tangyiq/dev/verifierforge/runs/provisioning/v0.28.0/p2-42436bb4c4a144d8980a/lifecycle.json",
+      "timestamp": "2026-07-19T10:22:01.221311+00:00"
+    },
+    {
+      "action": "orphan.created",
+      "external_id": "41l2l81044358g",
+      "timestamp": "2026-07-19T10:22:05.936390+00:00"
+    },
+    {
+      "action": "orphan.reaped",
+      "billing_status": "pending",
+      "cleanup_seconds": 8.756,
+      "deletion": {
+        "checked_at": "2026-07-19T10:22:10.828269+00:00",
+        "external_id": "41l2l81044358g",
+        "target_absent": true,
+        "vf_auto_prefix_count": 0
+      },
+      "estimated_cost_usd": 0.0,
+      "external_id": "41l2l81044358g",
+      "timestamp": "2026-07-19T10:22:10.828316+00:00"
+    },
+    {
+      "action": "training.created",
+      "external_id": "iqen85eumbjcld",
+      "timestamp": "2026-07-19T10:22:18.599179+00:00"
+    },
+    {
+      "action": "bootstrap.completed",
+      "log": "/Users/tangyiq/dev/verifierforge/runs/provisioning/v0.28.2/p2-42436bb4c4a144d8980a/bootstrap.log",
+      "revision": "d53dfb0f54d5c29973bc9ee7c13ff8e6ec606f51",
+      "timestamp": "2026-07-19T10:24:15.817832+00:00"
+    },
+    {
+      "action": "training.launched",
+      "revision": "d53dfb0f54d5c29973bc9ee7c13ff8e6ec606f51",
+      "s3_prefix": "vf/jobs/p2-42436bb4c4a144d8980a",
+      "timestamp": "2026-07-19T10:24:17.716198+00:00"
+    },
+    {
+      "action": "training.progress",
+      "cost_accrued_usd": 0.0,
+      "latest_step": 0,
+      "metric_count": 0,
+      "timestamp": "2026-07-19T10:24:19.101014+00:00",
+      "uptime_min": 0
+    },
+    {
+      "action": "training.progress",
+      "cost_accrued_usd": 0.0,
+      "latest_step": 12,
+      "metric_count": 12,
+      "timestamp": "2026-07-19T10:29:20.244200+00:00",
+      "uptime_min": 0
+    },
+    {
+      "action": "training.progress",
+      "cost_accrued_usd": 0.0,
+      "latest_step": 41,
+      "metric_count": 41,
+      "timestamp": "2026-07-19T10:34:21.293147+00:00",
+      "uptime_min": 0
+    },
+    {
+      "action": "training.progress",
+      "cost_accrued_usd": 0.0,
+      "latest_step": 49,
+      "metric_count": 49,
+      "timestamp": "2026-07-19T10:39:22.408379+00:00",
+      "uptime_min": 0
+    },
+    {
+      "action": "training.terminated",
+      "billing_status": "pending",
+      "cleanup_seconds": -0.0,
+      "deletion": {
+        "checked_at": "2026-07-19T10:42:22.259423+00:00",
+        "external_id": "iqen85eumbjcld",
+        "target_absent": true,
+        "vf_auto_prefix_count": 0
+      },
+      "estimated_cost_usd": 0.0,
+      "external_id": "iqen85eumbjcld",
+      "timestamp": "2026-07-19T10:42:22.259466+00:00"
+    }
+  ],
+  "job_id": "p2-42436bb4c4a144d8980a",
+  "schema_version": 1,
+  "started_at": "2026-07-19T10:21:58.500803+00:00"
+}

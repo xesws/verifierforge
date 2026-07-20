@@ -1,0 +1,14 @@
+INFO:     Started server process [26764]
+INFO:     Waiting for application startup.
+INFO:     Application startup complete.
+INFO:     Uvicorn running on http://127.0.0.1:8014 (Press CTRL+C to quit)
+INFO:     127.0.0.1:61862 - "GET /discover HTTP/1.1" 200 OK
+INFO  [alembic.runtime.migration] Context impl SQLiteImpl.
+INFO  [alembic.runtime.migration] Will assume non-transactional DDL.
+INFO  [alembic.runtime.migration] Running upgrade  -> 20260718_0001, DB-1 initial relational schema.
+INFO  [alembic.runtime.migration] Running upgrade 20260718_0001 -> 20260719_0002, Add governed sample-source metadata to clusters.
+INFO:     127.0.0.1:61863 - "GET /clusters HTTP/1.1" 200 OK
+INFO:     Shutting down
+INFO:     Waiting for application shutdown.
+INFO:     Application shutdown complete.
+INFO:     Finished server process [26764]

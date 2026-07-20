@@ -1,0 +1,83 @@
+{
+  "resources": [
+    {
+      "approval_id": "42436bb4c4a144d8980aa886fbb7b14f",
+      "deleted_confirmed_at": "2026-07-19T07:56:44.169648+00:00",
+      "external_id": "r6zizmfp8faklt",
+      "job_id": "p2-gold-42436bb4c4a1",
+      "provider": "runpod",
+      "slots": {
+        "plus-1h": {
+          "amount_usd": null,
+          "attempted_at": "2026-07-19T10:13:44.514883+00:00",
+          "due_at": "2026-07-19T08:56:44.169648+00:00",
+          "record_count": 0,
+          "status": "empty",
+          "time_billed_ms": null
+        },
+        "plus-6h": {
+          "amount_usd": null,
+          "attempted_at": "2026-07-19T16:42:26.920021+00:00",
+          "due_at": "2026-07-19T13:56:44.169648+00:00",
+          "record_count": 0,
+          "status": "unresolved",
+          "time_billed_ms": null
+        }
+      },
+      "start_time": "2026-07-19T07:56:10.188815+00:00"
+    },
+    {
+      "approval_id": "42436bb4c4a144d8980aa886fbb7b14f",
+      "deleted_confirmed_at": "2026-07-19T10:22:10.828269+00:00",
+      "external_id": "41l2l81044358g",
+      "job_id": "p2-orphan-42436bb4c4a1",
+      "provider": "runpod",
+      "slots": {
+        "plus-1h": {
+          "amount_usd": null,
+          "attempted_at": "2026-07-19T11:58:31.469934+00:00",
+          "due_at": "2026-07-19T11:22:10.828269+00:00",
+          "record_count": 0,
+          "status": "empty",
+          "time_billed_ms": null
+        },
+        "plus-6h": {
+          "amount_usd": null,
+          "attempted_at": "2026-07-19T16:42:26.920021+00:00",
+          "due_at": "2026-07-19T16:22:10.828269+00:00",
+          "record_count": 0,
+          "status": "unresolved",
+          "time_billed_ms": null
+        }
+      },
+      "start_time": "2026-07-19T10:22:05.286721+00:00"
+    },
+    {
+      "approval_id": "42436bb4c4a144d8980aa886fbb7b14f",
+      "deleted_confirmed_at": "2026-07-19T10:42:22.259423+00:00",
+      "external_id": "iqen85eumbjcld",
+      "job_id": "p2-42436bb4c4a144d8980a",
+      "provider": "runpod",
+      "slots": {
+        "plus-1h": {
+          "amount_usd": 0.124736,
+          "attempted_at": "2026-07-19T11:58:31.469934+00:00",
+          "due_at": "2026-07-19T11:42:22.259423+00:00",
+          "record_count": 1,
+          "status": "confirmed",
+          "time_billed_ms": 1125772
+        },
+        "plus-6h": {
+          "amount_usd": 0.124736,
+          "attempted_at": "2026-07-19T16:42:26.920021+00:00",
+          "due_at": "2026-07-19T16:42:22.259423+00:00",
+          "record_count": 1,
+          "status": "confirmed",
+          "time_billed_ms": 1125772
+        }
+      },
+      "start_time": "2026-07-19T10:22:17.097966+00:00"
+    }
+  ],
+  "schema_version": 1
+}

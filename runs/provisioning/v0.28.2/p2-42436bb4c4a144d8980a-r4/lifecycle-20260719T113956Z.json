@@ -1,0 +1,97 @@
+{
+  "approval_id": "42436bb4c4a144d8980aa886fbb7b14f",
+  "billing_status": "pending",
+  "error": "remote trainer published checkpoint-publication-failure evidence",
+  "error_type": "LiveExecutionError",
+  "events": [
+    {
+      "action": "account.inventory",
+      "pod_count": 8,
+      "timestamp": "2026-07-19T11:39:57.547700+00:00",
+      "vf_auto_prefix_count": 0
+    },
+    {
+      "action": "training.retry-admitted",
+      "attempt_estimated_cost_usd": 0.513707,
+      "deletion": {
+        "checked_at": "2026-07-19T11:39:59.280019+00:00",
+        "external_id": "wuvk037vks2c57",
+        "target_absent": true,
+        "vf_auto_prefix_count": 0
+      },
+      "elapsed_seconds": 1109.607,
+      "previous_evidence": "/Users/tangyiq/dev/verifierforge/runs/provisioning/v0.28.2/p2-42436bb4c4a144d8980a-r3/lifecycle-20260719T111834Z.json",
+      "previous_external_id": "wuvk037vks2c57",
+      "prior_estimated_cost_usd": 1.688479,
+      "timestamp": "2026-07-19T11:39:59.280084+00:00"
+    },
+    {
+      "action": "training.retry-prefix-empty",
+      "s3_job_id": "p2-42436bb4c4a144d8980a-r4",
+      "timestamp": "2026-07-19T11:40:00.552125+00:00"
+    },
+    {
+      "action": "training.retry-created",
+      "approval_root": "iqen85eumbjcld",
+      "external_id": "1okqsh91490bgu",
+      "retry_of": "wuvk037vks2c57",
+      "timestamp": "2026-07-19T11:40:07.436664+00:00"
+    },
+    {
+      "action": "bootstrap.completed",
+      "log": "/Users/tangyiq/dev/verifierforge/runs/provisioning/v0.28.2/p2-42436bb4c4a144d8980a-r4/bootstrap.log",
+      "revision": "8dbd7ff3047331f3d4ff7c9db9c1b36c750ddf7b",
+      "timestamp": "2026-07-19T11:42:41.098903+00:00"
+    },
+    {
+      "action": "training.launched",
+      "revision": "8dbd7ff3047331f3d4ff7c9db9c1b36c750ddf7b",
+      "s3_prefix": "vf/jobs/p2-42436bb4c4a144d8980a-r4",
+      "timestamp": "2026-07-19T11:42:42.948544+00:00"
+    },
+    {
+      "action": "training.progress",
+      "cost_accrued_usd": 0.017152,
+      "latest_step": 0,
+      "metric_count": 0,
+      "timestamp": "2026-07-19T11:42:43.994107+00:00",
+      "uptime_min": 3
+    },
+    {
+      "action": "training.progress",
+      "cost_accrued_usd": 0.049775,
+      "latest_step": 7,
+      "metric_count": 7,
+      "timestamp": "2026-07-19T11:47:45.124422+00:00",
+      "uptime_min": 8
+    },
+    {
+      "action": "training.progress",
+      "cost_accrued_usd": 0.082404,
+      "latest_step": 33,
+      "metric_count": 33,
+      "timestamp": "2026-07-19T11:52:46.320413+00:00",
+      "uptime_min": 13
+    },
+    {
+      "action": "training.terminated",
+      "billing_status": "pending",
+      "cleanup_seconds": 3.96,
+      "deletion": {
+        "checked_at": "2026-07-19T11:57:50.727422+00:00",
+        "external_id": "1okqsh91490bgu",
+        "target_absent": true,
+        "vf_auto_prefix_count": 0
+      },
+      "estimated_cost_usd": 0.082404,
+      "external_id": "1okqsh91490bgu",
+      "timestamp": "2026-07-19T11:57:50.727535+00:00"
+    }
+  ],
+  "finished_at": "2026-07-19T11:57:51.383264+00:00",
+  "job_id": "p2-42436bb4c4a144d8980a-r4",
+  "schema_version": 1,
+  "started_at": "2026-07-19T11:39:56.657598+00:00",
+  "status": "failed",
+  "wave_estimated_cost_usd": 1.688479
+}

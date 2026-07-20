@@ -1,0 +1,27 @@
+{
+  "resources": [
+    {
+      "approval_id": "1dd1909c9215444ba35357bcb395a229",
+      "deleted_confirmed_at": "2026-07-20T01:00:53.077950+00:00",
+      "external_id": "as0km86lszjvdb",
+      "job_id": "forge-1dd1909c9215444ba35357bcb395a229",
+      "provider": "runpod",
+      "slots": {
+        "plus-1h": {
+          "amount_usd": null,
+          "attempted_at": "2026-07-20T02:01:26.451680+00:00",
+          "due_at": "2026-07-20T02:00:53.077950+00:00",
+          "record_count": 0,
+          "status": "empty",
+          "time_billed_ms": null
+        },
+        "plus-6h": {
+          "due_at": "2026-07-20T07:00:53.077950+00:00",
+          "status": "scheduled"
+        }
+      },
+      "start_time": "2026-07-20T01:00:33.589000+00:00"
+    }
+  ],
+  "schema_version": 1
+}

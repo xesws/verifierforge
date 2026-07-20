@@ -1,0 +1,16 @@
+INFO:     Started server process [95938]
+INFO:     Waiting for application startup.
+INFO:     Application startup complete.
+INFO:     Uvicorn running on http://127.0.0.1:18110 (Press CTRL+C to quit)
+INFO:     127.0.0.1:61362 - "GET /clusters HTTP/1.1" 200 OK
+INFO:     127.0.0.1:61370 - "PUT /clusters/data-pull-sql/routing HTTP/1.1" 200 OK
+INFO:     127.0.0.1:61371 - "GET /clusters/data-pull-sql/routing HTTP/1.1" 200 OK
+INFO:     127.0.0.1:62077 - "PUT /clusters/data-pull-sql/routing HTTP/1.1" 200 OK
+INFO:     127.0.0.1:62078 - "GET /clusters/data-pull-sql/routing HTTP/1.1" 200 OK
+INFO:     127.0.0.1:62633 - "PUT /clusters/data-pull-sql/routing HTTP/1.1" 200 OK
+INFO:     127.0.0.1:62992 - "GET /clusters/data-pull-sql/routing HTTP/1.1" 200 OK
+INFO:     127.0.0.1:63188 - "GET /routing/data-pull-sql HTTP/1.1" 404 Not Found
+INFO:     127.0.0.1:63191 - "GET /clusters/data-pull-sql/routing HTTP/1.1" 200 OK
+INFO:     127.0.0.1:63199 - "PUT /clusters/data-pull-sql/routing HTTP/1.1" 200 OK
+INFO:     127.0.0.1:63236 - "GET /clusters/data-pull-sql/routing HTTP/1.1" 200 OK
+INFO:     127.0.0.1:63391 - "GET /clusters/data-pull-sql/routing HTTP/1.1" 200 OK

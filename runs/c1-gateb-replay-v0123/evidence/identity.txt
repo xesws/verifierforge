@@ -1,0 +1,50 @@
+tag=v0.10.2-p0-three-piece-freeze
+tag_commit=ad3d36b5860c66567a9f60f94c34101c787aaef3
+config_sha256=e2b8e973cf2400040dd83684e9bd7f4b0f191390ebce24ee43281f9ed5b81171
+data_sha256=c97a5adea789fae3be249bc9ac95a1902ae5a9769de9eefbc08277f056878e8c
+replay_worktree=/workspace/verifierforge-c1-gateb-v0123
+runtime_python=/workspace/verifierforge/.venv/bin/python
+Python 3.12.3
+Name: torch
+Version: 2.8.0+cu128
+Summary: Tensors and Dynamic neural networks in Python with strong GPU acceleration
+Home-page: https://pytorch.org/
+Author: PyTorch Team
+Author-email: packages@pytorch.org
+License: BSD-3-Clause
+Location: /workspace/verifierforge/.venv/lib/python3.12/site-packages
+Requires: filelock, fsspec, jinja2, networkx, nvidia-cublas-cu12, nvidia-cuda-cupti-cu12, nvidia-cuda-nvrtc-cu12, nvidia-cuda-runtime-cu12, nvidia-cudnn-cu12, nvidia-cufft-cu12, nvidia-cufile-cu12, nvidia-curand-cu12, nvidia-cusolver-cu12, nvidia-cusparse-cu12, nvidia-cusparselt-cu12, nvidia-nccl-cu12, nvidia-nvjitlink-cu12, nvidia-nvtx-cu12, setuptools, sympy, triton, typing-extensions
+Required-by: accelerate, compressed-tensors, peft, tensordict, torchaudio, torchdata, torchvision, vllm, xformers, xgrammar
+---
+Name: vllm
+Version: 0.10.2
+Summary: A high-throughput and memory-efficient inference and serving engine for LLMs
+Home-page: https://github.com/vllm-project/vllm
+Author: vLLM Team
+Author-email: 
+License-Expression: Apache-2.0
+Location: /workspace/verifierforge/.venv/lib/python3.12/site-packages
+Requires: aiohttp, blake3, cachetools, cbor2, cloudpickle, compressed-tensors, depyf, diskcache, einops, fastapi, filelock, gguf, lark, llguidance, lm-format-enforcer, mistral_common, msgspec, ninja, numba, numpy, openai, openai-harmony, opencv-python-headless, outlines_core, partial-json-parser, pillow, prometheus-fastapi-instrumentator, prometheus_client, protobuf, psutil, py-cpuinfo, pybase64, pydantic, python-json-logger, pyyaml, pyzmq, ray, regex, requests, scipy, sentencepiece, setproctitle, setuptools, six, tiktoken, tokenizers, torch, torchaudio, torchvision, tqdm, transformers, typing_extensions, watchfiles, xformers, xgrammar
+Required-by: 
+---
+Name: verl
+Version: 0.8.0
+Summary: verl: Volcano Engine Reinforcement Learning for LLM
+Home-page: https://github.com/verl-project/verl
+Author: Bytedance - Seed - MLSys
+Author-email: zhangchi.usc1992@bytedance.com, gmsheng@connect.hku.hk
+License: Apache-2.0
+Location: /workspace/verifierforge/.venv/lib/python3.12/site-packages
+Requires: accelerate, codetiming, datasets, dill, hydra-core, numpy, packaging, pandas, peft, pyarrow, pybind11, pylatexenc, ray, tensorboard, tensordict, torchdata, transformers, wandb
+Required-by: 
+---
+Name: ray
+Version: 2.56.0
+Summary: Ray provides a simple, universal API for building distributed applications.
+Home-page: https://github.com/ray-project/ray
+Author: Ray Team
+Author-email: ray-dev@googlegroups.com
+License: Apache 2.0
+Location: /workspace/verifierforge/.venv/lib/python3.12/site-packages
+Requires: click, filelock, jsonschema, msgpack, packaging, protobuf, pyyaml, requests
+Required-by: TransferQueue, verl, vllm

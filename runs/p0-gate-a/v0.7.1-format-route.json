@@ -1,0 +1,61 @@
+{
+  "operational_taxonomy": {
+    "D_format_parse_failure_fraction": 0.9442815249266863,
+    "categories": {
+      "executable_not_full_pass": {
+        "count": 10,
+        "fraction_of_failed": 0.02932551319648094
+      },
+      "execution_error": {
+        "count": 9,
+        "fraction_of_failed": 0.026392961876832845
+      },
+      "format_parse_failure": {
+        "count": 322,
+        "fraction_of_failed": 0.9442815249266863
+      },
+      "parse_failure": {
+        "count": 0,
+        "fraction_of_failed": 0.0
+      }
+    },
+    "failed_sample_count": 341,
+    "format_parse_failure_completions": [
+      "```sql\nSELECT DISTINCT T2.name FROM employees AS T1 JOIN departments AS T2 ON T1.department_id = T2.id ORDER BY T2.name ASC;\n```",
+      "```sql\nSELECT DISTINCT d.name \nFROM departments AS d \nORDER BY d.name ASC;\n```",
+      "```sql\nSELECT name FROM departments ORDER BY name ASC;\n```"
+    ]
+  },
+  "raw_taxonomy": {
+    "categories": {
+      "executable_not_full_pass": {
+        "count": 10,
+        "fraction_of_failed": 0.02932551319648094
+      },
+      "execution_error": {
+        "count": 331,
+        "fraction_of_failed": 0.9706744868035191
+      },
+      "parse_failure": {
+        "count": 0,
+        "fraction_of_failed": 0.0
+      }
+    },
+    "failed_sample_count": 341
+  },
+  "route": "branch_a",
+  "schema_version": 1,
+  "source": {
+    "gate_a_evidence": {
+      "path": "runs/p0-gate-a/v0.7.0-subset-diagnostic-evidence.json",
+      "sha256": "993686abb804369f7e92d4c6f85e39965c7e1cd03e378c6b94a65a1042a5b645"
+    },
+    "sample_evidence": {
+      "path": "runs/p0-gate-a/v0.7.0-subset-diagnostic-samples.jsonl",
+      "sample_count": 400,
+      "sha256": "89911b559a7ed66bf431a8aece37f579cd8757ab3759b7e203bd8cf6014fb9b0"
+    }
+  },
+  "status": "completed",
+  "timestamp": "2026-07-16T15:33:29.762256+00:00"
+}

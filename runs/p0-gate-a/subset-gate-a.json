@@ -1,0 +1,36 @@
+{
+  "base_url": "http://127.0.0.1:8000/v1",
+  "candidate_count": 50,
+  "candidate_path": "trainer/data/nl2sql_v1.jsonl",
+  "input_sha256": "cfa93154cd87013b7460666925200be14f67c5112229f03c66df2978d747255c",
+  "k": 8,
+  "max_in_flight": 8,
+  "mixed_fraction": 0.36,
+  "mode": "gate",
+  "model": "Qwen2.5-1.5B-Instruct",
+  "pass_at_1": 0.08,
+  "pass_at_8": 0.36,
+  "pass_at_k": 0.36,
+  "passed": false,
+  "resolved_config": {
+    "base_url": "http://127.0.0.1:8000/v1",
+    "model": "Qwen2.5-1.5B-Instruct"
+  },
+  "sample_count": 400,
+  "schema_version": 2,
+  "status": "completed",
+  "thresholds": {
+    "baseline_pass_at_1": [
+      0.2,
+      0.6
+    ],
+    "mixed_fraction_min": 0.3
+  },
+  "timestamp": "2026-07-16T07:28:27.907489+00:00",
+  "verifier": {
+    "full_pass_score": 1.0,
+    "identity": "core.rewards.nl2sql.NL2SQLVerifier",
+    "source_sha256": "34764efba707d6bf44142a75624b26342686e817e9ea0dcda1603222930f2fd2"
+  },
+  "workers": 8
+}

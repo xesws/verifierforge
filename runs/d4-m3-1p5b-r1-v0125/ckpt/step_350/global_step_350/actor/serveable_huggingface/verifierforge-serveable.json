@@ -1,0 +1,9 @@
+{
+  "already_present": false,
+  "destination": "runs/d4-m3-1p5b-r1-v0125/ckpt/step_350/global_step_350/actor/serveable_huggingface",
+  "layout": "prefixed_full",
+  "lora_alpha": 32,
+  "lora_rank": 16,
+  "source": "runs/d4-m3-1p5b-r1-v0125/ckpt/step_350/global_step_350/actor/huggingface",
+  "source_index_sha256": "095941e502f62d2b3d627389a6e418d6631c57fb550cc3b83c6a68a364421eb2"
+}

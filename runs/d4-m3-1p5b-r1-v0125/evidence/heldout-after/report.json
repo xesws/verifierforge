@@ -1,0 +1,36 @@
+{
+  "after": null,
+  "before": {
+    "mixed_fraction": 0.4666666666666667,
+    "pass_at_1": 0.5833333333333334,
+    "pass_at_8": 0.7666666666666667
+  },
+  "checkpoints": [
+    {
+      "checkpoint_sha256": "d3f825d71b9682b221d169e0a1d889180babdf172116c939b6c2201da9d27395",
+      "detail": "HeldoutEvaluationError: vLLM exited before readiness: 6m(APIServer pid=73556)\u001b[0;0m     return cls(\n\u001b[1;36m(APIServer pid=73556)\u001b[0;0m            ^^^^\n\u001b[1;36m(APIServer pid=73556)\u001b[0;0m   File \"/workspace/verifierforge/.venv/lib/python3.12/site-packages/vllm/v1/engine/async_llm.py\", line 136, in __init__\n\u001b[1;36m(APIServer pid=73556)\u001b[0;0m     self.engine_core = EngineCoreClient.make_async_mp_client(\n\u001b[1;36m(APIServer pid=73556)\u001b[0;0m                        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n\u001b[1;36m(APIServer pid=73556)\u001b[0;0m   File \"/workspace/verifierforge/.venv/lib/python3.12/site-packages/vllm/v1/engine/core_client.py\", line 102, in make_async_mp_client\n\u001b[1;36m(APIServer pid=73556)\u001b[0;0m     return AsyncMPClient(*client_args)\n\u001b[1;36m(APIServer pid=73556)\u001b[0;0m            ^^^^^^^^^^^^^^^^^^^^^^^^^^^\n\u001b[1;36m(APIServer pid=73556)\u001b[0;0m   File \"/workspace/verifierforge/.venv/lib/python3.12/site-packages/vllm/v1/engine/core_client.py\", line 769, in __init__\n\u001b[1;36m(APIServer pid=73556)\u001b[0;0m     super().__i",
+      "evidence_sha256": null,
+      "metrics": null,
+      "samples_sha256": null,
+      "status": "unavailable",
+      "step": 50
+    }
+  ],
+  "control_curve": {
+    "path": "runs/d4-m4-0p5b-random-v0126/artifacts/curve.png",
+    "sha256": "3b913ef64bb42e78ef6ef046f848cc46689cbfdf97a2b9638f18d30b1935c0d6"
+  },
+  "control_job": "d4-m4-0p5b-random-v0126",
+  "detail": "checkpoint step 50 is unavailable: HeldoutEvaluationError: vLLM exited before readiness: 6m(APIServer pid=73556)\u001b[0;0m     return cls(\n\u001b[1;36m(APIServer pid=73556)\u001b[0;0m            ^^^^\n\u001b[1;36m(APIServer pid=73556)\u001b[0;0m   File \"/workspace/verifierforge/.venv/lib/python3.12/site-packages/vllm/v1/engine/async_llm.py\", line 136, in __init__\n\u001b[1;36m(APIServer pid=73556)\u001b[0;0m     self.engine_core = EngineCoreClient.make_async_mp_client(\n\u001b[1;36m(APIServer pid=73556)\u001b[0;0m                        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n\u001b[1;36m(APIServer pid=73556)\u001b[0;0m   File \"/workspace/verifierforge/.venv/lib/python3.12/site-packages/vllm/v1/engine/core_client.py\", line 102, in make_async_mp_client\n\u001b[1;36m(APIServer pid=73556)\u001b[0;0m     return AsyncMPClient(*client_args)\n\u001b[1;36m(APIServer pid=73556)\u001b[0;0m            ^^^^^^^^^^^^^^^^^^^^^^^^^^^\n\u001b[1;36m(APIServer pid=73556)\u001b[0;0m   File \"/workspace/verifierforge/.venv/lib/python3.12/site-packages/vllm/v1/engine/core_client.py\", line 769, in __init__\n\u001b[1;36m(APIServer pid=73556)\u001b[0;0m     super().__i",
+  "frozen_identity": {
+    "path": "/workspace/verifierforge/data/nl2sql/v0.10.0-heldout.jsonl",
+    "record_count": 60,
+    "sha256": "482f0e7678e7603311f72aeead381364cd92f0596c20745cc58c96916a9177e8",
+    "verifier_source_sha256": "b76707e5c0603d227393d03ffc0bdc7c66ec072a139c6aa717c282f4082de47f",
+    "verifier_version": 2
+  },
+  "generated_at": "2026-07-17T04:04:58.381286+00:00",
+  "main_job": "d4-m3-1p5b-r1-v0125",
+  "schema_version": 1,
+  "status": "unavailable"
+}

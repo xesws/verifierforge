@@ -1,0 +1,6 @@
+captured_at_utc=2026-07-16T22:02:21Z
+driver_pid=7653
+--- py-spy dump --native ---
+Permission Denied
+
+It looks like you are running in a docker container. Please make sure you started your container with the SYS_PTRACE capability. See https://github.com/benfred/py-spy#how-do-i-run-py-spy-in-docker for more details

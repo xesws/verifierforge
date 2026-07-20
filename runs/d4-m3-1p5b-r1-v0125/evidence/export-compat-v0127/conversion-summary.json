@@ -1,0 +1,79 @@
+{
+  "checkpoints": [
+    {
+      "already_present": false,
+      "destination": "runs/d4-m3-1p5b-r1-v0125/ckpt/step_50/global_step_50/actor/serveable_huggingface",
+      "layout": "prefixed_full",
+      "lora_alpha": 32,
+      "lora_rank": 16,
+      "source": "runs/d4-m3-1p5b-r1-v0125/ckpt/step_50/global_step_50/actor/huggingface",
+      "source_index_sha256": "095941e502f62d2b3d627389a6e418d6631c57fb550cc3b83c6a68a364421eb2"
+    },
+    {
+      "already_present": false,
+      "destination": "runs/d4-m3-1p5b-r1-v0125/ckpt/step_100/global_step_100/actor/serveable_huggingface",
+      "layout": "prefixed_full",
+      "lora_alpha": 32,
+      "lora_rank": 16,
+      "source": "runs/d4-m3-1p5b-r1-v0125/ckpt/step_100/global_step_100/actor/huggingface",
+      "source_index_sha256": "095941e502f62d2b3d627389a6e418d6631c57fb550cc3b83c6a68a364421eb2"
+    },
+    {
+      "already_present": false,
+      "destination": "runs/d4-m3-1p5b-r1-v0125/ckpt/step_150/global_step_150/actor/serveable_huggingface",
+      "layout": "prefixed_full",
+      "lora_alpha": 32,
+      "lora_rank": 16,
+      "source": "runs/d4-m3-1p5b-r1-v0125/ckpt/step_150/global_step_150/actor/huggingface",
+      "source_index_sha256": "095941e502f62d2b3d627389a6e418d6631c57fb550cc3b83c6a68a364421eb2"
+    },
+    {
+      "already_present": false,
+      "destination": "runs/d4-m3-1p5b-r1-v0125/ckpt/step_200/global_step_200/actor/serveable_huggingface",
+      "layout": "prefixed_full",
+      "lora_alpha": 32,
+      "lora_rank": 16,
+      "source": "runs/d4-m3-1p5b-r1-v0125/ckpt/step_200/global_step_200/actor/huggingface",
+      "source_index_sha256": "095941e502f62d2b3d627389a6e418d6631c57fb550cc3b83c6a68a364421eb2"
+    },
+    {
+      "already_present": false,
+      "destination": "runs/d4-m3-1p5b-r1-v0125/ckpt/step_250/global_step_250/actor/serveable_huggingface",
+      "layout": "prefixed_full",
+      "lora_alpha": 32,
+      "lora_rank": 16,
+      "source": "runs/d4-m3-1p5b-r1-v0125/ckpt/step_250/global_step_250/actor/huggingface",
+      "source_index_sha256": "095941e502f62d2b3d627389a6e418d6631c57fb550cc3b83c6a68a364421eb2"
+    },
+    {
+      "already_present": false,
+      "destination": "runs/d4-m3-1p5b-r1-v0125/ckpt/step_300/global_step_300/actor/serveable_huggingface",
+      "layout": "prefixed_full",
+      "lora_alpha": 32,
+      "lora_rank": 16,
+      "source": "runs/d4-m3-1p5b-r1-v0125/ckpt/step_300/global_step_300/actor/huggingface",
+      "source_index_sha256": "095941e502f62d2b3d627389a6e418d6631c57fb550cc3b83c6a68a364421eb2"
+    },
+    {
+      "already_present": false,
+      "destination": "runs/d4-m3-1p5b-r1-v0125/ckpt/step_350/global_step_350/actor/serveable_huggingface",
+      "layout": "prefixed_full",
+      "lora_alpha": 32,
+      "lora_rank": 16,
+      "source": "runs/d4-m3-1p5b-r1-v0125/ckpt/step_350/global_step_350/actor/huggingface",
+      "source_index_sha256": "095941e502f62d2b3d627389a6e418d6631c57fb550cc3b83c6a68a364421eb2"
+    },
+    {
+      "already_present": false,
+      "destination": "runs/d4-m3-1p5b-r1-v0125/ckpt/step_400/global_step_400/actor/serveable_huggingface",
+      "layout": "prefixed_full",
+      "lora_alpha": 32,
+      "lora_rank": 16,
+      "source": "runs/d4-m3-1p5b-r1-v0125/ckpt/step_400/global_step_400/actor/huggingface",
+      "source_index_sha256": "095941e502f62d2b3d627389a6e418d6631c57fb550cc3b83c6a68a364421eb2"
+    }
+  ],
+  "generated_at": "2026-07-17T04:50:18.540547+00:00",
+  "job_id": "d4-m3-1p5b-r1-v0125",
+  "status": "completed"
+}

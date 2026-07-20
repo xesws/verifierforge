@@ -1,0 +1,67 @@
+{
+  "completion": {
+    "choices": [
+      {
+        "finish_reason": "length",
+        "index": 0,
+        "logprobs": null,
+        "prompt_logprobs": null,
+        "prompt_token_ids": null,
+        "stop_reason": null,
+        "text": " SELECT 'Hello, World!'; SELECT NULL;\nAnswer:\nC\n\nWhich of",
+        "token_ids": null
+      }
+    ],
+    "created": 1784264297,
+    "id": "cmpl-e777419ed4184bf2ae9bbe5ae5f9f03e",
+    "kv_transfer_params": null,
+    "model": "vf-x3-step50",
+    "object": "text_completion",
+    "service_tier": null,
+    "system_fingerprint": null,
+    "usage": {
+      "completion_tokens": 16,
+      "prompt_tokens": 7,
+      "prompt_tokens_details": null,
+      "total_tokens": 23
+    }
+  },
+  "completion_status": 200,
+  "models": {
+    "data": [
+      {
+        "created": 1784264297,
+        "id": "vf-x3-step50",
+        "max_model_len": 32768,
+        "object": "model",
+        "owned_by": "vllm",
+        "parent": null,
+        "permission": [
+          {
+            "allow_create_engine": false,
+            "allow_fine_tuning": false,
+            "allow_logprobs": true,
+            "allow_sampling": true,
+            "allow_search_indices": false,
+            "allow_view": true,
+            "created": 1784264297,
+            "group": null,
+            "id": "modelperm-d2a1d5c7495d4886812f80ddff434c4f",
+            "is_blocking": false,
+            "object": "model_permission",
+            "organization": "*"
+          }
+        ],
+        "root": "runs/d4-m3-1p5b-r1-v0125/ckpt/step_50/global_step_50/actor/serveable_huggingface"
+      }
+    ],
+    "object": "list"
+  },
+  "models_status": 200,
+  "request": {
+    "max_tokens": 16,
+    "model": "vf-x3-step50",
+    "prompt": "Return exactly: SELECT 1;",
+    "temperature": 0.0
+  }
+}

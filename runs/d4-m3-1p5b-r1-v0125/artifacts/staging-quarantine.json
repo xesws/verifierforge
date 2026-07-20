@@ -1,0 +1,8 @@
+{
+  "generated_at": "2026-07-17T02:34:21.447366+00:00",
+  "job_id": "d4-m3-1p5b-r1-v0125",
+  "quarantined_paths": [
+    "runs/d4-m3-1p5b-r1-v0125/evidence/failed-staging/global_step_150"
+  ],
+  "resume_path": "runs/d4-m3-1p5b-r1-v0125/ckpt/step_100/global_step_100"
+}

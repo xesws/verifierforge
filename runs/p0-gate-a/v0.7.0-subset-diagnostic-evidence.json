@@ -1,0 +1,61 @@
+{
+  "base_url": "http://127.0.0.1:8000/v1",
+  "candidate_count": 50,
+  "candidate_path": "trainer/data/nl2sql_v1.jsonl",
+  "input_sha256": "cfa93154cd87013b7460666925200be14f67c5112229f03c66df2978d747255c",
+  "k": 8,
+  "max_in_flight": 8,
+  "mixed_fraction": 0.32,
+  "mode": "reference",
+  "model": "Qwen2.5-1.5B-Instruct",
+  "pass_at_1": 0.12,
+  "pass_at_8": 0.32,
+  "pass_at_k": 0.32,
+  "passed": false,
+  "resolved_config": {
+    "base_url": "http://127.0.0.1:8000/v1",
+    "model": "Qwen2.5-1.5B-Instruct"
+  },
+  "sample_count": 400,
+  "sample_evidence": {
+    "path": "runs/p0-gate-a/v0.7.0-subset-diagnostic-samples.jsonl",
+    "sample_count": 400,
+    "sha256": "89911b559a7ed66bf431a8aece37f579cd8757ab3759b7e203bd8cf6014fb9b0"
+  },
+  "sample_taxonomy": {
+    "D_parse_failure_fraction": 0.0,
+    "categories": {
+      "executable_not_full_pass": {
+        "count": 10,
+        "fraction_of_failed": 0.02932551319648094
+      },
+      "execution_error": {
+        "count": 331,
+        "fraction_of_failed": 0.9706744868035191
+      },
+      "parse_failure": {
+        "count": 0,
+        "fraction_of_failed": 0.0
+      }
+    },
+    "failed_sample_count": 341,
+    "length_penalized_exact_result_count": 0,
+    "parse_failure_completions": []
+  },
+  "schema_version": 3,
+  "status": "completed",
+  "thresholds": {
+    "baseline_pass_at_1": [
+      0.2,
+      0.6
+    ],
+    "mixed_fraction_min": 0.3
+  },
+  "timestamp": "2026-07-16T15:27:10.368686+00:00",
+  "verifier": {
+    "full_pass_score": 1.0,
+    "identity": "core.rewards.nl2sql.NL2SQLVerifier",
+    "source_sha256": "a8f862d42b479916ac2cf887ef029202abdea51fab773aec651c5a1cfeee458f"
+  },
+  "workers": 8
+}

@@ -1,0 +1,936 @@
+{
+  "bucket": "verifierforge-artifacts-jq",
+  "candidate_manifests": [
+    {
+      "files": [
+        {
+          "key": "vf/jobs/p2-42436bb4c4a144d8980a-r5/artifacts/.tmp/9c16cca6ba0f4a46bf8aef81c508066e/candidate-checkpoints/step_50/global_step_50/data.pt",
+          "path": "global_step_50/data.pt",
+          "sha256": "8da403fb85ea17dde1779421618d0fb3f0cf34b0c071087a3648d443e0d932a5",
+          "size_bytes": 1947
+        },
+        {
+          "key": "vf/jobs/p2-42436bb4c4a144d8980a-r5/artifacts/.tmp/9c16cca6ba0f4a46bf8aef81c508066e/candidate-checkpoints/step_50/global_step_50/actor/extra_state_world_size_1_rank_0.pt",
+          "path": "global_step_50/actor/extra_state_world_size_1_rank_0.pt",
+          "sha256": "46b0b90964f49dd493feb53c234e15859e32a4d0e5a8cd71d6ccad13a17130fc",
+          "size_bytes": 15141
+        },
+        {
+          "key": "vf/jobs/p2-42436bb4c4a144d8980a-r5/artifacts/.tmp/9c16cca6ba0f4a46bf8aef81c508066e/candidate-checkpoints/step_50/global_step_50/actor/fsdp_config.json",
+          "path": "global_step_50/actor/fsdp_config.json",
+          "sha256": "7315a2057e6b04e0b2e7d6ee8ad070eafd481f3e1029fb9c75c97723b6f98f36",
+          "size_bytes": 46
+        },
+        {
+          "key": "vf/jobs/p2-42436bb4c4a144d8980a-r5/artifacts/.tmp/9c16cca6ba0f4a46bf8aef81c508066e/candidate-checkpoints/step_50/global_step_50/actor/lora_train_meta.json",
+          "path": "global_step_50/actor/lora_train_meta.json",
+          "sha256": "82c99ce144bb1153a915c91b27ccf741f35dcdfc4aa85f9f6034d12667732b35",
+          "size_bytes": 67
+        },
+        {
+          "key": "vf/jobs/p2-42436bb4c4a144d8980a-r5/artifacts/.tmp/9c16cca6ba0f4a46bf8aef81c508066e/candidate-checkpoints/step_50/global_step_50/actor/model_world_size_1_rank_0.pt",
+          "path": "global_step_50/actor/model_world_size_1_rank_0.pt",
+          "sha256": "032a89a90b345310ef1969f1cb5cf88cf111d2c53eb366b227e398b43c01ff23",
+          "size_bytes": 2556414171
+        },
+        {
+          "key": "vf/jobs/p2-42436bb4c4a144d8980a-r5/artifacts/.tmp/9c16cca6ba0f4a46bf8aef81c508066e/candidate-checkpoints/step_50/global_step_50/actor/optim_world_size_1_rank_0.pt",
+          "path": "global_step_50/actor/optim_world_size_1_rank_0.pt",
+          "sha256": "4ae7305a3df1e7ec3e68bf1ec7c4bf7ce4eaec07a5e251ba5720b154b1301f1e",
+          "size_bytes": 70681843
+        },
+        {
+          "key": "vf/jobs/p2-42436bb4c4a144d8980a-r5/artifacts/.tmp/9c16cca6ba0f4a46bf8aef81c508066e/candidate-checkpoints/step_50/global_step_50/actor/huggingface/added_tokens.json",
+          "path": "global_step_50/actor/huggingface/added_tokens.json",
+          "sha256": "58b54bbe36fc752f79a24a271ef66a0a0830054b4dfad94bde757d851968060b",
+          "size_bytes": 605
+        },
+        {
+          "key": "vf/jobs/p2-42436bb4c4a144d8980a-r5/artifacts/.tmp/9c16cca6ba0f4a46bf8aef81c508066e/candidate-checkpoints/step_50/global_step_50/actor/huggingface/chat_template.jinja",
+          "path": "global_step_50/actor/huggingface/chat_template.jinja",
+          "sha256": "cd8e9439f0570856fd70470bf8889ebd8b5d1107207f67a5efb46e342330527f",
+          "size_bytes": 2507
+        },
+        {
+          "key": "vf/jobs/p2-42436bb4c4a144d8980a-r5/artifacts/.tmp/9c16cca6ba0f4a46bf8aef81c508066e/candidate-checkpoints/step_50/global_step_50/actor/huggingface/config.json",
+          "path": "global_step_50/actor/huggingface/config.json",
+          "sha256": "f186f042c01e11eee0b34187a60029d36fb54e7ea304e5157c712aa67bab8be1",
+          "size_bytes": 1260
+        },
+        {
+          "key": "vf/jobs/p2-42436bb4c4a144d8980a-r5/artifacts/.tmp/9c16cca6ba0f4a46bf8aef81c508066e/candidate-checkpoints/step_50/global_step_50/actor/huggingface/generation_config.json",
+          "path": "global_step_50/actor/huggingface/generation_config.json",
+          "sha256": "da7d43d773bb1c2606bbd062d9af2e8aa2b73de104b1f8f0a93e31bf3b1426a3",
+          "size_bytes": 242
+        },
+        {
+          "key": "vf/jobs/p2-42436bb4c4a144d8980a-r5/artifacts/.tmp/9c16cca6ba0f4a46bf8aef81c508066e/candidate-checkpoints/step_50/global_step_50/actor/huggingface/merges.txt",
+          "path": "global_step_50/actor/huggingface/merges.txt",
+          "sha256": "8831e4f1a044471340f7c0a83d7bd71306a5b867e95fd870f74d0c5308a904d5",
+          "size_bytes": 1671853
+        },
+        {
+          "key": "vf/jobs/p2-42436bb4c4a144d8980a-r5/artifacts/.tmp/9c16cca6ba0f4a46bf8aef81c508066e/candidate-checkpoints/step_50/global_step_50/actor/huggingface/model.safetensors",
+          "path": "global_step_50/actor/huggingface/model.safetensors",
+          "sha256": "43e40710be910dbf1c214fe6fa63991eda066a03211dc15a0e07e7cc5c71f5ae",
+          "size_bytes": 2555951248
+        },
+        {
+          "key": "vf/jobs/p2-42436bb4c4a144d8980a-r5/artifacts/.tmp/9c16cca6ba0f4a46bf8aef81c508066e/candidate-checkpoints/step_50/global_step_50/actor/huggingface/special_tokens_map.json",
+          "path": "global_step_50/actor/huggingface/special_tokens_map.json",
+          "sha256": "76862e765266b85aa9459767e33cbaf13970f327a0e88d1c65846c2ddd3a1ecd",
+          "size_bytes": 613
+        },
+        {
+          "key": "vf/jobs/p2-42436bb4c4a144d8980a-r5/artifacts/.tmp/9c16cca6ba0f4a46bf8aef81c508066e/candidate-checkpoints/step_50/global_step_50/actor/huggingface/tokenizer.json",
+          "path": "global_step_50/actor/huggingface/tokenizer.json",
+          "sha256": "9c5ae00e602b8860cbd784ba82a8aa14e8feecec692e7076590d014d7b7fdafa",
+          "size_bytes": 11421896
+        },
+        {
+          "key": "vf/jobs/p2-42436bb4c4a144d8980a-r5/artifacts/.tmp/9c16cca6ba0f4a46bf8aef81c508066e/candidate-checkpoints/step_50/global_step_50/actor/huggingface/tokenizer_config.json",
+          "path": "global_step_50/actor/huggingface/tokenizer_config.json",
+          "sha256": "0a04a9d7d4a62b28482bdfe726c122756de85714fb64166ace92ae75b8f57614",
+          "size_bytes": 4686
+        },
+        {
+          "key": "vf/jobs/p2-42436bb4c4a144d8980a-r5/artifacts/.tmp/9c16cca6ba0f4a46bf8aef81c508066e/candidate-checkpoints/step_50/global_step_50/actor/huggingface/vocab.json",
+          "path": "global_step_50/actor/huggingface/vocab.json",
+          "sha256": "ca10d7e9fb3ed18575dd1e277a2579c16d108e32f27439684afa0e10b1440910",
+          "size_bytes": 2776833
+        }
+      ],
+      "manifest": {
+        "key": "vf/jobs/p2-42436bb4c4a144d8980a-r5/artifacts/candidate-checkpoints/step_50.manifest.json",
+        "sha256": "39f4260741b6fffbaea632acb74e2a2bbae327355f3b290a492c7115e6aa3403",
+        "size_bytes": 5251
+      },
+      "step": 50
+    },
+    {
+      "files": [
+        {
+          "key": "vf/jobs/p2-42436bb4c4a144d8980a-r5/artifacts/.tmp/679304d9c26e4ac1b099f1637c82014f/candidate-checkpoints/step_100/global_step_100/data.pt",
+          "path": "global_step_100/data.pt",
+          "sha256": "88f8a6191632465b880526d8561fc2e28ac75ab37ea7ca30e35ed0fda4052b9b",
+          "size_bytes": 1947
+        },
+        {
+          "key": "vf/jobs/p2-42436bb4c4a144d8980a-r5/artifacts/.tmp/679304d9c26e4ac1b099f1637c82014f/candidate-checkpoints/step_100/global_step_100/actor/extra_state_world_size_1_rank_0.pt",
+          "path": "global_step_100/actor/extra_state_world_size_1_rank_0.pt",
+          "sha256": "5a2fe2becf3c9950ec1514fc6036afd6a31bdb703e9bc3feff0372ec3469b9e7",
+          "size_bytes": 15141
+        },
+        {
+          "key": "vf/jobs/p2-42436bb4c4a144d8980a-r5/artifacts/.tmp/679304d9c26e4ac1b099f1637c82014f/candidate-checkpoints/step_100/global_step_100/actor/fsdp_config.json",
+          "path": "global_step_100/actor/fsdp_config.json",
+          "sha256": "7315a2057e6b04e0b2e7d6ee8ad070eafd481f3e1029fb9c75c97723b6f98f36",
+          "size_bytes": 46
+        },
+        {
+          "key": "vf/jobs/p2-42436bb4c4a144d8980a-r5/artifacts/.tmp/679304d9c26e4ac1b099f1637c82014f/candidate-checkpoints/step_100/global_step_100/actor/lora_train_meta.json",
+          "path": "global_step_100/actor/lora_train_meta.json",
+          "sha256": "82c99ce144bb1153a915c91b27ccf741f35dcdfc4aa85f9f6034d12667732b35",
+          "size_bytes": 67
+        },
+        {
+          "key": "vf/jobs/p2-42436bb4c4a144d8980a-r5/artifacts/.tmp/679304d9c26e4ac1b099f1637c82014f/candidate-checkpoints/step_100/global_step_100/actor/model_world_size_1_rank_0.pt",
+          "path": "global_step_100/actor/model_world_size_1_rank_0.pt",
+          "sha256": "ba2a3a37fa3ac66d28efbf9f7191478d1b80a9cbfc5194d277139cd1575dbba8",
+          "size_bytes": 2556414171
+        },
+        {
+          "key": "vf/jobs/p2-42436bb4c4a144d8980a-r5/artifacts/.tmp/679304d9c26e4ac1b099f1637c82014f/candidate-checkpoints/step_100/global_step_100/actor/optim_world_size_1_rank_0.pt",
+          "path": "global_step_100/actor/optim_world_size_1_rank_0.pt",
+          "sha256": "08246f96f7413a99113a645a0f03d73663ce0638fed26277efee741fb4442d50",
+          "size_bytes": 70681843
+        },
+        {
+          "key": "vf/jobs/p2-42436bb4c4a144d8980a-r5/artifacts/.tmp/679304d9c26e4ac1b099f1637c82014f/candidate-checkpoints/step_100/global_step_100/actor/huggingface/added_tokens.json",
+          "path": "global_step_100/actor/huggingface/added_tokens.json",
+          "sha256": "58b54bbe36fc752f79a24a271ef66a0a0830054b4dfad94bde757d851968060b",
+          "size_bytes": 605
+        },
+        {
+          "key": "vf/jobs/p2-42436bb4c4a144d8980a-r5/artifacts/.tmp/679304d9c26e4ac1b099f1637c82014f/candidate-checkpoints/step_100/global_step_100/actor/huggingface/chat_template.jinja",
+          "path": "global_step_100/actor/huggingface/chat_template.jinja",
+          "sha256": "cd8e9439f0570856fd70470bf8889ebd8b5d1107207f67a5efb46e342330527f",
+          "size_bytes": 2507
+        },
+        {
+          "key": "vf/jobs/p2-42436bb4c4a144d8980a-r5/artifacts/.tmp/679304d9c26e4ac1b099f1637c82014f/candidate-checkpoints/step_100/global_step_100/actor/huggingface/config.json",
+          "path": "global_step_100/actor/huggingface/config.json",
+          "sha256": "f186f042c01e11eee0b34187a60029d36fb54e7ea304e5157c712aa67bab8be1",
+          "size_bytes": 1260
+        },
+        {
+          "key": "vf/jobs/p2-42436bb4c4a144d8980a-r5/artifacts/.tmp/679304d9c26e4ac1b099f1637c82014f/candidate-checkpoints/step_100/global_step_100/actor/huggingface/generation_config.json",
+          "path": "global_step_100/actor/huggingface/generation_config.json",
+          "sha256": "da7d43d773bb1c2606bbd062d9af2e8aa2b73de104b1f8f0a93e31bf3b1426a3",
+          "size_bytes": 242
+        },
+        {
+          "key": "vf/jobs/p2-42436bb4c4a144d8980a-r5/artifacts/.tmp/679304d9c26e4ac1b099f1637c82014f/candidate-checkpoints/step_100/global_step_100/actor/huggingface/merges.txt",
+          "path": "global_step_100/actor/huggingface/merges.txt",
+          "sha256": "8831e4f1a044471340f7c0a83d7bd71306a5b867e95fd870f74d0c5308a904d5",
+          "size_bytes": 1671853
+        },
+        {
+          "key": "vf/jobs/p2-42436bb4c4a144d8980a-r5/artifacts/.tmp/679304d9c26e4ac1b099f1637c82014f/candidate-checkpoints/step_100/global_step_100/actor/huggingface/model.safetensors",
+          "path": "global_step_100/actor/huggingface/model.safetensors",
+          "sha256": "27208c89b36a6966588204e0ee65a1b16e62dd1c6cca034b2d1b2f47996b292c",
+          "size_bytes": 2555951248
+        },
+        {
+          "key": "vf/jobs/p2-42436bb4c4a144d8980a-r5/artifacts/.tmp/679304d9c26e4ac1b099f1637c82014f/candidate-checkpoints/step_100/global_step_100/actor/huggingface/special_tokens_map.json",
+          "path": "global_step_100/actor/huggingface/special_tokens_map.json",
+          "sha256": "76862e765266b85aa9459767e33cbaf13970f327a0e88d1c65846c2ddd3a1ecd",
+          "size_bytes": 613
+        },
+        {
+          "key": "vf/jobs/p2-42436bb4c4a144d8980a-r5/artifacts/.tmp/679304d9c26e4ac1b099f1637c82014f/candidate-checkpoints/step_100/global_step_100/actor/huggingface/tokenizer.json",
+          "path": "global_step_100/actor/huggingface/tokenizer.json",
+          "sha256": "9c5ae00e602b8860cbd784ba82a8aa14e8feecec692e7076590d014d7b7fdafa",
+          "size_bytes": 11421896
+        },
+        {
+          "key": "vf/jobs/p2-42436bb4c4a144d8980a-r5/artifacts/.tmp/679304d9c26e4ac1b099f1637c82014f/candidate-checkpoints/step_100/global_step_100/actor/huggingface/tokenizer_config.json",
+          "path": "global_step_100/actor/huggingface/tokenizer_config.json",
+          "sha256": "0a04a9d7d4a62b28482bdfe726c122756de85714fb64166ace92ae75b8f57614",
+          "size_bytes": 4686
+        },
+        {
+          "key": "vf/jobs/p2-42436bb4c4a144d8980a-r5/artifacts/.tmp/679304d9c26e4ac1b099f1637c82014f/candidate-checkpoints/step_100/global_step_100/actor/huggingface/vocab.json",
+          "path": "global_step_100/actor/huggingface/vocab.json",
+          "sha256": "ca10d7e9fb3ed18575dd1e277a2579c16d108e32f27439684afa0e10b1440910",
+          "size_bytes": 2776833
+        }
+      ],
+      "manifest": {
+        "key": "vf/jobs/p2-42436bb4c4a144d8980a-r5/artifacts/candidate-checkpoints/step_100.manifest.json",
+        "sha256": "97d539352cfca9858a85882742d41ad1562ac60e0f7dc596a183e74bcaa964f5",
+        "size_bytes": 5300
+      },
+      "step": 100
+    }
+  ],
+  "job_id": "p2-42436bb4c4a144d8980a-r5",
+  "local_artifacts": {
+    "curve.png": "runs/provisioning/v0.28.2/p2-42436bb4c4a144d8980a-r5/collected/curve.png",
+    "final/model.txt": "runs/provisioning/v0.28.2/p2-42436bb4c4a144d8980a-r5/collected/model.txt"
+  },
+  "objects": [
+    {
+      "key": "vf/jobs/p2-42436bb4c4a144d8980a-r5/artifacts/.tmp/9f83e420c929492d951be2f621a7d3ae/final/model.txt/.final-model.txt",
+      "sha256": "591b4f63cf1219601b2177dab73b79feeaf23e95ae501f8ec058cb57eb029567",
+      "size_bytes": 968
+    },
+    {
+      "key": "vf/jobs/p2-42436bb4c4a144d8980a-r5/artifacts/.tmp/bdde0cb6ec2f4a6aaec19b12630d6f1c/curve.png/.curve.png",
+      "sha256": "df84e6d39315d729551eee037f77418cfc912625579e313060224cd0940dec58",
+      "size_bytes": 15240
+    },
+    {
+      "key": "vf/jobs/p2-42436bb4c4a144d8980a-r5/artifacts/.tmp/d1f529b6c049407bb8352368b9e0507c/serveability/step_100.json/step_100.json",
+      "sha256": "1756783619fc4193e1273fa7cf89bef2b03d285b731f8724f5cde3ffcea0d526",
+      "size_bytes": 17260
+    },
+    {
+      "key": "vf/jobs/p2-42436bb4c4a144d8980a-r5/artifacts/candidate-checkpoints/step_100.manifest.json",
+      "sha256": "97d539352cfca9858a85882742d41ad1562ac60e0f7dc596a183e74bcaa964f5",
+      "size_bytes": 5300
+    },
+    {
+      "key": "vf/jobs/p2-42436bb4c4a144d8980a-r5/artifacts/candidate-checkpoints/step_50.manifest.json",
+      "sha256": "39f4260741b6fffbaea632acb74e2a2bbae327355f3b290a492c7115e6aa3403",
+      "size_bytes": 5251
+    },
+    {
+      "key": "vf/jobs/p2-42436bb4c4a144d8980a-r5/artifacts/curve.png.manifest.json",
+      "sha256": "172da558b290e5a5a51bc763d625f6dd7cdab02b1f7e1df798158057a4c19749",
+      "size_bytes": 293
+    },
+    {
+      "key": "vf/jobs/p2-42436bb4c4a144d8980a-r5/artifacts/final/model.txt.manifest.json",
+      "sha256": "5e5bba9347a8ca867869ee5cc41176f4384b1c9908ff0fca71743cb10f87b357",
+      "size_bytes": 315
+    },
+    {
+      "key": "vf/jobs/p2-42436bb4c4a144d8980a-r5/artifacts/serveability/step_100.json.manifest.json",
+      "sha256": "d335c0e7ba4fe3ead1a76db59e4226953a24a145762b664a4609bf7b500c7a56",
+      "size_bytes": 333
+    },
+    {
+      "key": "vf/jobs/p2-42436bb4c4a144d8980a-r5/ckpt/.tmp/step_100/ce3aa1632cb248d6ad32edf328af3db2/global_step_100/actor/extra_state_world_size_1_rank_0.pt",
+      "sha256": "5a2fe2becf3c9950ec1514fc6036afd6a31bdb703e9bc3feff0372ec3469b9e7",
+      "size_bytes": 15141
+    },
+    {
+      "key": "vf/jobs/p2-42436bb4c4a144d8980a-r5/ckpt/.tmp/step_100/ce3aa1632cb248d6ad32edf328af3db2/global_step_100/actor/fsdp_config.json",
+      "sha256": "7315a2057e6b04e0b2e7d6ee8ad070eafd481f3e1029fb9c75c97723b6f98f36",
+      "size_bytes": 46
+    },
+    {
+      "key": "vf/jobs/p2-42436bb4c4a144d8980a-r5/ckpt/.tmp/step_100/ce3aa1632cb248d6ad32edf328af3db2/global_step_100/actor/huggingface/added_tokens.json",
+      "sha256": "58b54bbe36fc752f79a24a271ef66a0a0830054b4dfad94bde757d851968060b",
+      "size_bytes": 605
+    },
+    {
+      "key": "vf/jobs/p2-42436bb4c4a144d8980a-r5/ckpt/.tmp/step_100/ce3aa1632cb248d6ad32edf328af3db2/global_step_100/actor/huggingface/chat_template.jinja",
+      "sha256": "cd8e9439f0570856fd70470bf8889ebd8b5d1107207f67a5efb46e342330527f",
+      "size_bytes": 2507
+    },
+    {
+      "key": "vf/jobs/p2-42436bb4c4a144d8980a-r5/ckpt/.tmp/step_100/ce3aa1632cb248d6ad32edf328af3db2/global_step_100/actor/huggingface/config.json",
+      "sha256": "f186f042c01e11eee0b34187a60029d36fb54e7ea304e5157c712aa67bab8be1",
+      "size_bytes": 1260
+    },
+    {
+      "key": "vf/jobs/p2-42436bb4c4a144d8980a-r5/ckpt/.tmp/step_100/ce3aa1632cb248d6ad32edf328af3db2/global_step_100/actor/huggingface/generation_config.json",
+      "sha256": "da7d43d773bb1c2606bbd062d9af2e8aa2b73de104b1f8f0a93e31bf3b1426a3",
+      "size_bytes": 242
+    },
+    {
+      "key": "vf/jobs/p2-42436bb4c4a144d8980a-r5/ckpt/.tmp/step_100/ce3aa1632cb248d6ad32edf328af3db2/global_step_100/actor/huggingface/merges.txt",
+      "sha256": "8831e4f1a044471340f7c0a83d7bd71306a5b867e95fd870f74d0c5308a904d5",
+      "size_bytes": 1671853
+    },
+    {
+      "key": "vf/jobs/p2-42436bb4c4a144d8980a-r5/ckpt/.tmp/step_100/ce3aa1632cb248d6ad32edf328af3db2/global_step_100/actor/huggingface/model.safetensors",
+      "sha256": "27208c89b36a6966588204e0ee65a1b16e62dd1c6cca034b2d1b2f47996b292c",
+      "size_bytes": 2555951248
+    },
+    {
+      "key": "vf/jobs/p2-42436bb4c4a144d8980a-r5/ckpt/.tmp/step_100/ce3aa1632cb248d6ad32edf328af3db2/global_step_100/actor/huggingface/special_tokens_map.json",
+      "sha256": "76862e765266b85aa9459767e33cbaf13970f327a0e88d1c65846c2ddd3a1ecd",
+      "size_bytes": 613
+    },
+    {
+      "key": "vf/jobs/p2-42436bb4c4a144d8980a-r5/ckpt/.tmp/step_100/ce3aa1632cb248d6ad32edf328af3db2/global_step_100/actor/huggingface/tokenizer.json",
+      "sha256": "9c5ae00e602b8860cbd784ba82a8aa14e8feecec692e7076590d014d7b7fdafa",
+      "size_bytes": 11421896
+    },
+    {
+      "key": "vf/jobs/p2-42436bb4c4a144d8980a-r5/ckpt/.tmp/step_100/ce3aa1632cb248d6ad32edf328af3db2/global_step_100/actor/huggingface/tokenizer_config.json",
+      "sha256": "0a04a9d7d4a62b28482bdfe726c122756de85714fb64166ace92ae75b8f57614",
+      "size_bytes": 4686
+    },
+    {
+      "key": "vf/jobs/p2-42436bb4c4a144d8980a-r5/ckpt/.tmp/step_100/ce3aa1632cb248d6ad32edf328af3db2/global_step_100/actor/huggingface/vocab.json",
+      "sha256": "ca10d7e9fb3ed18575dd1e277a2579c16d108e32f27439684afa0e10b1440910",
+      "size_bytes": 2776833
+    },
+    {
+      "key": "vf/jobs/p2-42436bb4c4a144d8980a-r5/ckpt/.tmp/step_100/ce3aa1632cb248d6ad32edf328af3db2/global_step_100/actor/lora_train_meta.json",
+      "sha256": "82c99ce144bb1153a915c91b27ccf741f35dcdfc4aa85f9f6034d12667732b35",
+      "size_bytes": 67
+    },
+    {
+      "key": "vf/jobs/p2-42436bb4c4a144d8980a-r5/ckpt/.tmp/step_100/ce3aa1632cb248d6ad32edf328af3db2/global_step_100/actor/model_world_size_1_rank_0.pt",
+      "sha256": "ba2a3a37fa3ac66d28efbf9f7191478d1b80a9cbfc5194d277139cd1575dbba8",
+      "size_bytes": 2556414171
+    },
+    {
+      "key": "vf/jobs/p2-42436bb4c4a144d8980a-r5/ckpt/.tmp/step_100/ce3aa1632cb248d6ad32edf328af3db2/global_step_100/actor/optim_world_size_1_rank_0.pt",
+      "sha256": "08246f96f7413a99113a645a0f03d73663ce0638fed26277efee741fb4442d50",
+      "size_bytes": 70681843
+    },
+    {
+      "key": "vf/jobs/p2-42436bb4c4a144d8980a-r5/ckpt/.tmp/step_100/ce3aa1632cb248d6ad32edf328af3db2/global_step_100/actor/serveable_huggingface/added_tokens.json",
+      "sha256": "58b54bbe36fc752f79a24a271ef66a0a0830054b4dfad94bde757d851968060b",
+      "size_bytes": 605
+    },
+    {
+      "key": "vf/jobs/p2-42436bb4c4a144d8980a-r5/ckpt/.tmp/step_100/ce3aa1632cb248d6ad32edf328af3db2/global_step_100/actor/serveable_huggingface/chat_template.jinja",
+      "sha256": "cd8e9439f0570856fd70470bf8889ebd8b5d1107207f67a5efb46e342330527f",
+      "size_bytes": 2507
+    },
+    {
+      "key": "vf/jobs/p2-42436bb4c4a144d8980a-r5/ckpt/.tmp/step_100/ce3aa1632cb248d6ad32edf328af3db2/global_step_100/actor/serveable_huggingface/config.json",
+      "sha256": "f186f042c01e11eee0b34187a60029d36fb54e7ea304e5157c712aa67bab8be1",
+      "size_bytes": 1260
+    },
+    {
+      "key": "vf/jobs/p2-42436bb4c4a144d8980a-r5/ckpt/.tmp/step_100/ce3aa1632cb248d6ad32edf328af3db2/global_step_100/actor/serveable_huggingface/generation_config.json",
+      "sha256": "da7d43d773bb1c2606bbd062d9af2e8aa2b73de104b1f8f0a93e31bf3b1426a3",
+      "size_bytes": 242
+    },
+    {
+      "key": "vf/jobs/p2-42436bb4c4a144d8980a-r5/ckpt/.tmp/step_100/ce3aa1632cb248d6ad32edf328af3db2/global_step_100/actor/serveable_huggingface/merges.txt",
+      "sha256": "8831e4f1a044471340f7c0a83d7bd71306a5b867e95fd870f74d0c5308a904d5",
+      "size_bytes": 1671853
+    },
+    {
+      "key": "vf/jobs/p2-42436bb4c4a144d8980a-r5/ckpt/.tmp/step_100/ce3aa1632cb248d6ad32edf328af3db2/global_step_100/actor/serveable_huggingface/model.safetensors",
+      "sha256": "3011b235e306479dc3d63112b23f03ce2a126de84e68a76a3cf2688587272d1e",
+      "size_bytes": 1260367448
+    },
+    {
+      "key": "vf/jobs/p2-42436bb4c4a144d8980a-r5/ckpt/.tmp/step_100/ce3aa1632cb248d6ad32edf328af3db2/global_step_100/actor/serveable_huggingface/model.safetensors.index.json",
+      "sha256": "15505122df2548e646c0c94b079315901e1779bb99e40867d22bd1c08cde8ab1",
+      "size_bytes": 19442
+    },
+    {
+      "key": "vf/jobs/p2-42436bb4c4a144d8980a-r5/ckpt/.tmp/step_100/ce3aa1632cb248d6ad32edf328af3db2/global_step_100/actor/serveable_huggingface/special_tokens_map.json",
+      "sha256": "76862e765266b85aa9459767e33cbaf13970f327a0e88d1c65846c2ddd3a1ecd",
+      "size_bytes": 613
+    },
+    {
+      "key": "vf/jobs/p2-42436bb4c4a144d8980a-r5/ckpt/.tmp/step_100/ce3aa1632cb248d6ad32edf328af3db2/global_step_100/actor/serveable_huggingface/tokenizer.json",
+      "sha256": "9c5ae00e602b8860cbd784ba82a8aa14e8feecec692e7076590d014d7b7fdafa",
+      "size_bytes": 11421896
+    },
+    {
+      "key": "vf/jobs/p2-42436bb4c4a144d8980a-r5/ckpt/.tmp/step_100/ce3aa1632cb248d6ad32edf328af3db2/global_step_100/actor/serveable_huggingface/tokenizer_config.json",
+      "sha256": "0a04a9d7d4a62b28482bdfe726c122756de85714fb64166ace92ae75b8f57614",
+      "size_bytes": 4686
+    },
+    {
+      "key": "vf/jobs/p2-42436bb4c4a144d8980a-r5/ckpt/.tmp/step_100/ce3aa1632cb248d6ad32edf328af3db2/global_step_100/actor/serveable_huggingface/verifierforge-serveable.json",
+      "sha256": "c09c446880aed4a775e686fda5bf00bddac3027ab0d17c609f755b7022cd8c2b",
+      "size_bytes": 646
+    },
+    {
+      "key": "vf/jobs/p2-42436bb4c4a144d8980a-r5/ckpt/.tmp/step_100/ce3aa1632cb248d6ad32edf328af3db2/global_step_100/actor/serveable_huggingface/vocab.json",
+      "sha256": "ca10d7e9fb3ed18575dd1e277a2579c16d108e32f27439684afa0e10b1440910",
+      "size_bytes": 2776833
+    },
+    {
+      "key": "vf/jobs/p2-42436bb4c4a144d8980a-r5/ckpt/.tmp/step_100/ce3aa1632cb248d6ad32edf328af3db2/global_step_100/data.pt",
+      "sha256": "88f8a6191632465b880526d8561fc2e28ac75ab37ea7ca30e35ed0fda4052b9b",
+      "size_bytes": 1947
+    },
+    {
+      "key": "vf/jobs/p2-42436bb4c4a144d8980a-r5/ckpt/step_100/manifest.json",
+      "sha256": "7c49dce281bde9ca6fd419cc0564ed0fbe584319fed9f9566b1045b98f9b5edd",
+      "size_bytes": 8801
+    },
+    {
+      "key": "vf/jobs/p2-42436bb4c4a144d8980a-r5/metrics.jsonl/000000000001-86c6819d1dfe48789060e62600d40b0b.json",
+      "sha256": "a9159bb6eafbf2a64199d9936aba02d69038e50fb6158b61bbeb7e2c8dcf38b3",
+      "size_bytes": 169
+    },
+    {
+      "key": "vf/jobs/p2-42436bb4c4a144d8980a-r5/metrics.jsonl/000000000002-fa009614c8824662a2c42cf74e934b84.json",
+      "sha256": "c4a737e7ea42f850ffa02f5114c5f5b6a17216ed784f60620512195a1358090c",
+      "size_bytes": 169
+    },
+    {
+      "key": "vf/jobs/p2-42436bb4c4a144d8980a-r5/metrics.jsonl/000000000003-a99b2066978543d594bb864e82ba13c2.json",
+      "sha256": "fe1503799dfe825a778e9f8e4fc44bd7b588bd8b44c77822160c3abed2b7a8b5",
+      "size_bytes": 169
+    },
+    {
+      "key": "vf/jobs/p2-42436bb4c4a144d8980a-r5/metrics.jsonl/000000000004-1f17ce17c4254c3eb44e466c60e6bd58.json",
+      "sha256": "5283a8c880c22e26b52afd3ee9b6260ad8c81afe75363011edf207c731f17d99",
+      "size_bytes": 169
+    },
+    {
+      "key": "vf/jobs/p2-42436bb4c4a144d8980a-r5/metrics.jsonl/000000000005-a970ba06ba224014950717f44d6b2157.json",
+      "sha256": "3007574b24078e95406942d5a8ed25c57623f071b73aed078ce0604947c05a6a",
+      "size_bytes": 170
+    },
+    {
+      "key": "vf/jobs/p2-42436bb4c4a144d8980a-r5/metrics.jsonl/000000000006-e5d4e250500540e5a545bda5a5cd94d1.json",
+      "sha256": "d3c223b2697e21bdb74db5d1b2d5927a0efbc4aa6e9ff9cbe0425f26a8a5a7f2",
+      "size_bytes": 169
+    },
+    {
+      "key": "vf/jobs/p2-42436bb4c4a144d8980a-r5/metrics.jsonl/000000000007-fcf8f90e333e45cd96b40bbde68d52a7.json",
+      "sha256": "70889be41dd13650236891a8701c4e7f5b4279131da5c58d3f630f7384569c22",
+      "size_bytes": 171
+    },
+    {
+      "key": "vf/jobs/p2-42436bb4c4a144d8980a-r5/metrics.jsonl/000000000008-e1736675b6a54f459da157d672a533fe.json",
+      "sha256": "0444160bbe9dfda7a6dd31c0762f6f5d043c9d80de0cc974ee3fbdf8877860bc",
+      "size_bytes": 170
+    },
+    {
+      "key": "vf/jobs/p2-42436bb4c4a144d8980a-r5/metrics.jsonl/000000000009-7fd73adffed1478da0c54d004d453d97.json",
+      "sha256": "7a537ead04358d0e76cb246ab1f7d80665b2ceb84e27e24f7095ff6b6697da86",
+      "size_bytes": 170
+    },
+    {
+      "key": "vf/jobs/p2-42436bb4c4a144d8980a-r5/metrics.jsonl/000000000010-0976831646384c51b53af07f346bbfbb.json",
+      "sha256": "d59dcae40205e73e0668eb38ac613e53c6dcb15e96870ef6fefda5d48990797e",
+      "size_bytes": 171
+    },
+    {
+      "key": "vf/jobs/p2-42436bb4c4a144d8980a-r5/metrics.jsonl/000000000011-a4a17012ba3a45a395ae9389f2ecbf1b.json",
+      "sha256": "9df5cfbc712f5e3d7f4fa796bceb2862b8d4b06e6108a30263019a32127d7c4b",
+      "size_bytes": 171
+    },
+    {
+      "key": "vf/jobs/p2-42436bb4c4a144d8980a-r5/metrics.jsonl/000000000012-b5219268622a463e8f91942b73b476b1.json",
+      "sha256": "5e20f68e10e8b43a216252b3bf3c6bd2f3105746b493877d95c513c6fac4b9ec",
+      "size_bytes": 171
+    },
+    {
+      "key": "vf/jobs/p2-42436bb4c4a144d8980a-r5/metrics.jsonl/000000000013-63d3cead1a594979af2099293305ff44.json",
+      "sha256": "98a3441f945bff2d0d5a5a2b470aa7b2c60abc9ff92a01bfdead50b0d38bfff0",
+      "size_bytes": 171
+    },
+    {
+      "key": "vf/jobs/p2-42436bb4c4a144d8980a-r5/metrics.jsonl/000000000014-28c510fac41a47a19e90b07742ed9722.json",
+      "sha256": "1e74f5c6bea4e79b13ef22d8282fbd2e58c569440f2ed62af5f03564fa77521f",
+      "size_bytes": 170
+    },
+    {
+      "key": "vf/jobs/p2-42436bb4c4a144d8980a-r5/metrics.jsonl/000000000015-e321c78cc56540dfbea4538603b143f2.json",
+      "sha256": "530a2e993722ba719bf577b71799cc5ee30c8a7e40a87cf69b638cc3314b46d9",
+      "size_bytes": 170
+    },
+    {
+      "key": "vf/jobs/p2-42436bb4c4a144d8980a-r5/metrics.jsonl/000000000016-8f658bdf1bc544c595ae5fd325896137.json",
+      "sha256": "0bb62dc6ab32e0d8b6fd394c6b1ac1bb6d45e5e4e695076ff70e6331638c3a31",
+      "size_bytes": 157
+    },
+    {
+      "key": "vf/jobs/p2-42436bb4c4a144d8980a-r5/metrics.jsonl/000000000017-5ff71d6a76dd406e9bed56cebf8e7d97.json",
+      "sha256": "8d5d493a08f525a193191d718fdc87c452296f643f9f1fa1c7b8f1ef07c4473d",
+      "size_bytes": 171
+    },
+    {
+      "key": "vf/jobs/p2-42436bb4c4a144d8980a-r5/metrics.jsonl/000000000018-c6323b6e14cf40fea2cf314c79549493.json",
+      "sha256": "7c048c0b5ce07d8cc91f79a223dfcb69a8d075e668cdc2028b4d95f168bc8eb5",
+      "size_bytes": 171
+    },
+    {
+      "key": "vf/jobs/p2-42436bb4c4a144d8980a-r5/metrics.jsonl/000000000019-a116085e2d284a92a19115d7dc17aaf0.json",
+      "sha256": "e58f717bc5644dc7407320114a44257ab8af8e9ed73095bf9fbd706b251b683d",
+      "size_bytes": 160
+    },
+    {
+      "key": "vf/jobs/p2-42436bb4c4a144d8980a-r5/metrics.jsonl/000000000020-1a0b7d0fdea740c1b20de518a994d621.json",
+      "sha256": "e33d28b6b7a4e7c87520ce6fc16959efcde4452a04d79c0647e212384b715477",
+      "size_bytes": 171
+    },
+    {
+      "key": "vf/jobs/p2-42436bb4c4a144d8980a-r5/metrics.jsonl/000000000021-9a621854876348eebce6fefd85611478.json",
+      "sha256": "1e884deac27fede8499947519c96b40a0c2326b423e7b2ad15bac0779a749e47",
+      "size_bytes": 162
+    },
+    {
+      "key": "vf/jobs/p2-42436bb4c4a144d8980a-r5/metrics.jsonl/000000000022-836e03faf50e4b9a9a0fd49fb59ce14a.json",
+      "sha256": "ab87e80e9ac08dbb41c5a38eb00d7b6a54c7bc2601e7d3843e5a5af35e6d1a78",
+      "size_bytes": 169
+    },
+    {
+      "key": "vf/jobs/p2-42436bb4c4a144d8980a-r5/metrics.jsonl/000000000023-1b5bbb2dd46043deb7bcc6402a0adaed.json",
+      "sha256": "cb385f879ca6788b3fba782ac99ffe001aef319ebb40fd8ac5437ac9df49a0b8",
+      "size_bytes": 170
+    },
+    {
+      "key": "vf/jobs/p2-42436bb4c4a144d8980a-r5/metrics.jsonl/000000000024-5a365519ee0d41cb974c8ff970861e4e.json",
+      "sha256": "ed0af6762c4842addee5957f7432ab392326eb8e065e4a953635be8a166e544e",
+      "size_bytes": 162
+    },
+    {
+      "key": "vf/jobs/p2-42436bb4c4a144d8980a-r5/metrics.jsonl/000000000025-2f42ebfe3f67414aa024342a6a2a9a62.json",
+      "sha256": "b82947d53cd0a3fb7fce43349865b599e4b3f3a963deaf6eb7cd8aa22c2fd4d8",
+      "size_bytes": 169
+    },
+    {
+      "key": "vf/jobs/p2-42436bb4c4a144d8980a-r5/metrics.jsonl/000000000026-f700d9c8d1e6451b8f8158a796898a43.json",
+      "sha256": "b3bb0837ed37face38b15c9d7deb4700c52002ce02382eafc75c78826de27789",
+      "size_bytes": 171
+    },
+    {
+      "key": "vf/jobs/p2-42436bb4c4a144d8980a-r5/metrics.jsonl/000000000027-a0b64afd80c542db9f22da2ab1fd4a9d.json",
+      "sha256": "0e004f54fb27c78082bbcac647267fd4216bfb1328679b47e3a16bcc78b08e96",
+      "size_bytes": 161
+    },
+    {
+      "key": "vf/jobs/p2-42436bb4c4a144d8980a-r5/metrics.jsonl/000000000028-7fac9aa056304f52a86441973ae996ad.json",
+      "sha256": "46c71d6a3659515051caca4b53dd899c29c290de86a906f9c1261d67db637a36",
+      "size_bytes": 170
+    },
+    {
+      "key": "vf/jobs/p2-42436bb4c4a144d8980a-r5/metrics.jsonl/000000000029-110fe0b03f464844a2a868d63378061a.json",
+      "sha256": "9aa20f66ec45636a093e7febcd6e41b0b485f37ee29e85818239697c4624add7",
+      "size_bytes": 170
+    },
+    {
+      "key": "vf/jobs/p2-42436bb4c4a144d8980a-r5/metrics.jsonl/000000000030-de12117daa6a4d569eaef730d201ed02.json",
+      "sha256": "2b2d845b0a3651f751d95b38144211c9f3b646d0a60b091bbcab8c0723f41dde",
+      "size_bytes": 168
+    },
+    {
+      "key": "vf/jobs/p2-42436bb4c4a144d8980a-r5/metrics.jsonl/000000000031-3233294dd5ce4af2beaa486a17170711.json",
+      "sha256": "7cb1267c06adf8dd86580ffaae45586b20dbceb39372ffed316b2d5fafd31993",
+      "size_bytes": 171
+    },
+    {
+      "key": "vf/jobs/p2-42436bb4c4a144d8980a-r5/metrics.jsonl/000000000032-4ed32081f0344f62987769dbe657c5a8.json",
+      "sha256": "3fd50704c959eda631f1a7edf04382bc52df2e919be5b1cd83ed1159883d8533",
+      "size_bytes": 172
+    },
+    {
+      "key": "vf/jobs/p2-42436bb4c4a144d8980a-r5/metrics.jsonl/000000000033-eef0db1c6bc040b68c91ce61158b94c8.json",
+      "sha256": "1aa67d1ee363b80bf1d12a9a650f6939ee3a0351a7cb229b18f95406b917a788",
+      "size_bytes": 170
+    },
+    {
+      "key": "vf/jobs/p2-42436bb4c4a144d8980a-r5/metrics.jsonl/000000000034-b87b0069e9b84e80b18dae9d1649acec.json",
+      "sha256": "9050b212a981cf64d7b21dff96501838e5bc96c9d2fab85cb84bf3f29c7660ad",
+      "size_bytes": 168
+    },
+    {
+      "key": "vf/jobs/p2-42436bb4c4a144d8980a-r5/metrics.jsonl/000000000035-b01de76d20894be8a4db1378af56e34f.json",
+      "sha256": "8d4e879aa57a7b424f63b9c9b417befe6a213dae0d5c37b8e1d38637dd1f7816",
+      "size_bytes": 170
+    },
+    {
+      "key": "vf/jobs/p2-42436bb4c4a144d8980a-r5/metrics.jsonl/000000000036-32535998b7424e91a84155d2d686c18e.json",
+      "sha256": "fa59fb5cc98dc231e1f8d21a7af3e1c775b22b2c88a75412f2e933d3583005d0",
+      "size_bytes": 171
+    },
+    {
+      "key": "vf/jobs/p2-42436bb4c4a144d8980a-r5/metrics.jsonl/000000000037-79f8eef3fc4e4231afffe12ff4cc88fe.json",
+      "sha256": "b46ddc9af0a26934e1e2f5cefbfacfecad86e6d0eef8a83e2f245ffed15f7997",
+      "size_bytes": 171
+    },
+    {
+      "key": "vf/jobs/p2-42436bb4c4a144d8980a-r5/metrics.jsonl/000000000038-f5cfdfca4cba4000b25099bd0dee402b.json",
+      "sha256": "32e2bcb2f16ebdf1ed3d515c13b176b2d443facf8da7d024177fda27cf89fea0",
+      "size_bytes": 171
+    },
+    {
+      "key": "vf/jobs/p2-42436bb4c4a144d8980a-r5/metrics.jsonl/000000000039-8f335087d783456ebf8b26a53111d3b7.json",
+      "sha256": "ce46d5ca51bde1758163cd4d9848f671fbaf60799104acc6fe87cb4e5eaf1695",
+      "size_bytes": 171
+    },
+    {
+      "key": "vf/jobs/p2-42436bb4c4a144d8980a-r5/metrics.jsonl/000000000040-04beb2c215094579a5f2097daae1530c.json",
+      "sha256": "6eaca25eef8363597373ea4e6754b31e11985ddfa59819712e4860ab288a2e74",
+      "size_bytes": 171
+    },
+    {
+      "key": "vf/jobs/p2-42436bb4c4a144d8980a-r5/metrics.jsonl/000000000041-7b5e25d372d7463fb571104662e06929.json",
+      "sha256": "c557bc1ce4a3f21375d394d60451df2a64548daaf05a1d5736e7536e05416986",
+      "size_bytes": 170
+    },
+    {
+      "key": "vf/jobs/p2-42436bb4c4a144d8980a-r5/metrics.jsonl/000000000042-e29939279a6c47358f42cedbcf8b0eea.json",
+      "sha256": "5ec087dae5a5c85e839e8a314df5f8d52b1f3a124c72e752971600b0db727f9e",
+      "size_bytes": 169
+    },
+    {
+      "key": "vf/jobs/p2-42436bb4c4a144d8980a-r5/metrics.jsonl/000000000043-ec3f2815e18040a490464efd22dd3e7a.json",
+      "sha256": "42c718b0ab2f635a90bd8f09f120d738f095589d2afdd1c084b978b66765bed3",
+      "size_bytes": 170
+    },
+    {
+      "key": "vf/jobs/p2-42436bb4c4a144d8980a-r5/metrics.jsonl/000000000044-46a7b5983bdc4731b98cb1ddbb322858.json",
+      "sha256": "b63d78a88479e517f68bbc529279eb703a9097c4305ebdaabae46743925cb0fc",
+      "size_bytes": 171
+    },
+    {
+      "key": "vf/jobs/p2-42436bb4c4a144d8980a-r5/metrics.jsonl/000000000045-434abb97fbe941a0b787cbc683a24603.json",
+      "sha256": "d810f66aa8ac7079cfd8a2fbf3847bb23f106f04a519e8852703b8a81dd2d2b9",
+      "size_bytes": 172
+    },
+    {
+      "key": "vf/jobs/p2-42436bb4c4a144d8980a-r5/metrics.jsonl/000000000046-8fe7850e6c964cebbac7bd63fb156991.json",
+      "sha256": "2e218d5b273a251e08ad4f3cded29f9be868d5afd43e8fa779eb45c247749bc3",
+      "size_bytes": 170
+    },
+    {
+      "key": "vf/jobs/p2-42436bb4c4a144d8980a-r5/metrics.jsonl/000000000047-c3a0ad009a7d4d0f8c51d609e227b2b4.json",
+      "sha256": "9ca97c44e00f3d9a902ccf024d52bf6660ee15cf8485ddc764ff6399c9890eed",
+      "size_bytes": 171
+    },
+    {
+      "key": "vf/jobs/p2-42436bb4c4a144d8980a-r5/metrics.jsonl/000000000048-3d7938ef99594732a49aaa3b3ed7bacf.json",
+      "sha256": "9a33caf905b1d536dafc86e32fc13a526e27ec8b3879dc745c475012eeaf0e15",
+      "size_bytes": 171
+    },
+    {
+      "key": "vf/jobs/p2-42436bb4c4a144d8980a-r5/metrics.jsonl/000000000049-01e6464b1a8a40c3aa8a60cac4724eb2.json",
+      "sha256": "65549770c1dfb4cd608e6e13bc8c2b817a297aea23daaeff5730b55e408a9f97",
+      "size_bytes": 171
+    },
+    {
+      "key": "vf/jobs/p2-42436bb4c4a144d8980a-r5/metrics.jsonl/000000000050-0a07b646ba7b4e0fa657cfedcb5e7cfe.json",
+      "sha256": "9f3b7bf6445da0c6dcd38a16dd89885fe0e10e55df6ee7c1888cea487e93750f",
+      "size_bytes": 171
+    },
+    {
+      "key": "vf/jobs/p2-42436bb4c4a144d8980a-r5/metrics.jsonl/000000000051-b82b23b5c72c4efe83c6e864a10b61cd.json",
+      "sha256": "249da19f2dba36afba002f9bfe238732c7786db28ee0ad8443cdb50ea5156c01",
+      "size_bytes": 170
+    },
+    {
+      "key": "vf/jobs/p2-42436bb4c4a144d8980a-r5/metrics.jsonl/000000000052-957b7fd91a254d2f84dda4756100d7bb.json",
+      "sha256": "d037b0ba56bb016954f6a169c520b9e8517969438ee142d4d94e8a9099df0de1",
+      "size_bytes": 170
+    },
+    {
+      "key": "vf/jobs/p2-42436bb4c4a144d8980a-r5/metrics.jsonl/000000000053-c9a7603518ac42b4a126737feee52d4f.json",
+      "sha256": "0a5a1420a4d9250fb83e78ba1a71e7e650e118ecff7b12526516625e92b75cbd",
+      "size_bytes": 160
+    },
+    {
+      "key": "vf/jobs/p2-42436bb4c4a144d8980a-r5/metrics.jsonl/000000000054-c1f9321bbc6543e0addd19962998dc23.json",
+      "sha256": "4314708548a51d4fafb120e3c94f5f6607e812e4e1fec87d506167c184318982",
+      "size_bytes": 171
+    },
+    {
+      "key": "vf/jobs/p2-42436bb4c4a144d8980a-r5/metrics.jsonl/000000000055-373f7a9589b5468c964083d27964fe4f.json",
+      "sha256": "d9d300527de26e1bd8ebbe9eae163aae03b4b74b34a659ba74a45b59877640b0",
+      "size_bytes": 172
+    },
+    {
+      "key": "vf/jobs/p2-42436bb4c4a144d8980a-r5/metrics.jsonl/000000000056-038222bdabb0485c908d8f1c70ba7440.json",
+      "sha256": "670313f0d32bc563ecbcbce94eb624a0618d77408f97ed577cefdd5d71324584",
+      "size_bytes": 171
+    },
+    {
+      "key": "vf/jobs/p2-42436bb4c4a144d8980a-r5/metrics.jsonl/000000000057-ec9c40dcf72c40bb9755745c796a0eb8.json",
+      "sha256": "ed70cd1342140dc69ac4b143ddfdcd6fd5eb65e9c93da7ea5f14684a0dce40aa",
+      "size_bytes": 170
+    },
+    {
+      "key": "vf/jobs/p2-42436bb4c4a144d8980a-r5/metrics.jsonl/000000000058-0362e19a600044d585a823297c36a838.json",
+      "sha256": "cfd22c02dfb7a29f5850b1e9fd269782e32417a529096a8ca33c70a41d555d55",
+      "size_bytes": 161
+    },
+    {
+      "key": "vf/jobs/p2-42436bb4c4a144d8980a-r5/metrics.jsonl/000000000059-78063c4676fd4142a4236142794a4a95.json",
+      "sha256": "f67bf81c265e034d16ca12d9053b690c2bdf8c858b7ca58161f1898de5eca945",
+      "size_bytes": 171
+    },
+    {
+      "key": "vf/jobs/p2-42436bb4c4a144d8980a-r5/metrics.jsonl/000000000060-f8d3dc7a764d4895a8746c45c63abd2d.json",
+      "sha256": "fe0c6ea5cdeb85fe38649bc10db9cace6ee895946ab076cb43f8345cabca81de",
+      "size_bytes": 170
+    },
+    {
+      "key": "vf/jobs/p2-42436bb4c4a144d8980a-r5/metrics.jsonl/000000000061-0952d7442d85482ab11d5429afb9a2f1.json",
+      "sha256": "fb36def3ecc6c9d77efb8663791f0aedf9b06573077fe4e82b6d41f78c22e856",
+      "size_bytes": 170
+    },
+    {
+      "key": "vf/jobs/p2-42436bb4c4a144d8980a-r5/metrics.jsonl/000000000062-f1f50a058c2d4f16a45b8193c78a1501.json",
+      "sha256": "fcb7cc742fad3fcdd1e12a955bd993c07b64d6284de64d9149dfd13d16a8082e",
+      "size_bytes": 170
+    },
+    {
+      "key": "vf/jobs/p2-42436bb4c4a144d8980a-r5/metrics.jsonl/000000000063-64abbbc0f3af4d53ab0981185d0041d4.json",
+      "sha256": "2208cd4875b34322f5b3de8e1109cd671ea37a11da13c079824b50c6129982bf",
+      "size_bytes": 170
+    },
+    {
+      "key": "vf/jobs/p2-42436bb4c4a144d8980a-r5/metrics.jsonl/000000000064-f2d1ff3fdac24ada9c39be9cb0f33a32.json",
+      "sha256": "edcfdb7bdad8169e72d934fe15d9586c56da2c658a153984d98c6c6115b0c576",
+      "size_bytes": 161
+    },
+    {
+      "key": "vf/jobs/p2-42436bb4c4a144d8980a-r5/metrics.jsonl/000000000065-bffe89eb4b68478597c37a3f31c8e3da.json",
+      "sha256": "3081d574fa9e36d27917179a47cd34ad57ffdb0c7e88963c24af3e117691da15",
+      "size_bytes": 170
+    },
+    {
+      "key": "vf/jobs/p2-42436bb4c4a144d8980a-r5/metrics.jsonl/000000000066-3e39b8db64d54c5893a43289837a39fe.json",
+      "sha256": "707dca499eab0cf5e587bd91a3bccfcf3a224ce6c4f5c901e85b07e7886f8bac",
+      "size_bytes": 161
+    },
+    {
+      "key": "vf/jobs/p2-42436bb4c4a144d8980a-r5/metrics.jsonl/000000000067-6af7ae23d5314d969585d12f9d24dcb0.json",
+      "sha256": "41ee8b25cdd9e970f3ce0aadfa08a0a8ac5e9787657a0b773b34fd09a39bb3a0",
+      "size_bytes": 172
+    },
+    {
+      "key": "vf/jobs/p2-42436bb4c4a144d8980a-r5/metrics.jsonl/000000000068-15acb46f09ad45a7970d56fd6eaeb3e1.json",
+      "sha256": "516dcb412bd7dcec96ff162be6f7e04ece3d5d25b14f1cff10f7fac9a4eb5ffa",
+      "size_bytes": 170
+    },
+    {
+      "key": "vf/jobs/p2-42436bb4c4a144d8980a-r5/metrics.jsonl/000000000069-5962a94bbf664311971d23b579398544.json",
+      "sha256": "136be943cf257090c6e7b7cbc355ee7d0a98bb99f5eb9ba788dc39446b5fc21e",
+      "size_bytes": 171
+    },
+    {
+      "key": "vf/jobs/p2-42436bb4c4a144d8980a-r5/metrics.jsonl/000000000070-83c436a6beb3401bae262041fc047e63.json",
+      "sha256": "01a7da8b31c7f79dcb3dc893eb431dc372c4d413738d99bded4b7cd8456e52ca",
+      "size_bytes": 162
+    },
+    {
+      "key": "vf/jobs/p2-42436bb4c4a144d8980a-r5/metrics.jsonl/000000000071-246bc0a4f6d44fcbb5fd9fff9b736c9c.json",
+      "sha256": "7fcff011853d61efdf4b48373a5ffa9b9c99239356e26440a0c879c79e8f6bfd",
+      "size_bytes": 171
+    },
+    {
+      "key": "vf/jobs/p2-42436bb4c4a144d8980a-r5/metrics.jsonl/000000000072-53ca566bf38543c9955564d2c54bbb01.json",
+      "sha256": "b221ed13d5400c4f64c689cf142183196fff1a857a7922e727da5f5d10b3fc1e",
+      "size_bytes": 171
+    },
+    {
+      "key": "vf/jobs/p2-42436bb4c4a144d8980a-r5/metrics.jsonl/000000000073-1ae6bcd56d014c25b211bcc52d03ce4d.json",
+      "sha256": "06e4afdb027d3ad8f2e501336b9d1d334e63a1b8ead09d8e1d11a316024ebff6",
+      "size_bytes": 170
+    },
+    {
+      "key": "vf/jobs/p2-42436bb4c4a144d8980a-r5/metrics.jsonl/000000000074-f4bce49521ca4bbbb6d43037a6c23335.json",
+      "sha256": "fc03a4f993eb82f9ba89a011de77890407a0387d61500dd9a0978e0bacd3f1b2",
+      "size_bytes": 171
+    },
+    {
+      "key": "vf/jobs/p2-42436bb4c4a144d8980a-r5/metrics.jsonl/000000000075-df9c500ae63046ffb40d1fb7e4584487.json",
+      "sha256": "6e32ad342db7ec8a57ed8bec0710ac2e01cc36acde72cbcff4b84b26ad0b6c73",
+      "size_bytes": 171
+    },
+    {
+      "key": "vf/jobs/p2-42436bb4c4a144d8980a-r5/metrics.jsonl/000000000076-6072187b8c524a82a2086a214f3ab373.json",
+      "sha256": "e55a38f408575f84704513b995b5008dbb28ba75167522af794140275a4a40c3",
+      "size_bytes": 171
+    },
+    {
+      "key": "vf/jobs/p2-42436bb4c4a144d8980a-r5/metrics.jsonl/000000000077-87dd64474de34bbe8119b5865eb2a2e3.json",
+      "sha256": "d38bd7a682b63546d048829795ab0efa6b4b48911eb5499cc34abefa43ff831a",
+      "size_bytes": 172
+    },
+    {
+      "key": "vf/jobs/p2-42436bb4c4a144d8980a-r5/metrics.jsonl/000000000078-bae87678b98242e4a7bb61b6294354c1.json",
+      "sha256": "24b04e8aa01190e6b62887c1153eaf4e58a02195ff090ab97e0ae70eab0a71a6",
+      "size_bytes": 169
+    },
+    {
+      "key": "vf/jobs/p2-42436bb4c4a144d8980a-r5/metrics.jsonl/000000000079-63a6379b402b4d878d950301994d28c0.json",
+      "sha256": "639cc4f3e06b67e8a102f03ea6f1862b736c3d29dbff236be00b7e96a818aa05",
+      "size_bytes": 159
+    },
+    {
+      "key": "vf/jobs/p2-42436bb4c4a144d8980a-r5/metrics.jsonl/000000000080-f4103bc24ab8413e829492ffd1b96620.json",
+      "sha256": "199edc44a4d9a59dd02b46c8ab6be97895d3acb29da099c7d2ff1cb991d8e0f9",
+      "size_bytes": 171
+    },
+    {
+      "key": "vf/jobs/p2-42436bb4c4a144d8980a-r5/metrics.jsonl/000000000081-7dc8d5761e244f758908643e5fc29716.json",
+      "sha256": "a70f45b4a4804ab1c00fd69d7826908da8278b56afd5ac3accb505718547a809",
+      "size_bytes": 170
+    },
+    {
+      "key": "vf/jobs/p2-42436bb4c4a144d8980a-r5/metrics.jsonl/000000000082-897587606b40403d997b31c96e4f417d.json",
+      "sha256": "4e8fe4d9ffb2db4e98c11635ac51bb25aead7cb590257558e0b44df56c9770bc",
+      "size_bytes": 171
+    },
+    {
+      "key": "vf/jobs/p2-42436bb4c4a144d8980a-r5/metrics.jsonl/000000000083-318581881fa64c3eaa39ac537e964aee.json",
+      "sha256": "e93ee1384d6c3fd3d6b472c5464cab6214498cd2d6613698a2251534320955bd",
+      "size_bytes": 171
+    },
+    {
+      "key": "vf/jobs/p2-42436bb4c4a144d8980a-r5/metrics.jsonl/000000000084-263bc0644abf463e974e9513522f093f.json",
+      "sha256": "77448ea92ba7b19c9acb711bd74821f25f4dfd8691abebc69f3843b5ace82534",
+      "size_bytes": 170
+    },
+    {
+      "key": "vf/jobs/p2-42436bb4c4a144d8980a-r5/metrics.jsonl/000000000085-a03e10d9d780443b805e102b3374a548.json",
+      "sha256": "2103c3c6101c0a76dcd64ec1ed4459fd2e2b61bc87556e30d98c4e1c6f151319",
+      "size_bytes": 169
+    },
+    {
+      "key": "vf/jobs/p2-42436bb4c4a144d8980a-r5/metrics.jsonl/000000000086-c8ffe0b4c2e647c989e9f7d885419aef.json",
+      "sha256": "41d6a7db13631ebcc35e0da2e0e5f685e614a58144b8490069f9c97a09533e07",
+      "size_bytes": 172
+    },
+    {
+      "key": "vf/jobs/p2-42436bb4c4a144d8980a-r5/metrics.jsonl/000000000087-2ecaee48a21241cdaa927f77d1be4d48.json",
+      "sha256": "365a6d8c15c4316bc805a444d491f18cd240d49ae10cdb2f0b60d5c261b5e09e",
+      "size_bytes": 170
+    },
+    {
+      "key": "vf/jobs/p2-42436bb4c4a144d8980a-r5/metrics.jsonl/000000000088-abc2879f7c404ef7b1d394363d0eb471.json",
+      "sha256": "30d2a1684b89a2bdee14921f72e334cef56b1bd2e34e53988ba16ff9ad051db8",
+      "size_bytes": 170
+    },
+    {
+      "key": "vf/jobs/p2-42436bb4c4a144d8980a-r5/metrics.jsonl/000000000089-667dee7899154c19bf9ebf422f1e0037.json",
+      "sha256": "b16dbf39d9175086384a53e8e639c76b6b4f3470ce9694ba38a826628f3c9236",
+      "size_bytes": 170
+    },
+    {
+      "key": "vf/jobs/p2-42436bb4c4a144d8980a-r5/metrics.jsonl/000000000090-1bd012063b144b5eb066f331d1e28585.json",
+      "sha256": "718e93787f50129cb8d38afc3bebaa139400ef06cc8cba18666571ffdb479a93",
+      "size_bytes": 170
+    },
+    {
+      "key": "vf/jobs/p2-42436bb4c4a144d8980a-r5/metrics.jsonl/000000000091-56bc78407af44847b9d59edbe4d5bd4b.json",
+      "sha256": "f079cf75754af01b78a2dafac3b71a4617f353d016db162f080791375656c122",
+      "size_bytes": 171
+    },
+    {
+      "key": "vf/jobs/p2-42436bb4c4a144d8980a-r5/metrics.jsonl/000000000092-eacff48fb3034a53aa4662199a4698b8.json",
+      "sha256": "d1d42570092917021b7c1de8196772afc6a061c76f4d6fc734b4b9e96afbc2a7",
+      "size_bytes": 171
+    },
+    {
+      "key": "vf/jobs/p2-42436bb4c4a144d8980a-r5/metrics.jsonl/000000000093-63f01629dd1f47b2910aff7540e0739a.json",
+      "sha256": "11d8f0ae09c7adbac2f8dfadd245aded2c3d3b8075cc01d13b8809e229dba558",
+      "size_bytes": 172
+    },
+    {
+      "key": "vf/jobs/p2-42436bb4c4a144d8980a-r5/metrics.jsonl/000000000094-e3cc160aa32641089a6dc0490f7a7cf5.json",
+      "sha256": "19501e4253748c705870d3d8c334cc67cf5eb90fc95c1511de98b41f934d2da8",
+      "size_bytes": 171
+    },
+    {
+      "key": "vf/jobs/p2-42436bb4c4a144d8980a-r5/metrics.jsonl/000000000095-daa4dd12ab4149d7b4c35dc00ec388a2.json",
+      "sha256": "fea4de9264795faccf187fcbb5470750936b066137a947cabfe2a16efff41fbb",
+      "size_bytes": 159
+    },
+    {
+      "key": "vf/jobs/p2-42436bb4c4a144d8980a-r5/metrics.jsonl/000000000096-dbafaa04d85c416badf51085ff60e03f.json",
+      "sha256": "14d41e7c2a8c749de2a805b8acd53aad3e928f125ab02826430cd9cd45d7c2e7",
+      "size_bytes": 171
+    },
+    {
+      "key": "vf/jobs/p2-42436bb4c4a144d8980a-r5/metrics.jsonl/000000000097-10ff46651d834d02bc62a3554b3a60c6.json",
+      "sha256": "bbc2981384346ccbcbd0a0506ad9213a1d81e43a64ae9f1c142d791b0acc11e6",
+      "size_bytes": 170
+    },
+    {
+      "key": "vf/jobs/p2-42436bb4c4a144d8980a-r5/metrics.jsonl/000000000098-59bc694dec9b4c18abbc0e1adc0617ae.json",
+      "sha256": "93db2077c1b84a163b5f428b7c81382460b2ebead9a6376469ea618c4088790b",
+      "size_bytes": 170
+    },
+    {
+      "key": "vf/jobs/p2-42436bb4c4a144d8980a-r5/metrics.jsonl/000000000099-54bd685f39644b9c8be281495e492bd5.json",
+      "sha256": "7253a9771b3b4d6a0cadf44fd395e177b9ac55707ee3a6c786bbc4e4716d824d",
+      "size_bytes": 171
+    },
+    {
+      "key": "vf/jobs/p2-42436bb4c4a144d8980a-r5/metrics.jsonl/000000000100-b26ed38f2dda4ee8a6fc0da936bb6a30.json",
+      "sha256": "9886b7a1b255d3b2054e246cade44630cc52988a39465d6766fa98e64e38d195",
+      "size_bytes": 171
+    }
+  ],
+  "prefix": "vf/jobs/p2-42436bb4c4a144d8980a-r5",
+  "serving_evidence": {
+    "file": {
+      "key": "vf/jobs/p2-42436bb4c4a144d8980a-r5/artifacts/.tmp/d1f529b6c049407bb8352368b9e0507c/serveability/step_100.json/step_100.json",
+      "sha256": "1756783619fc4193e1273fa7cf89bef2b03d285b731f8724f5cde3ffcea0d526",
+      "size_bytes": 17260
+    },
+    "local_path": "runs/provisioning/v0.28.2/p2-42436bb4c4a144d8980a-r5/collected/serveability-step-100.json",
+    "manifest": {
+      "key": "vf/jobs/p2-42436bb4c4a144d8980a-r5/artifacts/serveability/step_100.json.manifest.json",
+      "sha256": "d335c0e7ba4fe3ead1a76db59e4226953a24a145762b664a4609bf7b500c7a56",
+      "size_bytes": 333
+    }
+  },
+  "snapshot": {
+    "candidate_steps": [
+      50,
+      100
+    ],
+    "checkpoint_ready": true,
+    "curve_ready": true,
+    "failure_ready": false,
+    "final_model_ready": true,
+    "latest_step": 100,
+    "metric_count": 100,
+    "serving_evidence_ready": true
+  }
+}

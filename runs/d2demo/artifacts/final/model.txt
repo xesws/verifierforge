@@ -1,0 +1,8 @@
+job_id: d2demo
+model: Qwen/Qwen2.5-0.5B-Instruct
+completed_step: 100
+storage_checkpoint: runs/d2demo/ckpt/step_100/global_step_100
+checkpoint_contents: model, optimizer, extra
+generated_at: 2026-07-15T11:35:24.956372+00:00
+config: {'model_path': 'Qwen/Qwen2.5-0.5B-Instruct', 'total_steps': 100, 'train_batch_size': 4, 'rollout_n': 8, 'max_prompt_length': 1024, 'max_response_length': 512, 'lora_rank': 16, 'lora_alpha': 32, 'learning_rate': 1e-06, 'kl_loss_coef': 0.001, 'rollout_gpu_memory_utilization': 0.4, 'checkpoint_every': 50, 'validation_every': 10}
+weights remain in ckpt/ and are intentionally not synced by vf watch.

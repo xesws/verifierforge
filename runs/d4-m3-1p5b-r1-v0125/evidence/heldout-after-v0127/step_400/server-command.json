@@ -1,0 +1,22 @@
+{
+  "command": [
+    "/workspace/verifierforge/.venv/bin/vllm",
+    "serve",
+    "runs/d4-m3-1p5b-r1-v0125/ckpt/step_400/global_step_400/actor/serveable_huggingface",
+    "--served-model-name",
+    "vf-heldout-step-400",
+    "--host",
+    "127.0.0.1",
+    "--port",
+    "8018",
+    "--dtype",
+    "bfloat16",
+    "--gpu-memory-utilization",
+    "0.45",
+    "--tensor-parallel-size",
+    "1",
+    "--disable-log-stats"
+  ],
+  "model_name": "vf-heldout-step-400",
+  "port": 8018
+}

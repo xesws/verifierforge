@@ -1,0 +1,128 @@
+UTC=20260716T192034Z
+
+=== tmux/process state ===
+
+--- PGID marker ---
+10108
+
+--- matching processes ---
+10104 tmux new-session -d -s p0-w2-diag-v0111 cd "/workspace/verifierforge" && exec setsid bash -c 'printf "%s\n" "$$" > "runs/p0-w2-diag-v0111/pgid"; exec bash trainer/launch.sh "p0-w2-diag-v0111" "grpo_v1_1p5b_blackwell_smoke"' 2>&1 | tee "runs/p0-w2-diag-v0111/train.log"
+10105 bash -c cd "/workspace/verifierforge" && exec setsid bash -c 'printf "%s\n" "$$" > "runs/p0-w2-diag-v0111/pgid"; exec bash trainer/launch.sh "p0-w2-diag-v0111" "grpo_v1_1p5b_blackwell_smoke"' 2>&1 | tee "runs/p0-w2-diag-v0111/train.log"
+10108 .venv/bin/python -m trainer.grpo_train --job p0-w2-diag-v0111 --config grpo_v1_1p5b_blackwell_smoke
+10109 tee runs/p0-w2-diag-v0111/train.log
+10175 /workspace/verifierforge/.venv/bin/python -m verl.trainer.main_ppo model_engine=dp algorithm.adv_estimator=grpo algorithm.use_kl_in_reward=False data.train_files=/workspace/verifierforge/runs/p0-w2-diag-v0111/input/train.parquet data.val_files=/workspace/verifierforge/runs/p0-w2-diag-v0111/input/validation.parquet data.prompt_key=prompt data.return_raw_chat=True data.shuffle=False data.seed=42 data.filter_overlong_prompts=True data.truncation=error data.train_batch_size=4 data.val_batch_size=1 data.max_prompt_length=1024 data.max_response_length=512 actor_rollout_ref.model.path=Qwen/Qwen2.5-1.5B-Instruct +actor_rollout_ref.model.override_config.attn_implementation=sdpa actor_rollout_ref.model.use_remove_padding=True actor_rollout_ref.model.enable_gradient_checkpointing=True actor_rollout_ref.model.lora_rank=16 actor_rollout_ref.model.lora_alpha=32 actor_rollout_ref.model.target_modules=all-linear actor_rollout_ref.actor.strategy=fsdp actor_rollout_ref.actor.optim.lr=1e-06 actor_rollout_ref.actor.ppo_mini_batch_size=4 actor_rollout_ref.actor.ppo_micro_batch_size_per_gpu=1 actor_rollout_ref.actor.use_dynamic_bsz=True actor_rollout_ref.actor.ppo_max_token_len_per_gpu=16384 actor_rollout_ref.actor.use_kl_loss=True actor_rollout_ref.actor.kl_loss_coef=0.001 actor_rollout_ref.actor.kl_loss_type=low_var_kl actor_rollout_ref.actor.fsdp_config.param_offload=False actor_rollout_ref.actor.fsdp_config.optimizer_offload=False actor_rollout_ref.actor.checkpoint.save_contents=['model','optimizer','extra'] actor_rollout_ref.rollout.name=vllm actor_rollout_ref.rollout.tensor_model_parallel_size=1 actor_rollout_ref.rollout.gpu_memory_utilization=0.5 actor_rollout_ref.rollout.n=8 actor_rollout_ref.rollout.temperature=1.0 actor_rollout_ref.rollout.top_p=1.0 actor_rollout_ref.rollout.top_k=-1 actor_rollout_ref.rollout.max_num_batched_tokens=8192 actor_rollout_ref.rollout.enable_chunked_prefill=True actor_rollout_ref.rollout.free_cache_engine=True actor_rollout_ref.rollout.load_format=auto actor_rollout_ref.rollout.val_kwargs.n=1 actor_rollout_ref.rollout.val_kwargs.temperature=0 actor_rollout_ref.rollout.val_kwargs.top_p=1.0 actor_rollout_ref.rollout.val_kwargs.top_k=-1 actor_rollout_ref.rollout.val_kwargs.do_sample=False actor_rollout_ref.ref.fsdp_config.param_offload=True actor_rollout_ref.ref.log_prob_use_dynamic_bsz=True actor_rollout_ref.ref.log_prob_max_token_len_per_gpu=16384 reward.reward_manager.name=naive reward.num_workers=1 reward.custom_reward_function.path=/workspace/verifierforge/trainer/grpo_reward.py reward.custom_reward_function.name=compute_score trainer.project_name=verifierforge_d2 trainer.experiment_name=p0-w2-diag-v0111 trainer.logger=['console','file'] trainer.nnodes=1 trainer.n_gpus_per_node=1 trainer.total_training_steps=30 trainer.total_epochs=10 trainer.val_before_train=True trainer.save_freq=10 trainer.test_freq=10 trainer.default_local_dir=/workspace/verifierforge/runs/p0-w2-diag-v0111/.verl-staging trainer.default_hdfs_dir=null trainer.resume_mode=disable
+10315 bash -s -- p0-w2-diag-v0111
+10317 bash -s -- p0-w2-diag-v0111
+10318 tee runs/p0-w2-diag-v0111/evidence/20260716T192034Z-logs-and-state.txt
+
+=== verl driver/train log: last 100 ===
+Starting p0-w2-diag-v0111 from scratch
+Launching: /workspace/verifierforge/.venv/bin/python -m verl.trainer.main_ppo model_engine=dp algorithm.adv_estimator=grpo algorithm.use_kl_in_reward=False data.train_files=/workspace/verifierforge/runs/p0-w2-diag-v0111/input/train.parquet data.val_files=/workspace/verifierforge/runs/p0-w2-diag-v0111/input/validation.parquet data.prompt_key=prompt data.return_raw_chat=True data.shuffle=False data.seed=42 data.filter_overlong_prompts=True data.truncation=error data.train_batch_size=4 data.val_batch_size=1 data.max_prompt_length=1024 data.max_response_length=512 actor_rollout_ref.model.path=Qwen/Qwen2.5-1.5B-Instruct +actor_rollout_ref.model.override_config.attn_implementation=sdpa actor_rollout_ref.model.use_remove_padding=True actor_rollout_ref.model.enable_gradient_checkpointing=True actor_rollout_ref.model.lora_rank=16 actor_rollout_ref.model.lora_alpha=32 actor_rollout_ref.model.target_modules=all-linear actor_rollout_ref.actor.strategy=fsdp actor_rollout_ref.actor.optim.lr=1e-06 actor_rollout_ref.actor.ppo_mini_batch_size=4 actor_rollout_ref.actor.ppo_micro_batch_size_per_gpu=1 actor_rollout_ref.actor.use_dynamic_bsz=True actor_rollout_ref.actor.ppo_max_token_len_per_gpu=16384 actor_rollout_ref.actor.use_kl_loss=True actor_rollout_ref.actor.kl_loss_coef=0.001 actor_rollout_ref.actor.kl_loss_type=low_var_kl actor_rollout_ref.actor.fsdp_config.param_offload=False actor_rollout_ref.actor.fsdp_config.optimizer_offload=False actor_rollout_ref.actor.checkpoint.save_contents=['model','optimizer','extra'] actor_rollout_ref.rollout.name=vllm actor_rollout_ref.rollout.tensor_model_parallel_size=1 actor_rollout_ref.rollout.gpu_memory_utilization=0.5 actor_rollout_ref.rollout.n=8 actor_rollout_ref.rollout.temperature=1.0 actor_rollout_ref.rollout.top_p=1.0 actor_rollout_ref.rollout.top_k=-1 actor_rollout_ref.rollout.max_num_batched_tokens=8192 actor_rollout_ref.rollout.enable_chunked_prefill=True actor_rollout_ref.rollout.free_cache_engine=True actor_rollout_ref.rollout.load_format=auto actor_rollout_ref.rollout.val_kwargs.n=1 actor_rollout_ref.rollout.val_kwargs.temperature=0 actor_rollout_ref.rollout.val_kwargs.top_p=1.0 actor_rollout_ref.rollout.val_kwargs.top_k=-1 actor_rollout_ref.rollout.val_kwargs.do_sample=False actor_rollout_ref.ref.fsdp_config.param_offload=True actor_rollout_ref.ref.log_prob_use_dynamic_bsz=True actor_rollout_ref.ref.log_prob_max_token_len_per_gpu=16384 reward.reward_manager.name=naive reward.num_workers=1 reward.custom_reward_function.path=/workspace/verifierforge/trainer/grpo_reward.py reward.custom_reward_function.name=compute_score trainer.project_name=verifierforge_d2 trainer.experiment_name=p0-w2-diag-v0111 trainer.logger=['console','file'] trainer.nnodes=1 trainer.n_gpus_per_node=1 trainer.total_training_steps=30 trainer.total_epochs=10 trainer.val_before_train=True trainer.save_freq=10 trainer.test_freq=10 trainer.default_local_dir=/workspace/verifierforge/runs/p0-w2-diag-v0111/.verl-staging trainer.default_hdfs_dir=null trainer.resume_mode=disable
+
+=== Ray driver log candidates ===
+/tmp/ray/session_latest/logs/export_events/event_EXPORT_DRIVER_JOB.log
+/tmp/ray/session_latest/logs/python-core-driver-01000000ffffffffffffffffffffffffffffffffffffffffffffffff_2183.log
+
+--- /tmp/ray/session_latest/logs/export_events/event_EXPORT_DRIVER_JOB.log (last 100) ---
+
+--- /tmp/ray/session_latest/logs/python-core-driver-01000000ffffffffffffffffffffffffffffffffffffffffffffffff_2183.log (last 100) ---
+	ray::rpc::ControlPlanePubSubGcsService.grpc_client.GcsSubscriberPoll.OnReplyReceived - 4 total (0 active), Execution time: mean = 0.49ms, total = 1.96ms, Queueing time: mean = 0.84ms, max = 2.89ms, min = 0.08ms, total = 3.37ms
+	Publisher.CheckDeadSubscribers - 3 total (1 active), Execution time: mean = 0.01ms, total = 0.03ms, Queueing time: mean = 0.10ms, max = 0.17ms, min = 0.13ms, total = 0.30ms
+	Subscriber.HandlePublishedMessage_GCS_ACTOR_CHANNEL - 3 total (0 active), Execution time: mean = 0.72ms, total = 2.15ms, Queueing time: mean = 0.31ms, max = 0.61ms, min = 0.08ms, total = 0.92ms
+	ray::rpc::ControlPlanePubSubGcsService.grpc_client.GcsSubscriberCommandBatch - 2 total (0 active), Execution time: mean = 3.90ms, total = 7.80ms, Queueing time: mean = 0.00ms, max = -0.00ms, min = 9223372036854.78ms, total = 0.00ms
+	ray::rpc::ControlPlanePubSubGcsService.grpc_client.GcsSubscriberCommandBatch.OnReplyReceived - 2 total (0 active), Execution time: mean = 0.97ms, total = 1.93ms, Queueing time: mean = 0.22ms, max = 0.23ms, min = 0.22ms, total = 0.44ms
+	ray::rpc::NodeInfoGcsService.grpc_client.GetAllNodeAddressAndLiveness - 1 total (0 active), Execution time: mean = 4.42ms, total = 4.42ms, Queueing time: mean = 0.00ms, max = -0.00ms, min = 9223372036854.78ms, total = 0.00ms
+	ActorTaskSubmitter::SubmitTask - 1 total (0 active), Execution time: mean = 1.63ms, total = 1.63ms, Queueing time: mean = 0.21ms, max = 0.21ms, min = 0.21ms, total = 0.21ms
+	CoreWorkerService.grpc_server.WaitForActorRefDeleted - 1 total (1 active), Execution time: mean = 0.00ms, total = 0.00ms, Queueing time: mean = 0.00ms, max = -0.00ms, min = 9223372036854.78ms, total = 0.00ms
+	CoreWorkerService.grpc_server.WaitForActorRefDeleted.HandleRequestImpl - 1 total (0 active), Execution time: mean = 0.09ms, total = 0.09ms, Queueing time: mean = 0.15ms, max = 0.15ms, min = 0.15ms, total = 0.15ms
+	ray::rpc::NodeInfoGcsService.grpc_client.GetAllNodeAddressAndLiveness.OnReplyReceived - 1 total (0 active), Execution time: mean = 0.27ms, total = 0.27ms, Queueing time: mean = 0.15ms, max = 0.15ms, min = 0.15ms, total = 0.15ms
+	ray::rpc::ActorInfoGcsService.grpc_client.GetActorInfo.OnReplyReceived - 1 total (0 active), Execution time: mean = 3.11ms, total = 3.11ms, Queueing time: mean = 0.35ms, max = 0.35ms, min = 0.35ms, total = 0.35ms
+	ray::rpc::ActorInfoGcsService.grpc_client.RegisterActor.OnReplyReceived - 1 total (0 active), Execution time: mean = 0.41ms, total = 0.41ms, Queueing time: mean = 3.43ms, max = 3.43ms, min = 3.43ms, total = 3.43ms
+	ray::rpc::ActorInfoGcsService.grpc_client.CreateActor - 1 total (0 active), Execution time: mean = 101617.02ms, total = 101617.02ms, Queueing time: mean = 0.00ms, max = -0.00ms, min = 9223372036854.78ms, total = 0.00ms
+	ActorCreator.AsyncRegisterActor - 1 total (0 active), Execution time: mean = 6.63ms, total = 6.63ms, Queueing time: mean = 0.31ms, max = 0.31ms, min = 0.31ms, total = 0.31ms
+	ray::rpc::ActorInfoGcsService.grpc_client.CreateActor.OnReplyReceived - 1 total (0 active), Execution time: mean = 0.41ms, total = 0.41ms, Queueing time: mean = 0.10ms, max = 0.10ms, min = 0.10ms, total = 0.10ms
+	ray::rpc::WorkerInfoGcsService.grpc_client.AddWorkerInfo - 1 total (0 active), Execution time: mean = 2.59ms, total = 2.59ms, Queueing time: mean = 0.00ms, max = -0.00ms, min = 9223372036854.78ms, total = 0.00ms
+	ray::rpc::ActorInfoGcsService.grpc_client.RegisterActor - 1 total (0 active), Execution time: mean = 17.13ms, total = 17.13ms, Queueing time: mean = 0.00ms, max = -0.00ms, min = 9223372036854.78ms, total = 0.00ms
+	ray::rpc::WorkerInfoGcsService.grpc_client.AddWorkerInfo.OnReplyReceived - 1 total (0 active), Execution time: mean = 0.16ms, total = 0.16ms, Queueing time: mean = 0.19ms, max = 0.19ms, min = 0.19ms, total = 0.19ms
+	CoreWorkerService.grpc_client.PushTask - 1 total (1 active), Execution time: mean = 0.00ms, total = 0.00ms, Queueing time: mean = 0.00ms, max = -0.00ms, min = 9223372036854.78ms, total = 0.00ms
+	ray::rpc::ActorInfoGcsService.grpc_client.GetActorInfo - 1 total (0 active), Execution time: mean = 9.09ms, total = 9.09ms, Queueing time: mean = 0.00ms, max = -0.00ms, min = 9223372036854.78ms, total = 0.00ms
+
+-----------------
+Task execution event stats:
+
+Global stats: 0 total (0 active)
+Queueing time: mean = -nanms, max = -0.00ms, min = 9223372036854.78ms, total = 0.00ms
+Execution time:  mean = -nanms, total = 0.00ms
+Event stats:
+
+-----------------
+Task Event stats:
+
+IO Service Stats:
+
+Global stats: 785 total (1 active)
+Queueing time: mean = 0.12ms, max = 0.33ms, min = -0.01ms, total = 93.43ms
+Execution time:  mean = 0.06ms, total = 48.01ms
+Event stats:
+	CoreWorker.deadline_timer.flush_task_events - 780 total (1 active), Execution time: mean = 0.05ms, total = 35.54ms, Queueing time: mean = 0.12ms, max = 0.33ms, min = -0.01ms, total = 93.07ms
+	ray::rpc::TaskInfoGcsService.grpc_client.AddTaskEventData.OnReplyReceived - 2 total (0 active), Execution time: mean = 0.19ms, total = 0.37ms, Queueing time: mean = 0.15ms, max = 0.20ms, min = 0.10ms, total = 0.31ms
+	ray::rpc::TaskInfoGcsService.grpc_client.AddTaskEventData - 2 total (0 active), Execution time: mean = 5.99ms, total = 11.98ms, Queueing time: mean = 0.00ms, max = -0.00ms, min = 9223372036854.78ms, total = 0.00ms
+	PeriodicalRunner.RunFnPeriodically - 1 total (0 active), Execution time: mean = 0.12ms, total = 0.12ms, Queueing time: mean = 0.05ms, max = 0.05ms, min = 0.05ms, total = 0.05ms
+Other Stats:
+	gcs_grpc_in_progress:0
+	event_aggregator_grpc_in_progress:0
+	current number of task status events in buffer: 0
+	current number of profile events in buffer: 0
+	current number of dropped task attempts tracked: 0
+	total task events sent: 0.00140285 MiB
+	total number of task attempts sent: 5
+	total number of task attempts dropped reported: 0
+	total number of sent failure: 0
+	num status task events dropped: 0
+	num profile task events dropped: 0
+	num ray task events reported to aggregator: 0
+	num ray task events failed to report to aggregator: 0
+	num of task attempts dropped reported to aggregator: 0
+	num of failed requests to aggregator: 0
+
+[2026-07-16 19:08:01,387 W 2183 3181] task_manager.cc:1356: Task attempt 16310a0f0a45af5c8110c86571671cc1a6f0941601000000 failed with error ACTOR_UNAVAILABLE Fail immediately? 0, status UnexpectedSystemExit: Worker exits with an exit code 1. The process receives a SIGTERM., error info actor_unavailable_error {
+  actor_id: "\201\020\310eqg\034\301\246\360\224\026\001\000\000\000"
+}
+error_message: "The actor is temporarily unavailable: UnexpectedSystemExit: Worker exits with an exit code 1. The process receives a SIGTERM."
+error_type: ACTOR_UNAVAILABLE
+
+[2026-07-16 19:08:01,387 I 2183 3181] task_manager.cc:1236: task 16310a0f0a45af5c8110c86571671cc1a6f0941601000000 retries left: 0, oom retries left: 0, task failed due to oom: 0
+[2026-07-16 19:08:01,387 I 2183 3181] task_manager.cc:1251: No retries left for task 16310a0f0a45af5c8110c86571671cc1a6f0941601000000, not going to resubmit.
+[2026-07-16 19:08:01,387 I 2183 3181] actor_task_submitter.cc:774: PushActorTask failed because of network error, this task will be stashed away and waiting for Death info from GCS, wait_queue_size=1 task_id=16310a0f0a45af5c8110c86571671cc1a6f0941601000000
+[2026-07-16 19:08:01,399 E 2183 2183] logging.cc:474: *** SIGTERM received at time=1784228881 on cpu 167 ***
+[2026-07-16 19:08:01,399 E 2183 2183] logging.cc:474: PC: @     0x7f772bd4fd71  (unknown)  (unknown)
+[2026-07-16 19:08:01,399 E 2183 2183] logging.cc:474:     @     0x7f772bcfc330  1485763136  (unknown)
+[2026-07-16 19:08:01,399 E 2183 2183] logging.cc:474:     @     0x7f772bd52c8e        224  pthread_cond_timedwait
+[2026-07-16 19:08:01,399 E 2183 2183] logging.cc:474:     @     0x7f768341f46f       1184  ray::core::GetRequest::Wait()
+[2026-07-16 19:08:01,400 E 2183 2183] logging.cc:474:     @     0x7f76834215c7       1328  ray::core::CoreWorkerMemoryStore::GetImpl()
+[2026-07-16 19:08:01,400 E 2183 2183] logging.cc:474:     @     0x7f7683422019         64  ray::core::CoreWorkerMemoryStore::Get()
+[2026-07-16 19:08:01,400 E 2183 2183] logging.cc:474:     @     0x7f768342221f        208  ray::core::CoreWorkerMemoryStore::Get()
+[2026-07-16 19:08:01,400 E 2183 2183] logging.cc:474:     @     0x7f76832c4cb6       1488  ray::core::CoreWorker::GetObjects()
+[2026-07-16 19:08:01,400 E 2183 2183] logging.cc:474:     @     0x7f76832c5940        160  ray::core::CoreWorker::Get()
+[2026-07-16 19:08:01,400 E 2183 2183] logging.cc:474:     @     0x7f76831ed0a0        272  __pyx_pw_3ray_7_raylet_10CoreWorker_35get_objects()
+[2026-07-16 19:08:01,400 E 2183 2183] logging.cc:474:     @           0x549cf5         32  PyObject_Vectorcall
+[2026-07-16 19:08:01,400 E 2183 2183] logging.cc:474:     @           0x5d68bf        384  _PyEval_EvalFrameDefault
+[2026-07-16 19:08:01,400 E 2183 2183] logging.cc:474:     @           0x5d4dab        128  PyEval_EvalCode
+[2026-07-16 19:08:01,400 E 2183 2183] logging.cc:474:     @           0x5d2bac        112  (unknown)
+[2026-07-16 19:08:01,400 E 2183 2183] logging.cc:474:     @           0x5818ed         64  (unknown)
+[2026-07-16 19:08:01,400 E 2183 2183] logging.cc:474:     @           0x549cf5         32  PyObject_Vectorcall
+[2026-07-16 19:08:01,400 E 2183 2183] logging.cc:474:     @           0x5d68bf        384  _PyEval_EvalFrameDefault
+[2026-07-16 19:08:01,400 E 2183 2183] logging.cc:474:     @           0x6bc192         80  (unknown)
+[2026-07-16 19:08:01,400 E 2183 2183] logging.cc:474:     @           0x6bbdc2        288  Py_RunMain
+[2026-07-16 19:08:01,400 E 2183 2183] logging.cc:474:     @           0x6bba2d         48  Py_BytesMain
+[2026-07-16 19:08:01,400 E 2183 2183] logging.cc:474:     @     0x7f772bce11ca        160  (unknown)
+[2026-07-16 19:08:01,400 E 2183 2183] logging.cc:474:     @     0x7f772bce128b         96  __libc_start_main
+[2026-07-16 19:08:01,400 E 2183 2183] logging.cc:474:     @           0x656a35  (unknown)  _start
+[2026-07-16 19:08:02,432 W 2183 9857] open_telemetry_metric_recorder.cc:67: Failed to export metrics to the metrics agent. Result: 1
+[2026-07-16 19:08:02,483 I 2183 3181] task_manager.cc:1327: Task failed: UnexpectedSystemExit: Worker exits with an exit code 1. The process receives a SIGTERM.: Type=ACTOR_TASK, Language=PYTHON, Resources: {}, function_descriptor={type=PythonFunctionDescriptor, module_name=main_ppo, class_name=TaskRunner, function_name=run, function_hash=}, task_id=16310a0f0a45af5c8110c86571671cc1a6f0941601000000, task_name=TaskRunner.run, job_id=01000000, num_args=2, num_returns=1, max_retries=0, depth=1, attempt_number=0, actor_task_spec={actor_id=8110c86571671cc1a6f0941601000000, actor_caller_id=ffffffffffffffffffffffffffffffffffffffff01000000, seq_no=0, retry_exceptions=0}, runtime_env_hash=-1485304624, eager_install=1, setup_timeout_seconds=600, dependencies={}
+[2026-07-16 19:08:04,076 W 2183 2183] python_gcs_subscriber.cc:195: Error while unregistering the subscriber: failed to connect to all addresses; last error: UNKNOWN: ipv4:172.23.0.2:45707: Failed to connect to remote host: Connection refused [code 14]
+[2026-07-16 19:08:04,076 W 2183 5354] python_gcs_subscriber.cc:195: Error while unregistering the subscriber: failed to connect to all addresses; last error: UNKNOWN: ipv4:172.23.0.2:45707: Failed to connect to remote host: Connection refused [code 14]
+[2026-07-16 19:08:04,077 I 2183 2183] core_worker.cc:608: Sending disconnect message to the local raylet.
+[2026-07-16 19:08:04,077 I 2183 2183] raylet_ipc_client.cc:133: RayletIpcClient::Disconnect, exit_type=INTENDED_USER_EXIT, exit_detail=Shutdown by ray.shutdown()., has creation_task_exception_pb_bytes=0
+[2026-07-16 19:08:04,081 I 2183 2183] core_worker.cc:612: Disconnected from the local raylet.
+[2026-07-16 19:08:04,082 I 2183 2183] task_event_buffer.cc:580: Shutting down TaskEventBuffer.

@@ -1,0 +1,46 @@
+{
+  "accepted_state": "provisioning",
+  "approval_id": "1dd1909c9215444ba35357bcb395a229",
+  "approval_only_response": {
+    "approved_at": "2026-07-20T01:00:22.295834Z",
+    "approved_by": "p4-live-owner"
+  },
+  "audit_actions": [
+    "provision.requested",
+    "provision.created",
+    "state.transition",
+    "provision.terminated",
+    "lifecycle.terminated",
+    "provider.deletion_confirmed"
+  ],
+  "billing_status": "scheduled_plus_1h_plus_6h",
+  "decision_id": "faa59efe08a64b639d8681dda7245297",
+  "final": {
+    "approval_id": "1dd1909c9215444ba35357bcb395a229",
+    "budget_usd_cap": 1.0,
+    "cost_accrued_usd": 0.000623,
+    "created_at": "2026-07-20T01:00:25.141224Z",
+    "credential_source": "system_env",
+    "decision_id": "faa59efe08a64b639d8681dda7245297",
+    "detail": "provider DELETE accepted; target absent; raw vf-auto-* inventory zero",
+    "job_id": "forge-1dd1909c9215444ba35357bcb395a229",
+    "provider": "runpod",
+    "provision_handle": "as0km86lszjvdb",
+    "state": "done",
+    "updated_at": "2026-07-20T01:00:53.802201Z"
+  },
+  "finished_at": "2026-07-20T01:00:55.873060+00:00",
+  "preflight": {
+    "account_pod_count": 8,
+    "conservative_prior_estimate_usd": 2.36358,
+    "credential_source": "system_env",
+    "cumulative_reserved_usd": 3.36358,
+    "reservation_usd": 1.0,
+    "vf_auto_prefix_count": 0
+  },
+  "schema_version": 1,
+  "stage": "provisioner-p4-live",
+  "start_confirmed": true,
+  "started_at": "2026-07-20T01:00:23.123064+00:00",
+  "status": "passed"
+}

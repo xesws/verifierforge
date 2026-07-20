@@ -1,0 +1,24 @@
+{
+  "observed_at": "2026-07-19T20:06:12.244681+00:00",
+  "outcomes": [
+    {
+      "amount_usd": 0.290031,
+      "external_id": "9z7g1w69kec4kb",
+      "record_count": 3,
+      "status": "confirmed"
+    }
+  ],
+  "slot": "plus-1h"
+}
+{
+  "observed_at": "2026-07-20T01:06:12.428113+00:00",
+  "outcomes": [
+    {
+      "amount_usd": 0.290031,
+      "external_id": "9z7g1w69kec4kb",
+      "record_count": 3,
+      "status": "confirmed"
+    }
+  ],
+  "slot": "plus-6h"
+}

@@ -1,0 +1,19 @@
+{
+  "failures": [],
+  "full_pass_count": 276,
+  "input": {
+    "path": "data/nl2sql/v0.6.1-p0-full.jsonl",
+    "record_count": 276,
+    "sha256": "0ad88c264bb4488189fc0788b740bdfabf99fc5fb2be0e232f0420953c79c96a"
+  },
+  "record_count": 276,
+  "schema_version": 1,
+  "status": "completed",
+  "timestamp": "2026-07-16T15:38:29.699174+00:00",
+  "verifier": {
+    "extraction_policy": "markdown_sql_fence_first_statement",
+    "identity": "core.rewards.nl2sql.NL2SQLVerifier",
+    "source_sha256": "b76707e5c0603d227393d03ffc0bdc7c66ec072a139c6aa717c282f4082de47f",
+    "version": 2
+  }
+}

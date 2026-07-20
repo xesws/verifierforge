@@ -1,0 +1,8 @@
+{"job_id":"c1-gateb-replay-v0123","step":1,"reward_mean":0.53125,"pass_at_1":0.5,"entropy":0.2712034583091736,"timestamp":"2026-07-16T22:11:29.560876Z"}
+{"job_id":"c1-gateb-replay-v0123","step":2,"reward_mean":0.4749999940395355,"pass_at_1":0.5,"entropy":0.49799618124961853,"timestamp":"2026-07-16T22:11:36.627839Z"}
+{"job_id":"c1-gateb-replay-v0123","step":3,"reward_mean":0.38593751192092896,"pass_at_1":0.5,"entropy":0.35146206617355347,"timestamp":"2026-07-16T22:11:41.681756Z"}
+{"job_id":"c1-gateb-replay-v0123","step":4,"reward_mean":0.4921875,"pass_at_1":0.5,"entropy":0.33308181166648865,"timestamp":"2026-07-16T22:11:47.744942Z"}
+{"job_id":"c1-gateb-replay-v0123","step":5,"reward_mean":0.3734375238418579,"pass_at_1":0.5,"entropy":0.4341936409473419,"timestamp":"2026-07-16T22:11:54.815856Z"}
+{"job_id":"c1-gateb-replay-v0123","step":6,"reward_mean":0.3562500476837158,"pass_at_1":0.5,"entropy":0.34285253286361694,"timestamp":"2026-07-16T22:11:59.865120Z"}
+{"job_id":"c1-gateb-replay-v0123","step":7,"reward_mean":0.42499998211860657,"pass_at_1":0.5,"entropy":0.3296443819999695,"timestamp":"2026-07-16T22:12:05.927221Z"}
+{"job_id":"c1-gateb-replay-v0123","step":8,"reward_mean":0.34843751788139343,"pass_at_1":0.5,"entropy":0.3666219711303711,"timestamp":"2026-07-16T22:12:12.997336Z"}

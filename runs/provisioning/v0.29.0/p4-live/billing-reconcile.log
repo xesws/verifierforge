@@ -1,0 +1,12 @@
+{
+  "observed_at": "2026-07-20T02:01:26.451680+00:00",
+  "outcomes": [
+    {
+      "amount_usd": null,
+      "external_id": "as0km86lszjvdb",
+      "record_count": 0,
+      "status": "empty"
+    }
+  ],
+  "slot": "plus-1h"
+}

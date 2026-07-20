@@ -1,0 +1,8 @@
+job_id: p2-42436bb4c4a144d8980a-r5
+model: Qwen/Qwen2.5-0.5B-Instruct
+completed_step: 100
+storage_checkpoint: /tmp/verifierforge-s3-cache/p2-42436bb4c4a144d8980a-r5/p2-42436bb4c4a144d8980a-r5/ckpt/step_100/global_step_100
+checkpoint_contents: ['model','optimizer','extra','hf_model']
+generated_at: 2026-07-19T18:32:54.730659+00:00
+config: {'model_path': 'Qwen/Qwen2.5-0.5B-Instruct', 'total_steps': 100, 'total_epochs': None, 'train_batch_size': 4, 'rollout_n': 8, 'max_prompt_length': 1024, 'max_response_length': 512, 'lora_rank': 16, 'lora_alpha': 32, 'learning_rate': 1e-06, 'kl_loss_coef': 0.001, 'rollout_gpu_memory_utilization': 0.4, 'enforce_eager': False, 'vllm_attention_backend': None, 'checkpoint_every': 50, 'validation_every': 10, 'dataset_mode': 'frozen_training_pool', 'reward_mode': 'verifier', 'save_hf_model': True, 'entropy_brake': False, 'serving_gate_timing': 'post_training'}
+weights remain in ckpt/ and are intentionally not synced by vf watch.

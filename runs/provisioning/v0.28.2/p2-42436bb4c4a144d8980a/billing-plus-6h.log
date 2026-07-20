@@ -1,0 +1,24 @@
+{
+  "observed_at": "2026-07-19T16:42:26.920021+00:00",
+  "outcomes": [
+    {
+      "amount_usd": null,
+      "external_id": "r6zizmfp8faklt",
+      "record_count": 0,
+      "status": "unresolved"
+    },
+    {
+      "amount_usd": null,
+      "external_id": "41l2l81044358g",
+      "record_count": 0,
+      "status": "unresolved"
+    },
+    {
+      "amount_usd": 0.124736,
+      "external_id": "iqen85eumbjcld",
+      "record_count": 1,
+      "status": "confirmed"
+    }
+  ],
+  "slot": "plus-6h"
+}

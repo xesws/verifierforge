@@ -1,0 +1,72 @@
+{
+  "approval_id": "8fafa4bc17d244a5af48a26d0bc36e62",
+  "cluster_count": 3,
+  "clusters_status": 200,
+  "decision": "forge",
+  "final_state": "done",
+  "guardian_final": 0.85,
+  "guardian_followup_attempts": [
+    {
+      "http": 200,
+      "route": "tuned"
+    },
+    {
+      "http": 200,
+      "route": "tuned"
+    },
+    {
+      "http": 200,
+      "route": "default"
+    },
+    {
+      "http": 200,
+      "route": "tuned"
+    },
+    {
+      "http": 200,
+      "route": "default"
+    },
+    {
+      "http": 200,
+      "route": "default"
+    },
+    {
+      "http": 200,
+      "route": "tuned"
+    },
+    {
+      "http": 200,
+      "route": "tuned"
+    }
+  ],
+  "guardian_new_point": true,
+  "guardian_point_count": 127,
+  "guardian_points_before": 126,
+  "guardian_status": 200,
+  "job_count": 2,
+  "jobs_status": 200,
+  "proxy_attempts": [
+    {
+      "http": 200,
+      "route": "default"
+    },
+    {
+      "http": 200,
+      "route": "default"
+    },
+    {
+      "http": 200,
+      "route": "tuned"
+    }
+  ],
+  "public_url": "https://functioning-become-revelation-meanwhile.trycloudflare.com",
+  "routing": {
+    "canary_percent": 50,
+    "cluster_id": "data-pull-sql",
+    "enabled": true,
+    "target_model": "tuned"
+  },
+  "start_accepted": "provisioning",
+  "tuned_completion_nonempty": true,
+  "unauth_status": 401
+}

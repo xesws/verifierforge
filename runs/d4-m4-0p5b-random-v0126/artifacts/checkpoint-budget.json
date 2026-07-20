@@ -1,0 +1,13 @@
+{
+  "allowed_bytes": 118681903824896,
+  "checkpoint_count": 4,
+  "free_bytes": 148352379781120,
+  "full_checkpoint_bytes": 3998416504,
+  "generated_at": "2026-07-17T03:24:12.284300+00:00",
+  "hf_export_bytes": 999604126,
+  "job_id": "d4-m4-0p5b-random-v0126",
+  "policy": "checkpoint_count * hf_export_bytes + 3 * full_checkpoint_bytes",
+  "projected_peak_bytes": 15993666016,
+  "source": "model-cache:Qwen/Qwen2.5-0.5B-Instruct",
+  "status": "accepted"
+}

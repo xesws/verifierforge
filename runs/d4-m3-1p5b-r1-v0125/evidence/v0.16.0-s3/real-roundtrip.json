@@ -1,0 +1,9 @@
+{
+  "checkpoint_sha256": "a60b4cf7a2129129e6cf8a181b435ebf04f1be49037a1e1c76d936bf958a64e9",
+  "checkpoint_step": 50,
+  "interrupted_manifest_visible": false,
+  "job_id": "s3-v0160-roundtrip-20260717",
+  "metric_count": 50,
+  "object_count": 53,
+  "status": "passed"
+}

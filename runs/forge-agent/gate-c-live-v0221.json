@@ -1,0 +1,27 @@
+{
+  "failures": [
+    "forge-sql-volume: missing trace",
+    "forge-invoice-structured: missing trace",
+    "forge-support-simple: missing trace",
+    "forge-sql-poison-budget: missing trace",
+    "skip-low-volume: missing trace",
+    "skip-unverifiable: missing trace",
+    "skip-existing-tuned: missing trace",
+    "skip-negative-economics: missing trace",
+    "need-samples: missing trace",
+    "need-cost: missing trace",
+    "need-schema: missing trace",
+    "need-poison-fields: missing trace"
+  ],
+  "gate_eligible": false,
+  "metrics": {
+    "chain_success_rate": 0.0,
+    "config_legality_rate": 0.0,
+    "decision_accuracy": 0.0,
+    "illegal_action_count": 0,
+    "tool_schema_valid_rate": 0.0
+  },
+  "mode": "live",
+  "passed": false,
+  "scenario_count": 12
+}

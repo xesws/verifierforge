@@ -1,0 +1,14 @@
+{
+  "failures": [],
+  "gate_eligible": true,
+  "metrics": {
+    "chain_success_rate": 1.0,
+    "config_legality_rate": 1.0,
+    "decision_accuracy": 1.0,
+    "illegal_action_count": 0,
+    "tool_schema_valid_rate": 1.0
+  },
+  "mode": "live",
+  "passed": true,
+  "scenario_count": 12
+}

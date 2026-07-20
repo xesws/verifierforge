@@ -1,0 +1,19 @@
+{
+  "failures": [
+    "forge-support-simple: decision mismatch",
+    "forge-sql-poison-budget: decision mismatch",
+    "skip-low-volume: missing trace",
+    "need-schema: missing trace"
+  ],
+  "gate_eligible": false,
+  "metrics": {
+    "chain_success_rate": 0.8333333333333334,
+    "config_legality_rate": 0.5,
+    "decision_accuracy": 0.6666666666666666,
+    "illegal_action_count": 0,
+    "tool_schema_valid_rate": 1.0
+  },
+  "mode": "live",
+  "passed": false,
+  "scenario_count": 12
+}

@@ -1,0 +1,1 @@
+cd /workspace/verifierforge-c1-gateb-v0123; export HF_HOME=/workspace/hf-cache VF_RUNS_DIR=/workspace/verifierforge/runs; exec /workspace/verifierforge/.venv/bin/python -m trainer.grpo_train --job c1-gateb-replay-v0123 --config grpo_v1_0p5b

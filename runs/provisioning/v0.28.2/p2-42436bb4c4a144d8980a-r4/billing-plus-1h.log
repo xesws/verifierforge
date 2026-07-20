@@ -1,0 +1,12 @@
+{
+  "observed_at": "2026-07-19T12:57:55.863462+00:00",
+  "outcomes": [
+    {
+      "amount_usd": 0.094305,
+      "external_id": "1okqsh91490bgu",
+      "record_count": 1,
+      "status": "confirmed"
+    }
+  ],
+  "slot": "plus-1h"
+}
