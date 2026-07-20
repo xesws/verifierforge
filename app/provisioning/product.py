@@ -16,6 +16,12 @@ from app.provisioning.mock import MockAdapter
 from app.provisioning.orchestrator import LifecycleOrchestrator
 from app.provisioning.policy import ProvisioningPolicy
 from app.provisioning.runpod import MANAGED_NAME_PREFIX, RUNPOD_IMAGE, RunPodAdapter
+from app.provisioning.termination import (
+    DeletionReceipt,
+    audit_deletion,
+    confirm_deleted,
+    schedule_billing,
+)
 from core.agent_contracts import AgentDecisionType, ProviderPreference, TrainingConfig
 from core.p4_contracts import CredentialSource, ForgeExecutionStatus, ForgeLifecycle
 from core.provisioning_contracts import (
@@ -394,7 +400,11 @@ async def _execute(
             actor=prepared.requested_by,
             reason="P-4 minimal wiring smoke complete",
         )
-        await _prove_absent(adapter, handle.external_id, environ=environ)
+        receipt = await _prove_absent(adapter, handle, environ=environ)
+        await audit_deletion(GatewayAuditLog(gateway), handle, receipt)
+        schedule_path = environ.get("VF_P4_BILLING_SCHEDULE", "").strip()
+        if schedule_path:
+            schedule_billing(Path(schedule_path), handle, receipt.checked_at)
         return _advance(
             gateway,
             prepared,
@@ -412,7 +422,11 @@ async def _execute(
                     reason="P-4 fail-closed cleanup",
                 )
                 if binding == "runpod":
-                    await _prove_absent(adapter, handle.external_id, environ=environ)
+                    receipt = await _prove_absent(adapter, handle, environ=environ)
+                    await audit_deletion(GatewayAuditLog(gateway), handle, receipt)
+                    schedule_path = environ.get("VF_P4_BILLING_SCHEDULE", "").strip()
+                    if schedule_path:
+                        schedule_billing(Path(schedule_path), handle, receipt.checked_at)
             except Exception:
                 pass
         raise
@@ -459,22 +473,18 @@ def training_config_to_spec(
 
 async def _prove_absent(
     adapter: RunPodAdapter,
-    external_id: str,
+    handle,
     *,
     environ: Mapping[str, str],
-) -> None:
-    deadline = time.monotonic() + max(
-        30.0, float(environ.get("VF_P4_DELETE_TIMEOUT_SECONDS", "180"))
+) -> DeletionReceipt:
+    return await confirm_deleted(
+        adapter,
+        handle,
+        timeout_s=max(
+            30.0, float(environ.get("VF_P4_DELETE_TIMEOUT_SECONDS", "180"))
+        ),
+        poll_s=max(1.0, float(environ.get("VF_P4_POLL_SECONDS", "5"))),
     )
-    poll = max(1.0, float(environ.get("VF_P4_POLL_SECONDS", "5")))
-    while time.monotonic() < deadline:
-        target = await adapter.get_pod(external_id)
-        inventory = await adapter.list_account_pods()
-        prefixed = [pod for pod in inventory if str(pod.get("name", "")).startswith(MANAGED_NAME_PREFIX)]
-        if target is None and not prefixed:
-            return
-        await asyncio.sleep(poll)
-    raise ForgeExecutionError("provider deletion proof timed out")
 
 
 def _public_key(environ: Mapping[str, str]) -> str:
