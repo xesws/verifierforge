@@ -20,6 +20,8 @@ from app.db.records import (
     JobRecord,
     ProvisionEventRecord,
     RoutingRecord,
+    ServingEndpointRecord,
+    ServingEventRecord,
     TrafficRequestRecord,
 )
 from app.db.repositories import create_repositories
@@ -58,6 +60,8 @@ async def repositories(request, tmp_path: Path):
         async with runtime.engine.connect() as connection:
             transaction = await connection.begin()
             for table_name in (
+                "serving_events",
+                "serving_endpoints",
                 "provision_events",
                 "approvals",
                 "provider_credentials",
@@ -214,6 +218,79 @@ async def test_all_repository_contracts_round_trip(repositories) -> None:
     assert await repositories.provision_audit.append(event) == event
     assert await repositories.provision_audit.append(event) == event
     assert await repositories.provision_audit.list_for_approval(approval.id) == [event]
+
+    reserved, created = await repositories.serving_endpoints.reserve(
+        "vf-demo", "serving-session-1", NOW
+    )
+    assert created is True
+    assert reserved.state == "provisioning"
+    assert reserved.session_id == "serving-session-1"
+    same, created = await repositories.serving_endpoints.reserve(
+        "vf-demo", "ignored-session", NOW + timedelta(seconds=1)
+    )
+    assert created is False
+    assert same == reserved
+    with pytest.raises(ValueError, match="reserved by model vf-demo"):
+        await repositories.serving_endpoints.reserve(
+            "another-model", "another-session", NOW
+        )
+
+    ready = ServingEndpointRecord(
+        model_id="vf-demo",
+        session_id="serving-session-1",
+        url="https://endpoint.example.test/v1",
+        api_key_ref=credential.id,
+        state="ready",
+        provider="runpod",
+        external_id="pod-123",
+        gpu_model="NVIDIA L4",
+        hourly_price_usd=0.44,
+        cost_accrued_usd=0.12,
+        requested_at=NOW,
+        ready_at=NOW + timedelta(minutes=5),
+        updated_at=NOW + timedelta(minutes=5),
+        detail="serving smoke passed",
+    )
+    assert await repositories.serving_endpoints.put(
+        ready, expected_state="provisioning"
+    ) == ready
+    assert await repositories.serving_endpoints.get("vf-demo") == ready
+    assert await repositories.serving_endpoints.list_active() == [ready]
+
+    serving_event = ServingEventRecord(
+        id="serving-event-1",
+        session_id="serving-session-1",
+        model_id="vf-demo",
+        provider="runpod",
+        action="ready",
+        state="ready",
+        actor="serving-orchestrator",
+        occurred_at=NOW + timedelta(minutes=5),
+        external_id="pod-123",
+        detail_json={"gpu_model": "NVIDIA L4"},
+    )
+    assert await repositories.serving_audit.append(serving_event) == serving_event
+    assert await repositories.serving_audit.append(serving_event) == serving_event
+    assert await repositories.serving_audit.list_for_session(
+        "serving-session-1"
+    ) == [serving_event]
+
+    cold = ServingEndpointRecord(
+        model_id="vf-demo",
+        session_id="serving-session-1",
+        state="cold",
+        provider="runpod",
+        external_id="pod-123",
+        gpu_model="NVIDIA L4",
+        hourly_price_usd=0.44,
+        cost_accrued_usd=0.21,
+        requested_at=NOW,
+        ready_at=NOW + timedelta(minutes=5),
+        updated_at=NOW + timedelta(minutes=30),
+        detail="idle reaper terminated endpoint",
+    )
+    assert await repositories.serving_endpoints.put(cold, expected_state="ready") == cold
+    assert await repositories.serving_endpoints.list_active() == []
 
 
 async def test_repository_boundary_validation(repositories) -> None:

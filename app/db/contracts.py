@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from datetime import datetime
 from typing import Protocol
 
 from .records import (
@@ -14,6 +15,8 @@ from .records import (
     LivePassRateRecord,
     ProvisionEventRecord,
     RoutingRecord,
+    ServingEndpointRecord,
+    ServingEventRecord,
     TrafficRequestRecord,
     TrafficAggregateRecord,
 )
@@ -80,3 +83,22 @@ class ApprovalStore(Protocol):
 class ProvisionAuditStore(Protocol):
     async def append(self, record: ProvisionEventRecord) -> ProvisionEventRecord: ...
     async def list_for_approval(self, approval_id: str) -> list[ProvisionEventRecord]: ...
+
+
+class ServingEndpointStore(Protocol):
+    async def get(self, model_id: str) -> ServingEndpointRecord | None: ...
+    async def list_active(self) -> list[ServingEndpointRecord]: ...
+    async def reserve(
+        self, model_id: str, session_id: str, observed_at: datetime
+    ) -> tuple[ServingEndpointRecord, bool]: ...
+    async def put(
+        self,
+        record: ServingEndpointRecord,
+        *,
+        expected_state: str | None = None,
+    ) -> ServingEndpointRecord: ...
+
+
+class ServingAuditStore(Protocol):
+    async def append(self, record: ServingEventRecord) -> ServingEventRecord: ...
+    async def list_for_session(self, session_id: str) -> list[ServingEventRecord]: ...

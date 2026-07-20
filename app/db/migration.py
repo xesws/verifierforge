@@ -27,6 +27,8 @@ _MANAGED_TABLES = {
     "provider_credentials",
     "approvals",
     "provision_events",
+    "serving_endpoints",
+    "serving_events",
 }
 
 

@@ -130,3 +130,36 @@ class ProvisionEventRecord:
     actor: str
     occurred_at: datetime
     detail_json: JsonObject = field(default_factory=dict)
+
+
+@dataclass(frozen=True)
+class ServingEndpointRecord:
+    model_id: str
+    state: str
+    updated_at: datetime
+    session_id: str | None = None
+    url: str | None = None
+    api_key_ref: str | None = None
+    provider: str | None = None
+    external_id: str | None = None
+    gpu_model: str | None = None
+    hourly_price_usd: float | None = None
+    cost_accrued_usd: float = 0.0
+    requested_at: datetime | None = None
+    ready_at: datetime | None = None
+    error_code: str | None = None
+    detail: str = ""
+
+
+@dataclass(frozen=True)
+class ServingEventRecord:
+    id: str
+    session_id: str
+    model_id: str
+    provider: str
+    action: str
+    state: str
+    actor: str
+    occurred_at: datetime
+    external_id: str | None = None
+    detail_json: JsonObject = field(default_factory=dict)

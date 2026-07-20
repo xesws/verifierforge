@@ -218,3 +218,65 @@ class ProvisionEventRow(Base):
     actor: Mapped[str] = mapped_column(String(128), nullable=False)
     occurred_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
     detail_json: Mapped[dict[str, Any]] = mapped_column(JSON, nullable=False)
+
+
+class ServingEndpointRow(Base):
+    __tablename__ = "serving_endpoints"
+    __table_args__ = (
+        CheckConstraint(
+            "state IN ('cold','provisioning','loading','ready','draining')",
+            name="state_allowed",
+        ),
+        CheckConstraint(
+            "(state IN ('provisioning','loading','ready','draining') AND active_slot = 1) "
+            "OR (state = 'cold' AND active_slot IS NULL)",
+            name="active_slot_matches_state",
+        ),
+        CheckConstraint("cost_accrued_usd >= 0", name="cost_nonnegative"),
+        CheckConstraint(
+            "hourly_price_usd IS NULL OR hourly_price_usd >= 0",
+            name="hourly_price_nonnegative",
+        ),
+        UniqueConstraint("active_slot", name="uq_serving_endpoints_active_slot"),
+        Index("ix_serving_endpoints_state_updated", "state", "updated_at"),
+    )
+
+    model_id: Mapped[str] = mapped_column(String(255), primary_key=True)
+    session_id: Mapped[str | None] = mapped_column(String(128), unique=True)
+    url: Mapped[str | None] = mapped_column(String(2048))
+    api_key_ref: Mapped[str | None] = mapped_column(
+        String(128), ForeignKey("provider_credentials.id", ondelete="SET NULL")
+    )
+    state: Mapped[str] = mapped_column(String(32), nullable=False)
+    provider: Mapped[str | None] = mapped_column(String(64))
+    external_id: Mapped[str | None] = mapped_column(String(255))
+    gpu_model: Mapped[str | None] = mapped_column(String(255))
+    hourly_price_usd: Mapped[float | None] = mapped_column(Float)
+    cost_accrued_usd: Mapped[float] = mapped_column(Float, nullable=False, default=0.0)
+    requested_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    ready_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+    error_code: Mapped[str | None] = mapped_column(String(128))
+    detail: Mapped[str] = mapped_column(Text, nullable=False, default="")
+    active_slot: Mapped[int | None] = mapped_column(Integer)
+
+
+class ServingEventRow(Base):
+    __tablename__ = "serving_events"
+    __table_args__ = (
+        Index("ix_serving_events_session_time", "session_id", "occurred_at"),
+        Index("ix_serving_events_model_time", "model_id", "occurred_at"),
+    )
+
+    id: Mapped[str] = mapped_column(String(128), primary_key=True)
+    session_id: Mapped[str] = mapped_column(String(128), nullable=False)
+    model_id: Mapped[str] = mapped_column(
+        String(255), ForeignKey("serving_endpoints.model_id", ondelete="RESTRICT"), nullable=False
+    )
+    provider: Mapped[str] = mapped_column(String(64), nullable=False)
+    action: Mapped[str] = mapped_column(String(64), nullable=False)
+    state: Mapped[str] = mapped_column(String(32), nullable=False)
+    actor: Mapped[str] = mapped_column(String(128), nullable=False)
+    occurred_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+    external_id: Mapped[str | None] = mapped_column(String(255))
+    detail_json: Mapped[dict[str, Any]] = mapped_column(JSON, nullable=False)

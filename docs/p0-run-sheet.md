@@ -3101,6 +3101,11 @@ local/static fallback. No trainer or frozen-data work belongs to this patch.
   descriptor cache; plaintext endpoint keys are never cached. Cold/non-ready
   state uses deterministic default fallback while artifact report/arena remain
   complete. Public routing accepts only the logical `tuned` alias.
+  - [x] Alembic `20260720_0003`, SQLite/Postgres repository parity, global
+    single-active-slot constraint, idempotent reservation, CAS transitions,
+    and append-only serving audit. Supabase reflection confirmed
+    `serving_endpoints=true` and `serving_events=true`; validation was `463
+    passed, 1 skipped`. Dynamic proxy resolution remains the open half of SV1.
 - [ ] **SV2 — recoverable ServingSession.** Capacity-aware `small_ada`,
   Blackwell blocked, database active-slot concurrency 1, `$5` session cap,
   120-minute runtime cap, S3 identity gate, vLLM + cloudflared readiness gate,

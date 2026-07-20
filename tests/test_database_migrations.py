@@ -22,6 +22,8 @@ EXPECTED_TABLES = {
     "provider_credentials",
     "approvals",
     "provision_events",
+    "serving_endpoints",
+    "serving_events",
 }
 
 
@@ -65,6 +67,13 @@ async def test_alembic_upgrade_downgrade_upgrade_cycle(tmp_path: Path) -> None:
     }
     assert columns["provision_events"] >= {
         "id", "approval_id", "action", "status", "occurred_at",
+    }
+    assert columns["serving_endpoints"] >= {
+        "model_id", "session_id", "url", "api_key_ref", "state",
+        "external_id", "active_slot", "updated_at",
+    }
+    assert columns["serving_events"] >= {
+        "id", "session_id", "model_id", "action", "state", "occurred_at",
     }
     assert "approved_sample_source" in columns["clusters"]
 

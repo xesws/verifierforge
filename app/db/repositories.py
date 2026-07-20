@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import asyncio
 from contextlib import asynccontextmanager
 from dataclasses import dataclass
 from datetime import datetime, timezone
@@ -22,6 +23,8 @@ from .contracts import (
     LivePassRateStore,
     ProvisionAuditStore,
     RoutingStore,
+    ServingAuditStore,
+    ServingEndpointStore,
     TrafficStore,
 )
 from .engine import DatabaseRuntime
@@ -35,6 +38,8 @@ from .models import (
     ProviderCredentialRow,
     ProvisionEventRow,
     RoutingStateRow,
+    ServingEndpointRow,
+    ServingEventRow,
     TrafficRequestRow,
 )
 from .records import (
@@ -47,6 +52,8 @@ from .records import (
     LivePassRateRecord,
     ProvisionEventRecord,
     RoutingRecord,
+    ServingEndpointRecord,
+    ServingEventRecord,
     TrafficRequestRecord,
     TrafficAggregateRecord,
 )
@@ -482,6 +489,165 @@ class SQLAlchemyProvisionAuditStore:
             return [_provision_event_record(row) for row in rows]
 
 
+_ACTIVE_SERVING_STATES = {"provisioning", "loading", "ready", "draining"}
+_SERVING_STATES = _ACTIVE_SERVING_STATES | {"cold"}
+
+
+class SQLAlchemyServingEndpointStore:
+    """Single-slot endpoint registry with idempotent session reservation."""
+
+    def __init__(self, sessions: async_sessionmaker[AsyncSession]) -> None:
+        self.sessions = sessions
+        # The database unique constraint is the cross-process safety net. The
+        # lock keeps a single API worker's competing wake requests deterministic.
+        self._reservation_lock = asyncio.Lock()
+
+    async def get(self, model_id: str) -> ServingEndpointRecord | None:
+        _text(model_id, "model_id")
+        async with _transaction(self.sessions) as session:
+            row = await session.get(ServingEndpointRow, model_id)
+            return _serving_endpoint_record(row) if row else None
+
+    async def list_active(self) -> list[ServingEndpointRecord]:
+        statement = (
+            select(ServingEndpointRow)
+            .where(ServingEndpointRow.state.in_(_ACTIVE_SERVING_STATES))
+            .order_by(ServingEndpointRow.updated_at, ServingEndpointRow.model_id)
+        )
+        async with _transaction(self.sessions) as session:
+            rows = (await session.scalars(statement)).all()
+            return [_serving_endpoint_record(row) for row in rows]
+
+    async def reserve(
+        self, model_id: str, session_id: str, observed_at: datetime
+    ) -> tuple[ServingEndpointRecord, bool]:
+        _text(model_id, "model_id")
+        _text(session_id, "session_id")
+        _timestamp(observed_at, "observed_at")
+        async with self._reservation_lock:
+            async with _transaction(self.sessions) as session:
+                active = await session.scalar(
+                    select(ServingEndpointRow)
+                    .where(ServingEndpointRow.active_slot == 1)
+                    .with_for_update()
+                )
+                if active is not None:
+                    if active.model_id == model_id:
+                        return _serving_endpoint_record(active), False
+                    raise ValueError(
+                        f"serving capacity is reserved by model {active.model_id}"
+                    )
+
+                row = await session.scalar(
+                    select(ServingEndpointRow)
+                    .where(ServingEndpointRow.model_id == model_id)
+                    .with_for_update()
+                )
+                if row is None:
+                    row = ServingEndpointRow(model_id=model_id)
+                    session.add(row)
+                row.session_id = session_id
+                row.url = None
+                row.api_key_ref = None
+                row.state = "provisioning"
+                row.provider = None
+                row.external_id = None
+                row.gpu_model = None
+                row.hourly_price_usd = None
+                row.cost_accrued_usd = 0.0
+                row.requested_at = _utc(observed_at)
+                row.ready_at = None
+                row.updated_at = _utc(observed_at)
+                row.error_code = None
+                row.detail = "capacity reserved"
+                row.active_slot = 1
+                await session.flush()
+                return _serving_endpoint_record(row), True
+
+    async def put(
+        self,
+        record: ServingEndpointRecord,
+        *,
+        expected_state: str | None = None,
+    ) -> ServingEndpointRecord:
+        _serving_endpoint_valid(record)
+        if expected_state is not None and expected_state not in _SERVING_STATES:
+            raise ValueError("expected_state is not a serving state")
+        async with _transaction(self.sessions) as session:
+            row = await session.scalar(
+                select(ServingEndpointRow)
+                .where(ServingEndpointRow.model_id == record.model_id)
+                .with_for_update()
+            )
+            if row is None:
+                if expected_state is not None:
+                    raise ValueError("serving endpoint does not exist")
+                row = ServingEndpointRow(model_id=record.model_id)
+                session.add(row)
+            elif expected_state is not None and row.state != expected_state:
+                raise ValueError(
+                    f"serving endpoint state changed: expected {expected_state}, got {row.state}"
+                )
+            row.session_id = record.session_id
+            row.url = record.url
+            row.api_key_ref = record.api_key_ref
+            row.state = record.state
+            row.provider = record.provider
+            row.external_id = record.external_id
+            row.gpu_model = record.gpu_model
+            row.hourly_price_usd = record.hourly_price_usd
+            row.cost_accrued_usd = record.cost_accrued_usd
+            row.requested_at = _utc(record.requested_at) if record.requested_at else None
+            row.ready_at = _utc(record.ready_at) if record.ready_at else None
+            row.updated_at = _utc(record.updated_at)
+            row.error_code = record.error_code
+            row.detail = record.detail
+            row.active_slot = 1 if record.state in _ACTIVE_SERVING_STATES else None
+            await session.flush()
+            return _serving_endpoint_record(row)
+
+
+class SQLAlchemyServingAuditStore:
+    def __init__(self, sessions: async_sessionmaker[AsyncSession]) -> None:
+        self.sessions = sessions
+
+    async def append(self, record: ServingEventRecord) -> ServingEventRecord:
+        _serving_event_valid(record)
+        async with _transaction(self.sessions) as session:
+            existing = await session.get(ServingEventRow, record.id)
+            if existing is not None:
+                saved = _serving_event_record(existing)
+                if saved != _normalized_serving_event(record):
+                    raise ValueError("serving event id already exists with different content")
+                return saved
+            row = ServingEventRow(
+                id=record.id,
+                session_id=record.session_id,
+                model_id=record.model_id,
+                provider=record.provider,
+                action=record.action,
+                state=record.state,
+                actor=record.actor,
+                occurred_at=_utc(record.occurred_at),
+                external_id=record.external_id,
+                detail_json=_bounded_json(record.detail_json, "detail_json"),
+            )
+            session.add(row)
+            await session.flush()
+            return _serving_event_record(row)
+
+    async def list_for_session(self, session_id: str) -> list[ServingEventRecord]:
+        _text(session_id, "session_id")
+        statement = (
+            select(ServingEventRow)
+            .where(ServingEventRow.session_id == session_id)
+            .order_by(ServingEventRow.occurred_at, ServingEventRow.id)
+        )
+        async with _transaction(self.sessions) as session:
+            rows = (await session.scalars(statement)).all()
+            return [_serving_event_record(row) for row in rows]
+
+
 @dataclass(frozen=True)
 class RepositoryBundle:
     traffic: TrafficStore
@@ -493,6 +659,8 @@ class RepositoryBundle:
     credentials: CredentialStore
     approvals: ApprovalStore
     provision_audit: ProvisionAuditStore
+    serving_endpoints: ServingEndpointStore
+    serving_audit: ServingAuditStore
 
 
 def create_repositories(runtime: DatabaseRuntime) -> RepositoryBundle:
@@ -507,6 +675,8 @@ def create_repositories(runtime: DatabaseRuntime) -> RepositoryBundle:
         credentials=SQLAlchemyCredentialStore(sessions),
         approvals=SQLAlchemyApprovalStore(sessions),
         provision_audit=SQLAlchemyProvisionAuditStore(sessions),
+        serving_endpoints=SQLAlchemyServingEndpointStore(sessions),
+        serving_audit=SQLAlchemyServingAuditStore(sessions),
     )
 
 
@@ -625,12 +795,51 @@ def _provision_event_record(row: ProvisionEventRow) -> ProvisionEventRecord:
     )
 
 
+def _serving_endpoint_record(row: ServingEndpointRow) -> ServingEndpointRecord:
+    return ServingEndpointRecord(
+        model_id=row.model_id,
+        session_id=row.session_id,
+        url=row.url,
+        api_key_ref=row.api_key_ref,
+        state=row.state,
+        provider=row.provider,
+        external_id=row.external_id,
+        gpu_model=row.gpu_model,
+        hourly_price_usd=row.hourly_price_usd,
+        cost_accrued_usd=row.cost_accrued_usd,
+        requested_at=_utc(row.requested_at) if row.requested_at else None,
+        ready_at=_utc(row.ready_at) if row.ready_at else None,
+        updated_at=_utc(row.updated_at),
+        error_code=row.error_code,
+        detail=row.detail,
+    )
+
+
+def _serving_event_record(row: ServingEventRow) -> ServingEventRecord:
+    return ServingEventRecord(
+        id=row.id,
+        session_id=row.session_id,
+        model_id=row.model_id,
+        provider=row.provider,
+        action=row.action,
+        state=row.state,
+        actor=row.actor,
+        occurred_at=_utc(row.occurred_at),
+        external_id=row.external_id,
+        detail_json=row.detail_json,
+    )
+
+
 def _normalized_decision(record: AgentDecisionRecord) -> AgentDecisionRecord:
     return AgentDecisionRecord(**{**record.__dict__, "created_at": _utc(record.created_at)})
 
 
 def _normalized_provision_event(record: ProvisionEventRecord) -> ProvisionEventRecord:
     return ProvisionEventRecord(**{**record.__dict__, "occurred_at": _utc(record.occurred_at)})
+
+
+def _normalized_serving_event(record: ServingEventRecord) -> ServingEventRecord:
+    return ServingEventRecord(**{**record.__dict__, "occurred_at": _utc(record.occurred_at)})
 
 
 def _traffic_valid(record: TrafficRequestRecord) -> None:
@@ -711,6 +920,37 @@ def _approval_valid(record: ApprovalRecord) -> None:
 def _provision_event_valid(record: ProvisionEventRecord) -> None:
     for name in ("id", "approval_id", "provider", "action", "status", "actor"):
         _text(getattr(record, name), name)
+    _timestamp(record.occurred_at, "occurred_at")
+    _bounded_json(record.detail_json, "detail_json")
+
+
+def _serving_endpoint_valid(record: ServingEndpointRecord) -> None:
+    _text(record.model_id, "model_id")
+    if record.state not in _SERVING_STATES:
+        raise ValueError("state is not a serving state")
+    if record.state in _ACTIVE_SERVING_STATES and not record.session_id:
+        raise ValueError("active serving endpoint requires session_id")
+    if record.state == "ready" and not record.url:
+        raise ValueError("ready serving endpoint requires url")
+    if record.state != "ready" and record.url is not None:
+        raise ValueError("non-ready serving endpoint cannot publish url")
+    _timestamp(record.updated_at, "updated_at")
+    if record.requested_at is not None:
+        _timestamp(record.requested_at, "requested_at")
+    if record.ready_at is not None:
+        _timestamp(record.ready_at, "ready_at")
+    if record.hourly_price_usd is not None:
+        _nonnegative_number(record.hourly_price_usd, "hourly_price_usd")
+    _nonnegative_number(record.cost_accrued_usd, "cost_accrued_usd")
+    if not isinstance(record.detail, str):
+        raise ValueError("detail must be a string")
+
+
+def _serving_event_valid(record: ServingEventRecord) -> None:
+    for name in ("id", "session_id", "model_id", "provider", "action", "state", "actor"):
+        _text(getattr(record, name), name)
+    if record.state not in _SERVING_STATES:
+        raise ValueError("state is not a serving state")
     _timestamp(record.occurred_at, "occurred_at")
     _bounded_json(record.detail_json, "detail_json")
 
