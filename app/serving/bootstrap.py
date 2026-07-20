@@ -37,6 +37,10 @@ def fetch(url, destination, expected_size, expected_sha):
     os.replace(temporary, destination)
 
 def main():
+    if os.environ.get("VF_INSTALL_VLLM", "false").lower() == "true":
+        subprocess.check_call(
+            [sys.executable, "-m", "pip", "install", "--no-cache-dir", "vllm==0.10.2"]
+        )
     with urlopen(os.environ["VF_MODEL_MANIFEST_URL"], timeout=60) as response:
         manifest = json.load(response)
     files = manifest.get("files")

@@ -146,6 +146,7 @@ class RunPodServingRuntime:
             "VF_CLOUDFLARED_SHA256": CLOUDFLARED_SHA256,
             "VF_ENDPOINT_API_KEY": endpoint_api_key,
             "VF_SERVED_MODEL": model_id,
+            "VF_INSTALL_VLLM": "true" if self.settings.install_vllm else "false",
         }
         runtime = RunPodRuntimeConfig(
             http_ports=(8000,),

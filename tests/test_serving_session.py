@@ -115,6 +115,7 @@ def test_s3_identity_and_callback_validation() -> None:
 
 def test_serving_settings_keep_paid_wake_off_and_budget_bounded() -> None:
     assert ServingSettings.from_env({}).enabled is False
+    assert ServingSettings.from_env({"VF_SERVING_INSTALL_VLLM": "true"}).install_vllm is True
     with pytest.raises(ValueError, match=r"\(0, 5\]"):
         ServingSettings.from_env({"VF_SERVING_BUDGET_USD_CAP": "5.01"})
 

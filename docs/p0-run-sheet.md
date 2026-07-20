@@ -3122,6 +3122,13 @@ local/static fallback. No trainer or frozen-data work belongs to this patch.
   official vLLM 0.10.2 linux-amd64 digest
   `sha256:df2607b26bdda2875de4832f4d08da0055b4b6e3570347f3a849bcc652771dd6`.
   Fall back to the verified install path without weakening gates.
+  - [x] Official-image experiment allocated L4 `lvxho39akxlwgq` at
+    `$0.39/hr`, but after 30 minutes still had no RunPod runtime keys, public
+    port, or S3 tunnel callback and no provider error. Readiness fuse fired;
+    the first DELETE was transiently unproven, an identity-gated idempotent
+    retry confirmed target absent and `vf-auto-* = 0`, and restart
+    reconciliation wrote `cold`. Selected fallback: verified PyTorch
+    2.8/cu128 image plus locked `vllm==0.10.2`; all later gates unchanged.
 - [ ] **SV5-A — first live cycle.** Wake to ready, record cold-start duration,
   canary 50%, send 200 SQL requests, require 40–60% tuned, no tuned fallback,
   and at least one new Guardian point; restore canary to zero.

@@ -11,6 +11,7 @@ OFFICIAL_VLLM_IMAGE = (
     "vllm/vllm-openai:v0.10.2@"
     "sha256:df2607b26bdda2875de4832f4d08da0055b4b6e3570347f3a849bcc652771dd6"
 )
+FALLBACK_VLLM_IMAGE = "runpod/pytorch:1.0.2-cu1281-torch280-ubuntu2404"
 MODEL_JOB_ID = "d4-m3-1p5b-r1-v0125"
 MODEL_ARTIFACT_NAME = "serving/step_350"
 MODEL_TREE_SHA256 = "7bde853af7c82405fd1356de9bad9b6c421de45a45ce747f63ea2f8a27eda658"
@@ -38,6 +39,7 @@ class ServingSettings:
     model_artifact_name: str = MODEL_ARTIFACT_NAME
     expected_tree_sha256: str = MODEL_TREE_SHA256
     presign_ttl_seconds: int = 3 * 60 * 60
+    install_vllm: bool = False
 
     @classmethod
     def from_env(
@@ -57,6 +59,7 @@ class ServingSettings:
             presign_ttl_seconds=int(
                 values.get("VF_SERVING_PRESIGN_TTL_SECONDS", str(3 * 60 * 60))
             ),
+            install_vllm=_bool(values.get("VF_SERVING_INSTALL_VLLM")),
         )
         settings.validate()
         return settings
