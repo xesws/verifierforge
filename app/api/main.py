@@ -52,9 +52,16 @@ def _runs_dir() -> Path:
 
 def _data_mode() -> str:
     mode = os.environ.get("VF_API_DATA_MODE", "runs").strip().lower()
-    if mode not in {"runs", "artifacts"}:
-        raise HTTPException(status_code=500, detail="VF_API_DATA_MODE must be runs or artifacts")
+    if mode not in {"runs", "artifacts", "hybrid"}:
+        raise HTTPException(
+            status_code=500,
+            detail="VF_API_DATA_MODE must be runs, artifacts, or hybrid",
+        )
     return mode
+
+
+def _artifact_jobs_mode() -> bool:
+    return _data_mode() in {"artifacts", "hybrid"}
 
 
 def _artifact_store() -> ArtifactStore:
@@ -115,7 +122,7 @@ def _metrics_for(job_dir: Path) -> Metrics:
 @app.get("/jobs")
 def list_jobs() -> list[dict[str, str]]:
     """List local run IDs and their file-inferred status."""
-    if _data_mode() == "artifacts":
+    if _artifact_jobs_mode():
         return _artifact_store().list_jobs()
     root = _runs_dir()
     if not root.is_dir():
@@ -144,7 +151,7 @@ def list_jobs() -> list[dict[str, str]]:
 @app.get("/jobs/{job_id}", response_model=Job)
 def get_job(job_id: str) -> Job:
     """Return a minimal Job built from files already present under runs/."""
-    if _data_mode() == "artifacts":
+    if _artifact_jobs_mode():
         try:
             return _artifact_store().job(job_id)
         except KeyError as error:
@@ -186,7 +193,7 @@ def get_job(job_id: str) -> Job:
 @app.get("/jobs/{job_id}/metrics", response_model=Metrics)
 def job_metrics(job_id: str) -> Metrics:
     """Aggregate the append-only metric log into the shared Metrics shape."""
-    if _data_mode() == "artifacts":
+    if _artifact_jobs_mode():
         try:
             return _artifact_store().metrics(job_id)
         except KeyError as error:

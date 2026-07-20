@@ -96,6 +96,20 @@ Open `http://127.0.0.1:8012/docs` for the API. The optional mock Agent demo is
 documented in [JUDGES.md](JUDGES.md); it uses the real Discover UI and stores a
 decision/approval locally without a paid call.
 
+Owners can expose the full product composition—Supabase repositories, the
+configured real tuned endpoint, mock Agent, mock provisioner and Guardian—via
+an authenticated Cloudflare quick tunnel:
+
+```bash
+bash scripts/start_reviewer_sandbox.sh --mode full
+```
+
+The launcher prints the ephemeral URL and the path to a `0600`, ignored invite
+code file. Reviewers authenticate as Basic Auth user `judge`; the code must be
+shared separately. Quick tunnels are temporary evidence, not production
+hosting. `VF_AUTOPROVISION` is enabled only inside this launcher together with
+`VF_PROVISION_BINDING=mock`, so Start Forge cannot create a paid resource.
+
 ## Engineering boundaries
 
 The training control plane detaches jobs in tmux, records process groups for
@@ -154,6 +168,8 @@ BYO credentials through Settings and keep that fallback unset.
 - P-4 proves real approval/Start/provision/delete wiring, not a second complete
   training run from the web. `VF_AUTOPROVISION` remains default-off. The P-4
   smoke estimate was `$0.000623`; final provider billing remains asynchronous.
+- The provider-neutral seam is ready for another adapter, but
+  `NebiusAdapter` is roadmap-only; RunPod is the only live implementation.
 - Agent Gate C covers a frozen 12-scenario evaluator. It is not evidence that
   arbitrary business traffic should auto-train; the flag remains default-off
   and approval is required.

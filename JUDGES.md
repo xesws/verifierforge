@@ -11,7 +11,7 @@ python -m pip install -r requirements-app.txt
 pytest -q
 ```
 
-Expected at this revision: `383 passed, 1 skipped`. The skip is the explicitly
+Expected at this revision: `426 passed, 1 skipped`. The skip is the explicitly
 credential-gated live S3 test.
 
 ## 2. Start the reviewer sandbox (about 1 minute)
@@ -28,7 +28,22 @@ Proxy: http://127.0.0.1:8013/v1/chat/completions
 ```
 
 The API reads immutable committed evidence; the proxy uses a deterministic fake
-upstream.
+upstream. This fallback remains the no-secret path for a fresh clone.
+
+### Owner-hosted full sandbox
+
+The owner may instead run:
+
+```bash
+bash scripts/start_reviewer_sandbox.sh --mode full
+```
+
+This publishes one ephemeral `trycloudflare.com` URL backed by Supabase, the
+configured real tuned endpoint, mock Agent and mock Start Forge lifecycle. It
+requires HTTP Basic Auth: username `judge`, invitation code shared separately.
+The launcher never prints the code; it records it only in the ignored runtime
+path it reports. A request without auth returns 401. This full path calls no
+paid LLM and provisions no GPU.
 
 ## 3. Inspect the training result (about 2 minutes)
 
@@ -70,13 +85,16 @@ Open `http://127.0.0.1:8014/discover`. On **Data Pull SQL**:
 1. inspect `95,000 SQL queries/month` and `$5,500/month`;
 2. click **Input**, keep the default repository source, and confirm;
 3. click **Analyze** to see the mock-bound decision, rationale and config;
-4. click **Approve & Forge** and observe the durable approval receipt.
+4. click **Approve & Forge** and observe the durable approval receipt;
+5. on the owner-hosted full sandbox, confirm the separate spend boundary and
+   click **Start Forge**; it runs the mock provisioner and polls to `done`.
 
 This UI path is structurally real but intentionally zero-cost. The separate
 live Gate C evidence is `1.0 / 1.0 / 0 / 1.0` under tag
 `agent-gate-c-pass`; the production source/decision/approval record is in
 [`docs/p0-run-sheet.md`](docs/p0-run-sheet.md). Approval writes intent only—it
-does not launch a GPU from the browser.
+does not launch a GPU from the browser. Start is a distinct action; the public
+reviewer sandbox binds it to the mock provisioner.
 
 ## 5. Inspect delivery and persistence evidence (about 2 minutes)
 
@@ -101,5 +119,9 @@ hardening.
   0.5B/100-step S3 run, post-training vLLM models/completion gate, 137-object
   SHA collection, and target-absent/raw-prefix-zero deletion. Tag
   `provisioner-p2-live` records it; billing reconciliation remains asynchronous.
+- P-4 separately proved the product approval→Start→real RunPod readiness→delete
+  wiring at a `$0.000623` provider estimate. `VF_AUTOPROVISION` remains
+  default-off; the reviewer full sandbox explicitly uses the mock adapter.
+- Nebius is the next adapter on the roadmap and is not implemented.
 - The repository contains no weights, credentials, raw traffic bodies, or
   requirement for a paid provider during review.

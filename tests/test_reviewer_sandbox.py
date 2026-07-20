@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import base64
 import os
 from pathlib import Path
 import socket
@@ -102,3 +103,64 @@ def test_launcher_refuses_one_port_for_both_services() -> None:
 
     assert result.returncode == 2
     assert "ports must differ" in result.stderr
+
+
+def test_full_mode_composes_authenticated_surface_without_cloud_calls(
+    tmp_path: Path,
+) -> None:
+    public_port = _free_port()
+    runtime = tmp_path / "full-runtime"
+    environment = {
+        **os.environ,
+        "PYTHON": sys.executable,
+        "VF_REVIEW_RUNTIME_DIR": str(runtime),
+        "VF_REVIEW_TEST_MODE": "true",
+    }
+    process = subprocess.Popen(
+        [
+            "bash",
+            str(LAUNCHER),
+            "--mode",
+            "full",
+            "--public-port",
+            str(public_port),
+        ],
+        cwd=ROOT,
+        env=environment,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE,
+        text=True,
+    )
+    try:
+        assert _wait_for_json(f"http://127.0.0.1:{public_port}/healthz") == {
+            "status": "ok"
+        }
+        for _ in range(80):
+            invite_path = runtime / "invite-code.txt"
+            if invite_path.exists():
+                break
+            time.sleep(0.1)
+        invite = invite_path.read_text(encoding="utf-8").strip()
+        token = base64.b64encode(f"judge:{invite}".encode()).decode()
+        request = Request(
+            f"http://127.0.0.1:{public_port}/jobs",
+            headers={"Authorization": f"Basic {token}"},
+        )
+        with urlopen(request, timeout=3) as response:
+            jobs = json.loads(response.read().decode())
+        assert len(jobs) == 2
+        public_url_path = runtime / "public-url.txt"
+        for _ in range(80):
+            if public_url_path.exists():
+                break
+            time.sleep(0.1)
+        assert public_url_path.read_text().strip() == (
+            f"http://127.0.0.1:{public_port}"
+        )
+    finally:
+        process.terminate()
+        try:
+            process.wait(timeout=8)
+        except subprocess.TimeoutExpired:
+            process.kill()
+            process.wait(timeout=8)

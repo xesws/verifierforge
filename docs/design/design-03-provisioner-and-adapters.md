@@ -113,6 +113,10 @@ AgentDecision(forge, config) → 用户点 Approve
 同一契约、同一一致性套件过关(dry-run + 金路径)。
 **DoD**:切换 provider 仅改 ProvisionSpec.provider 一个字段,其余体验同构。
 
+> 2026-07-19 状态:provider-neutral 接口、保险丝、审计与 P-4 产品边界
+> 已就绪;`NebiusAdapter` 是下一适配器,本轮仅登记路线图,尚未实现或
+> 调用任何 Nebius API。RunPod 仍是唯一通过真实金路径的适配器。
+
 ### Stage P-4 BYO 凭证 + 批准流接线
 settings 凭证入库(加密)、Approve 页 / 弹窗、决策 → 批准 → 执行全链。
 **DoD**:一个从未接触过系统内部的用户,只凭"填自己的 key + 点批准"即可让系统在其账户上完成一次全自动锻造。

@@ -2748,13 +2748,22 @@ supporting reads if the laptop remains awake. Sanitized tracked evidence:
 ## 2026-07-19 v0.30.0 — reviewer sandbox full mode
 
 - [x] Reserve version plus infrastructure/submission/provisioner area docs.
-- [ ] Preserve default artifact/fake fallback and add one authenticated
+- [x] Preserve default artifact/fake fallback and add one authenticated
   full-mode composite: Supabase + real tuned endpoint + mock Agent + mock Start.
 - [ ] Capture a Cloudflare quick-tunnel URL, verify invite rejection/acceptance,
   and record the ephemeral URL without committing the invite code.
-- [ ] Align JUDGES and README; mark `NebiusAdapter` as next, not implemented.
+- [x] Align JUDGES and README; mark `NebiusAdapter` as next, not implemented.
 - [ ] Full regression, secret scan, commit/push, tag `reviewer-sandbox-full`.
 
 Stop without weakening the boundary if database, public model health,
 invitation auth or cloudflared readiness fails. This stage performs zero GPU,
 provider-provisioning and paid-LLM mutations.
+
+Zero-cost implementation result: `--mode fallback` retains its two loopback
+processes. `--mode full` uses an authenticated one-port ASGI composition, a
+hybrid artifact/repository API mode, temporary 50% route setup with shutdown
+restore, mock Agent and mock provisioner, real tuned-endpoint health preflight,
+and quick-tunnel URL capture. Basic Auth protects every product/proxy path;
+only `/healthz` is public. Local full-mode tests use SQLite/fake-tuned and no
+tunnel or external call. Validation: `426 passed, 1 skipped`; secret scan and
+shell syntax passed.
