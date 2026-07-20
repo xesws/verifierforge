@@ -2907,3 +2907,26 @@ Pod `ol2xt6tn71b8oc`, then deleted it immediately. The 5.225-second wall-clock
 estimate was `$0.000290`; target GET absence and a new account inventory with
 `vf-auto-* = 0` closed the cleanup gate. Sanitized evidence:
 `docs/evidence/provisioner/v0.32.0-capacity-live-pass.json`.
+
+## 2026-07-19 v0.32.1 — backend self-check and frontend handoff
+
+- [x] Reserve the patch version and backend/database/frontend area documents
+  before implementation.
+- [ ] Replace wildcard CORS with environment-controlled local defaults and
+  add regression coverage.
+- [ ] Preserve Start Forge's disabled boundary while returning an explicit
+  disabled detail and proving zero provider/persistence action.
+- [ ] Start the true API on Postgres with mock Agent and autoprovision off.
+- [ ] Exercise the 16 frozen operations, validate fields, and record exact
+  HTTP status/provenance; separately note the three documented non-frozen GETs.
+- [ ] Verify three clusters, D4 before/after and curves, routing, Guardian,
+  Analyze, Approve, and disabled Start; put anomalies first without inventing
+  missing data.
+- [ ] Restore Supabase product state, remove bounded test fixtures, prove the
+  SQLite sentinel was never created, and stop the local API.
+- [ ] Publish `docs/frontend/integration-cheatsheet.md`, run focused/full/
+  Postgres tests plus secret scan, commit, push, and report final HEAD.
+
+Stop conditions: any secret in output, paid LLM/provider call, contract field
+drift, failed cleanup, or evidence that cannot distinguish Supabase from a
+local/static fallback. No trainer or frozen-data work belongs to this patch.
