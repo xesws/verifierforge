@@ -3173,13 +3173,28 @@ semantic tag. Existing L4 service is out of scope and must remain untouched.
 
 ## 2026-07-20 v0.34.1 — L4 retirement readiness
 
-**Status:** in progress. No old-L4 process may be contacted or mutated.
+**Status:** complete. No old-L4 process was contacted or mutated.
 
 - [x] Read-only inventory found Supabase `vf-demo` cold with `url=NULL`, SQL
   routing disabled/canary zero/target `tuned`, and zero managed serving pods.
-- [ ] Remove four stale physical tuned-endpoint variables from Railway and the
+- [x] Remove four stale physical tuned-endpoint variables from Railway and the
   active local-full configuration path; deploy registry-only resolution.
-- [ ] Prove the complete public reviewer surface in cold state and prove an
+- [x] Prove the complete public reviewer surface in cold state and prove an
   explicitly forced tuned request produces observable automatic fallback.
-- [ ] Verify Wake status messaging, update JUDGES, run full tests/secret scan,
+- [x] Verify Wake status messaging, update JUDGES, run full tests/secret scan,
   commit, push, and issue the explicit old-L4 shutdown conclusion.
+
+Public evidence: `/healthz`, `/discover`, `/clusters`, flagship Job,
+flagship metrics, routing, LivePassRate and serving status all returned HTTP
+200 while `serving_endpoints` was cold and provider inventory was zero. The Job
+contained before/after `0.5833/0.7833`, main/control curves `400/200`, ten
+`arena.samples`, `$3,850`, and `real_gain`. A temporary 100% logical tuned route
+returned HTTP 200 with `X-VerifierForge-Route=default-fallback`; route state was
+restored to disabled/canary zero. Concurrent cluster hydration reduced observed
+latency from 9,390ms to 2,503–2,819ms. Final validation: 474 passed, one skipped,
+secret scan passed, shell syntax passed.
+
+**Retirement conclusion:** old L4 now has no config, routing, registry, report,
+or cold-reviewer dependency and may be safely closed by the owner. Closing it
+does not remove any reviewer report/arena/Discover experience; live inference
+remains available through the Wake model scale-to-zero path.

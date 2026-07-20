@@ -45,12 +45,15 @@ invitation code shared separately. A request without auth returns 401;
 `/healthz` remains public. `VF_AUTOPROVISION=false`, so Start Forge returns an
 explicit disabled response and cannot create a paid resource.
 
-On Discover, **Wake model** is a separate, explicitly confirmed serving action.
-It permits only one session, has a `$5` session cap, and normally reaches ready
-in about 4.5 minutes. The page polls `cold → provisioning → loading → ready`;
-after 30 idle minutes the production reaper deletes the pod. Reports and arena
-remain usable throughout cold start. Do not confuse this with Start Forge:
-training autoprovision remains disabled.
+Start the hosted walkthrough by clicking **Wake model** on Discover. The action
+permits only one session and has a `$5` cap. While its visible state advances
+through `provisioning` and `loading`, inspect the flagship Job report: the two
+curves, held-out arena, and `0.5833 → 0.7833` result do not need a live GPU.
+Return to Discover after about 4.5 minutes; the two measured cold starts were
+282 and 267 seconds. `ready` is shown before live inference is offered, while a
+failed wake shows `failed` plus a readable reason and leaves reports available.
+After 30 idle minutes the production reaper deletes the pod. Do not confuse
+this with Start Forge: training autoprovision remains disabled.
 
 If the hosted service is unavailable, the owner may recreate the local full
 fallback with:
@@ -59,8 +62,8 @@ fallback with:
 bash scripts/start_reviewer_sandbox.sh --mode full
 ```
 
-This publishes an ephemeral `trycloudflare.com` URL backed by Supabase, the
-configured real tuned endpoint, mock Agent and mock Start Forge lifecycle. It
+This publishes an ephemeral `trycloudflare.com` reviewer URL backed by
+Supabase, the dynamic serving registry, mock Agent and mock Start Forge lifecycle. It
 requires HTTP Basic Auth: username `judge`, invitation code shared separately.
 The launcher never prints the code; it records it only in the ignored runtime
 path it reports. A request without auth returns 401. This full path calls no
