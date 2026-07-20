@@ -2883,6 +2883,32 @@ Stop conditions: any trainer/frozen-data mutation, secret exposure, destructive
 contract drift, non-held-out arena input, hand-authored database projection, or
 failure to preserve the two pre-existing provisioning billing modifications.
 
+## 2026-07-20 v0.33.0 — hosted backend separation
+
+- [x] Reserve version and backend/infrastructure/frontend area documents before
+  implementation.
+- [x] H0: prove lightweight imports, split runtime requirements, and record the
+  complete environment inventory.
+- [x] H1: build a sub-1GB non-root container and pass local 19-operation,
+  invitation, CORS, proxy, Guardian, and degraded-mode gates.
+- [ ] H2: deploy one always-on Railway Hobby service and repeat the matrix from
+  its fixed public subdomain.
+- [ ] H3: only after H2 green, retire old sandbox processes while preserving
+  vLLM; establish fixed-port or one-variable tunnel rotation.
+- [ ] H4: update JUDGES/README/frontend/infrastructure handoff, validate,
+  commit/tag/push, and write the owner checklist.
+
+Stop conditions: any secret in repository/log output, duplicate hosted service,
+paid LLM/provisioning action, image at or above 1GB, H3 before public H2 green,
+or accidental staging of the two background billing files. A stage blocked for
+more than 30 minutes is recorded and skipped.
+
+H0/H1 evidence: image `98,709,804` bytes; imported heavy-module set `[]`;
+19/19 expected API statuses; localhost and Vercel CORS at API/proxy; tuned
+completion HTTP 200; Guardian 129 points; unreachable tuned endpoint fell back
+with HTTP 200 and `{"status":"degraded","tuned_upstream_reachable":false}`.
+The old local reviewer (`:8014`) and quick tunnel remain running pending H2.
+
 ## 2026-07-19 v0.32.0 — P-2.5 capacity-aware RunPod selection
 
 - [x] Reserve v0.32.0 and affected provisioner/infrastructure/design docs

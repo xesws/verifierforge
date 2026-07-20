@@ -4,7 +4,12 @@ from fastapi import FastAPI
 from fastapi.testclient import TestClient
 import pytest
 
-from app.api.cors import DEFAULT_LOCAL_ORIGINS, configure_cors, cors_origins
+from app.api.cors import (
+    DEFAULT_LOCAL_ORIGINS,
+    configure_cors,
+    cors_origin_regex,
+    cors_origins,
+)
 from app.api.main import app as real_app
 from mock.server import app as mock_app
 
@@ -57,3 +62,19 @@ def test_wildcard_requires_explicit_value() -> None:
         ValueError, match="VF_CORS_ORIGINS wildcard must be the only value"
     ):
         cors_origins({"VF_CORS_ORIGINS": "*,https://frontend.example"})
+
+
+def test_hosted_preview_regex_is_explicit_and_validated() -> None:
+    expression = r"^https://[a-z0-9-]+\.vercel\.app$"
+    app = FastAPI()
+    configure_cors(app, {"VF_CORS_ORIGIN_REGEX": expression})
+    client = TestClient(app)
+
+    assert cors_origin_regex({"VF_CORS_ORIGIN_REGEX": expression}) == expression
+    response = _preflight(client, "https://vf-preview-123.vercel.app")
+    assert response.status_code == 200
+    assert response.headers["access-control-allow-origin"] == (
+        "https://vf-preview-123.vercel.app"
+    )
+    with pytest.raises(ValueError, match="valid regular expression"):
+        cors_origin_regex({"VF_CORS_ORIGIN_REGEX": "["})

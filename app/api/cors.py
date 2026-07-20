@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import os
+import re
 from collections.abc import Mapping
 
 from fastapi import FastAPI
@@ -36,6 +37,20 @@ def cors_origins(environ: Mapping[str, str] | None = None) -> list[str]:
     return origins or list(DEFAULT_LOCAL_ORIGINS)
 
 
+def cors_origin_regex(environ: Mapping[str, str] | None = None) -> str | None:
+    """Resolve and validate an optional hosted-preview origin expression."""
+
+    values = os.environ if environ is None else environ
+    raw = values.get("VF_CORS_ORIGIN_REGEX", "").strip()
+    if not raw:
+        return None
+    try:
+        re.compile(raw)
+    except re.error:
+        raise ValueError("VF_CORS_ORIGIN_REGEX must be a valid regular expression") from None
+    return raw
+
+
 def configure_cors(
     app: FastAPI, environ: Mapping[str, str] | None = None
 ) -> None:
@@ -44,10 +59,16 @@ def configure_cors(
     app.add_middleware(
         CORSMiddleware,
         allow_origins=cors_origins(environ),
+        allow_origin_regex=cors_origin_regex(environ),
         allow_credentials=False,
         allow_methods=["*"],
         allow_headers=["*"],
     )
 
 
-__all__ = ["DEFAULT_LOCAL_ORIGINS", "configure_cors", "cors_origins"]
+__all__ = [
+    "DEFAULT_LOCAL_ORIGINS",
+    "configure_cors",
+    "cors_origin_regex",
+    "cors_origins",
+]

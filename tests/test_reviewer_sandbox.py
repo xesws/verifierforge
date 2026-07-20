@@ -132,9 +132,9 @@ def test_full_mode_composes_authenticated_surface_without_cloud_calls(
         text=True,
     )
     try:
-        assert _wait_for_json(f"http://127.0.0.1:{public_port}/healthz") == {
-            "status": "ok"
-        }
+        health = _wait_for_json(f"http://127.0.0.1:{public_port}/healthz")
+        assert health["status"] == "ok"
+        assert health["tuned_upstream_reachable"] is None
         for _ in range(80):
             invite_path = runtime / "invite-code.txt"
             if invite_path.exists():

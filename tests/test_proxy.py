@@ -10,7 +10,7 @@ import pytest
 from app.proxy.clusters import SYSTEM_PROMPTS_BY_CLUSTER
 from app.proxy.main import ProxySettings, create_app
 from app.proxy.traffic import estimate_cost
-from app.proxy.upstream import ForwardedResponse
+from app.proxy.upstream import ForwardedResponse, UpstreamRequestError
 
 
 def _request(*, system: str = "Extract support fields.", model: str = "vf-demo") -> dict[str, object]:
@@ -118,6 +118,47 @@ def test_http_tuned_upstream_uses_only_its_dedicated_key(monkeypatch, tmp_path: 
         "api_key": "endpoint-only-key",
     }
     assert "endpoint-only-key" not in repr(settings)
+
+
+def test_unreachable_tuned_upstream_falls_back_without_guardian_or_502(
+    monkeypatch, tmp_path: Path
+) -> None:
+    scheduled: list[object] = []
+
+    def unavailable(*_args, **_kwargs):
+        raise UpstreamRequestError("bounded fixture failure")
+
+    settings = ProxySettings(
+        upstream="fake",
+        tuned_upstream="https://tuned.example/v1",
+        tuned_api_key="endpoint-only-key",
+        tuned_model="served-step-350",
+        db_path=tmp_path / "traffic.db",
+    )
+    monkeypatch.setattr(
+        "app.proxy.main.get_route",
+        lambda *_args, **_kwargs: __import__(
+            "app.proxy.routing", fromlist=["RouteRecord"]
+        ).RouteRecord("data-pull-sql", True, 100, "tuned"),
+    )
+    app = create_app(
+        settings=settings,
+        real_forwarder=unavailable,
+        canary_draw=lambda: 0.0,
+        guardian_draw=lambda: 0.0,
+        guardian_scheduler=scheduled.append,
+    )
+    response = TestClient(app).post(
+        "/v1/chat/completions",
+        json=_request(system=SYSTEM_PROMPTS_BY_CLUSTER["data-pull-sql"]),
+    )
+
+    assert response.status_code == 200
+    assert response.json()["choices"][0]["message"]["content"].startswith(
+        "vf-fake-completion-"
+    )
+    assert app.state.tuned_upstream_status == "degraded"
+    assert scheduled == []
 
 
 def test_http_tuned_upstream_never_falls_back_to_llm_key(monkeypatch) -> None:

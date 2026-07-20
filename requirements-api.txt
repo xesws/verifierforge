@@ -1,0 +1,14 @@
+# v0.33.0 hosted reviewer/API runtime. Test and training packages stay elsewhere.
+fastapi>=0.110
+uvicorn[standard]>=0.27
+pydantic>=2,<3
+sqlparse>=0.5
+openai>=1,<3
+httpx>=0.27,<1
+python-dotenv>=1,<2
+boto3>=1.34,<2
+SQLAlchemy[asyncio]>=2.0,<2.1
+aiosqlite>=0.20,<1
+asyncpg>=0.29,<1
+alembic>=1.13,<2
+cryptography>=42,<46

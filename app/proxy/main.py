@@ -148,6 +148,7 @@ def create_app(
         return database
     schedule_guardian = guardian_scheduler or _schedule_background
     proxy = FastAPI(title="VerifierForge Proxy")
+    proxy.state.tuned_upstream_status = "unknown"
 
     @proxy.post("/v1/chat/completions")
     def chat_completions(request: dict[str, Any]) -> JSONResponse:
@@ -161,18 +162,39 @@ def create_app(
             else None
         )
         decision = _route_decision(system_prompt, active_database, canary_draw)
+        selected_upstream = _selected_upstream(decision, resolved)
         try:
             forwarded = _forward(
                 request,
-                upstream=_selected_upstream(decision, resolved),
+                upstream=selected_upstream,
                 settings=resolved,
                 real_forwarder=real_forwarder,
             )
         except (LLMConfigurationError, UpstreamRequestError) as error:
-            forwarded = ForwardedResponse(
-                502,
-                {"error": {"message": str(error), "type": "upstream_error"}},
-            )
+            if decision.route_path == "tuned":
+                forwarded, decision = _fallback_from_tuned(
+                    proxy,
+                    request,
+                    decision=decision,
+                    settings=resolved,
+                    real_forwarder=real_forwarder,
+                )
+            else:
+                forwarded = ForwardedResponse(
+                    502,
+                    {"error": {"message": str(error), "type": "upstream_error"}},
+                )
+        else:
+            if decision.route_path == "tuned" and not 200 <= forwarded.status_code < 300:
+                forwarded, decision = _fallback_from_tuned(
+                    proxy,
+                    request,
+                    decision=decision,
+                    settings=resolved,
+                    real_forwarder=real_forwarder,
+                )
+            elif decision.route_path == "tuned":
+                proxy.state.tuned_upstream_status = "ok"
 
         _record_best_effort(
             recorder,
@@ -197,6 +219,27 @@ def create_app(
         return JSONResponse(content=forwarded.payload, status_code=forwarded.status_code)
 
     return proxy
+
+
+def _fallback_from_tuned(
+    proxy: FastAPI,
+    request: Mapping[str, Any],
+    *,
+    decision: RouteDecision,
+    settings: ProxySettings,
+    real_forwarder: RealForwarder,
+) -> tuple[ForwardedResponse, RouteDecision]:
+    """Keep the product path usable while marking tuned inference degraded."""
+
+    proxy.state.tuned_upstream_status = "degraded"
+    _LOGGER.warning("tuned upstream unavailable; deterministic fallback selected")
+    fallback = _forward(
+        request,
+        upstream=settings.upstream,
+        settings=settings,
+        real_forwarder=real_forwarder,
+    )
+    return fallback, RouteDecision(decision.cluster_id, "default-fallback", None)
 
 
 def _forward(

@@ -338,21 +338,31 @@ def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description="Build committed reviewer demo artifacts from D4 evidence")
     parser.add_argument("--runs-dir", type=Path, default=Path(os.environ.get("VF_RUNS_DIR", "./runs")))
     parser.add_argument("--destination", type=Path, default=Path("data/demo-artifacts"))
-    parser.add_argument(
+    sync = parser.add_mutually_exclusive_group()
+    sync.add_argument(
         "--sync-db",
         action="store_true",
-        help="idempotently backfill the configured relational Job store",
+        help="rebuild and idempotently backfill the configured relational Job store",
+    )
+    sync.add_argument(
+        "--sync-existing-db",
+        action="store_true",
+        help="backfill the configured store from the committed artifact without rebuilding",
     )
     return parser.parse_args()
 
 
 def main() -> None:
     args = parse_args()
-    manifest = build(runs_dir=args.runs_dir, destination=args.destination)
-    if args.sync_db:
+    manifest = (
+        _read_json(args.destination / "manifest.json")
+        if args.sync_existing_db
+        else build(runs_dir=args.runs_dir, destination=args.destination)
+    )
+    if args.sync_db or args.sync_existing_db:
         from dotenv import load_dotenv
 
-        load_dotenv()
+        load_dotenv(".env")
         sync_job_projection(args.destination)
     print(
         json.dumps(
@@ -360,7 +370,7 @@ def main() -> None:
                 "main_job": manifest["main_job"],
                 "control_job": manifest["control_job"],
                 "projection_sha256": manifest["report_projection_sha256"],
-                "database_synced": args.sync_db,
+                "database_synced": args.sync_db or args.sync_existing_db,
             },
             sort_keys=True,
         )

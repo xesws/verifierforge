@@ -37,6 +37,31 @@ def test_full_reviewer_app_requires_invitation_and_mounts_api_proxy(monkeypatch)
     assert completion.json()["object"] == "chat.completion"
 
 
+def test_reviewer_cors_preflight_bypasses_invitation_for_api_and_proxy(
+    monkeypatch,
+) -> None:
+    monkeypatch.setenv("VF_REVIEW_INVITE_CODE", "invite-fixture")
+    monkeypatch.setenv(
+        "VF_CORS_ORIGINS",
+        "http://localhost:5173,https://verifierforge.vercel.app",
+    )
+    module = importlib.import_module("app.reviewer.main")
+    client = TestClient(module.create_app())
+
+    for path in ("/clusters", "/proxy/v1/chat/completions"):
+        response = client.options(
+            path,
+            headers={
+                "Origin": "http://localhost:5173",
+                "Access-Control-Request-Method": "POST",
+                "Access-Control-Request-Headers": "authorization,content-type",
+            },
+        )
+        assert response.status_code == 200
+        assert response.headers["access-control-allow-origin"] == "http://localhost:5173"
+    assert client.get("/jobs").status_code == 401
+
+
 def test_full_reviewer_app_rejects_missing_invite_configuration(monkeypatch) -> None:
     monkeypatch.delenv("VF_REVIEW_INVITE_CODE", raising=False)
     module = importlib.import_module("app.reviewer.main")
