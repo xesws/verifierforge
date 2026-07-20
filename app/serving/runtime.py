@@ -15,6 +15,7 @@ from typing import Awaitable, Callable, Mapping, Protocol
 import httpx
 
 from app.provisioning.product import CredentialResolver
+from app.provisioning.errors import ProvisionProviderError
 from app.provisioning.runpod import RunPodAdapter, RunPodRuntimeConfig
 from app.provisioning.termination import DeletionReceipt, confirm_deleted, schedule_billing
 from app.serving.bootstrap import BOOTSTRAP_B64, BOOTSTRAP_LOADER
@@ -242,7 +243,7 @@ class RunPodServingRuntime:
     async def terminate(self, handle: ProvisionHandle) -> DeletionReceipt:
         adapter = RunPodAdapter(api_key_provider=self.credential_resolver)
         try:
-            await adapter.terminate(handle)
+            await _terminate_with_one_retry(adapter, handle)
             receipt = await confirm_deleted(adapter, handle, timeout_s=10 * 60, poll_s=15)
             schedule_billing(
                 Path("runs/serving/v0.34.0/billing-schedule.json"),
@@ -443,6 +444,23 @@ def _ephemeral_public_key() -> str:
         encoding=serialization.Encoding.OpenSSH,
         format=serialization.PublicFormat.OpenSSH,
     ).decode("ascii")
+
+
+async def _terminate_with_one_retry(
+    adapter,
+    handle: ProvisionHandle,
+    *,
+    sleeper=asyncio.sleep,
+) -> None:
+    try:
+        await adapter.terminate(handle)
+    except ProvisionProviderError as error:
+        if error.status_code in {401, 403}:
+            raise
+        # DELETE is idempotent. One bounded retry handles a transient provider
+        # edge failure without creating a retry storm.
+        await sleeper(2)
+        await adapter.terminate(handle)
 
 
 __all__ = [

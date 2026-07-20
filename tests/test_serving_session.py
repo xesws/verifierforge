@@ -10,9 +10,12 @@ import pytest
 from app.db.gateway import RepositoryGateway
 from app.db.settings import DatabaseSettings
 from app.serving.runtime import MockServingRuntime, _verified_callback, _verified_files
+from app.serving.runtime import _terminate_with_one_retry
+from app.provisioning.errors import ProvisionProviderError
 from app.serving.session import ServingControlError, ServingCoordinator
 from app.serving.settings import ServingSettings
 from core.serving_contracts import ServingState
+from core.provisioning_contracts import ProvisionHandle, ProvisionProvider
 
 
 @pytest.fixture
@@ -114,3 +117,39 @@ def test_serving_settings_keep_paid_wake_off_and_budget_bounded() -> None:
     assert ServingSettings.from_env({}).enabled is False
     with pytest.raises(ValueError, match=r"\(0, 5\]"):
         ServingSettings.from_env({"VF_SERVING_BUDGET_USD_CAP": "5.01"})
+
+
+async def test_delete_retries_one_transient_failure_but_never_retries_permission() -> None:
+    handle = ProvisionHandle(
+        provider=ProvisionProvider.RUNPOD,
+        external_id="pod-test",
+        job_id="serve-test",
+        approval_id="sv-test",
+    )
+
+    class Adapter:
+        def __init__(self, status_code):
+            self.status_code = status_code
+            self.calls = 0
+
+        async def terminate(self, _handle):
+            self.calls += 1
+            if self.calls == 1:
+                raise ProvisionProviderError("safe fixture", status_code=self.status_code)
+
+    transient = Adapter(500)
+    await _terminate_with_one_retry(
+        transient, handle, sleeper=lambda _seconds: _completed()
+    )
+    assert transient.calls == 2
+
+    denied = Adapter(403)
+    with pytest.raises(ProvisionProviderError):
+        await _terminate_with_one_retry(
+            denied, handle, sleeper=lambda _seconds: _completed()
+        )
+    assert denied.calls == 1
+
+
+async def _completed() -> None:
+    return None
