@@ -7,11 +7,14 @@ set -euo pipefail
 : "${VF_AGENT_ENABLED:=true}"
 : "${VF_AGENT_BINDING:=mock}"
 : "${VF_AUTOPROVISION:=false}"
+: "${VF_SERVING_WAKE_ENABLED:=false}"
+: "${VF_SERVING_BINDING:=runpod}"
 : "${VF_PROVISION_BINDING:=mock}"
 : "${VF_PROXY_UPSTREAM:=fake}"
 
 export PORT VF_DB_BACKEND VF_API_DATA_MODE VF_AGENT_ENABLED VF_AGENT_BINDING
-export VF_AUTOPROVISION VF_PROVISION_BINDING VF_PROXY_UPSTREAM
+export VF_AUTOPROVISION VF_SERVING_WAKE_ENABLED VF_SERVING_BINDING
+export VF_PROVISION_BINDING VF_PROXY_UPSTREAM
 
 alembic upgrade head
 python -m scripts.build_demo_artifacts --sync-existing-db
