@@ -5,7 +5,9 @@ from __future__ import annotations
 from datetime import datetime
 from enum import Enum
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, ConfigDict, Field
+
+from core.agent_contracts import AgentDecision
 
 
 class JobStatus(str, Enum):
@@ -124,6 +126,20 @@ class Cluster(BaseModel):
     routing: RoutingState | None = None
     live_pass_rate: LivePassRate | None = None
     approved_sample_source: ApprovedSampleSource | None = None
+    analyzer_decision: AgentDecision | None = None
+
+
+class JobCreateRequest(BaseModel):
+    """Queued metadata submission; execution still requires Start Forge."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    template: str = Field(default="nl2sql", min_length=1, max_length=128)
+    model: str = Field(
+        default="Qwen/Qwen2.5-1.5B-Instruct",
+        min_length=1,
+        max_length=512,
+    )
 
 
 class Job(BaseModel):
