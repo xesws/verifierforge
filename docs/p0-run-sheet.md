@@ -2791,14 +2791,75 @@ Tracked proof: `docs/evidence/reviewer/v0.30.0-full-public-proof.json`.
 ## 2026-07-19 v0.31.0 — frontend API contract v1 freeze
 
 - [x] Reserve version, backend area and final contract document before code.
-- [ ] Land additive core fields (`Cluster.analyzer_decision`,
+- [x] Land additive core fields (`Cluster.analyzer_decision`,
   `JobCreateRequest`) in a serialized contract-only wave.
-- [ ] Implement/verify real and mock cluster aggregation plus queued
+- [x] Implement/verify real and mock cluster aggregation plus queued
   `POST /jobs`; preserve all existing fields.
-- [ ] Fill endpoint request/response examples, field notes, auth and launch/env
+- [x] Fill endpoint request/response examples, field notes, auth and launch/env
   matrix in `docs/frontend/api-contract-v1.md`.
-- [ ] Prove real/mock parity and full regression; commit/push and tag
+- [x] Prove real/mock parity and full regression; commit/push and tag
   `frontend-api-v1`.
 
 Hard stop: destructive contract drift, a prose-only endpoint, feature-flag
 default change, or any endpoint that can spend without Start confirmation.
+
+Implementation result: the core wave was isolated in `5f0364f`; the real/mock
+route wave was isolated in `f229051`. `POST /jobs` persists queued metadata and
+does not provision. Cluster reads join the latest valid Agent decision, current
+route and Guardian points; malformed historical decision rows are ignored for
+catalog availability. The mock now matches Settings and Start Forge response
+contracts while retaining deterministic zero-cost execution. OpenAPI request
+and response schemas match for all 16 frozen operations. Full validation:
+`433 passed, 1 skipped`; secret scan, compile and diff checks passed.
+
+## 2026-07-19 Sunday night closeout
+
+### OWNER morning checklist (shortest first)
+
+1. **Decide whether to enable paid Start Forge — 1 minute.** Leave
+   `VF_AUTOPROVISION=false` for safety or explicitly set it to `true` only in a
+   deployment with BYO credentials and budget policy. After a change, run
+   `pytest -q tests/test_p4_api.py tests/test_p4_product.py`.
+2. **Share the private repository with the two judge emails — 2 minutes.** Use
+   GitHub **Settings → Collaborators and teams → Add people**; no repository
+   command is safe without the two owner-supplied addresses.
+3. **Replace the quick tunnel with a named Cloudflare tunnel — about 10
+   minutes.** Configure the owned hostname in Cloudflare, then restart
+   `bash scripts/start_reviewer_sandbox.sh --mode full` and verify `/healthz`
+   plus Basic-authenticated `/clusters`. Until then, the tracked quick URL is
+   ephemeral.
+
+### Stage status
+
+- **P4-1/P4-2:** complete. BYO credentials are Fernet-encrypted; approval and
+  Start are separate; `VF_AUTOPROVISION` remains default-off.
+- **P4-3:** complete. One real readiness/delete smoke closed with target absent
+  and raw `vf-auto-* = 0`; tag `provisioner-p4-complete`.
+- **Reviewer sandbox:** complete. Supabase + real tuned endpoint + mock Agent /
+  provisioner is publicly composed behind invitation auth; `/healthz` was
+  still live at closeout; tag `reviewer-sandbox-full`.
+- **P3 Nebius:** roadmap-only by instruction; provider interface is ready but
+  no `NebiusAdapter` was implemented.
+- **Frontend contract v1:** complete. Additive core schema, real/mock endpoint
+  parity and integration examples are frozen; tag `frontend-api-v1`.
+
+### Stage commits and tags
+
+- P4 docs/contracts/product/live/evidence: `41fcd4d`, `66e54ef`, `cbd76fe`,
+  `adc6edc`, `5b80041`; tag `provisioner-p4-complete`.
+- Reviewer sandbox docs/composition/model-map/evidence: `6c41251`, `5f16e18`,
+  `89fe6a3`, `fced1b5`; tag `reviewer-sandbox-full`.
+- Frontend freeze docs/contracts/routes/final record: `5d5a784`, `5f0364f`,
+  `f229051`, plus the closeout commit; tag `frontend-api-v1`.
+
+### OWNER-ACTION
+
+- Configure a named Cloudflare tunnel/domain; quick tunnel remains the
+  deliberate placeholder.
+- Share this private repository with the two judge email addresses.
+- Decide whether `VF_AUTOPROVISION` may be enabled; it remains `false` by
+  default and the reviewer full mode uses `VF_PROVISION_BINDING=mock`.
+
+No trainer, frozen dataset, paid LLM request, or flagship training run was
+changed in this wave. P4's only provider mutation was the already documented
+sub-cent readiness/delete smoke under its `$1` cap.

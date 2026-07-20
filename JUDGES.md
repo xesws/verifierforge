@@ -11,7 +11,7 @@ python -m pip install -r requirements-app.txt
 pytest -q
 ```
 
-Expected at this revision: `427 passed, 1 skipped`. The skip is the explicitly
+Expected at this revision: `433 passed, 1 skipped`. The skip is the explicitly
 credential-gated live S3 test.
 
 ## 2. Start the reviewer sandbox (about 1 minute)
@@ -100,6 +100,10 @@ live Gate C evidence is `1.0 / 1.0 / 0 / 1.0` under tag
 [`docs/p0-run-sheet.md`](docs/p0-run-sheet.md). Approval writes intent only—it
 does not launch a GPU from the browser. Start is a distinct action; the public
 reviewer sandbox binds it to the mock provisioner.
+
+Frontend implementers can use the frozen request/response examples in
+[`docs/frontend/api-contract-v1.md`](docs/frontend/api-contract-v1.md); the
+real and mock OpenAPI schemas are parity-tested for all listed operations.
 
 ## 5. Inspect delivery and persistence evidence (about 2 minutes)
 

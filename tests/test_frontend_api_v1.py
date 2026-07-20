@@ -15,6 +15,36 @@ from core.p4_contracts import ForgeExecutionStatus, ProviderCredentialStatus
 from mock import server as mock_server
 
 
+FROZEN_OPERATIONS = (
+    ("get", "/jobs", "200"),
+    ("post", "/jobs", "201"),
+    ("get", "/jobs/{job_id}", "200"),
+    ("get", "/clusters", "200"),
+    ("get", "/clusters/{cluster_id}", "200"),
+    ("post", "/clusters/{cluster_id}/agent/analyze", "200"),
+    ("post", "/agent-decisions/{decision_id}/approvals", "200"),
+    ("post", "/approvals/{approval_id}/start-forge", "200"),
+    ("get", "/approvals/{approval_id}/forge-execution", "200"),
+    ("get", "/clusters/{cluster_id}/routing", "200"),
+    ("put", "/clusters/{cluster_id}/routing", "200"),
+    ("get", "/clusters/{cluster_id}/live-pass-rate", "200"),
+    ("get", "/clusters/{cluster_id}/sample-source", "200"),
+    ("put", "/clusters/{cluster_id}/sample-source", "200"),
+    ("get", "/settings/provider-credentials/{provider}", "200"),
+    ("put", "/settings/provider-credentials/{provider}", "200"),
+)
+
+
+def test_mock_and_real_openapi_freeze_the_same_request_and_response_shapes() -> None:
+    real = api_main.app.openapi()
+    mock = mock_server.app.openapi()
+
+    for method, path, status in FROZEN_OPERATIONS:
+        assert _operation_shapes(real, method, path, status) == _operation_shapes(
+            mock, method, path, status
+        )
+
+
 def test_real_job_submission_is_metadata_only_and_round_trips(
     tmp_path: Path, monkeypatch
 ) -> None:
@@ -120,3 +150,22 @@ def test_mock_start_forge_and_settings_use_the_real_contract_shapes(monkeypatch)
     assert ForgeExecutionStatus.model_validate(finished.json()).state.value == "done"
     assert set(credential.json()) == set(ProviderCredentialStatus.model_fields)
     assert set(started.json()) == set(ForgeExecutionStatus.model_fields)
+
+
+def _operation_shapes(
+    schema: dict[str, object], method: str, path: str, status: str
+) -> tuple[object, object]:
+    operation = schema["paths"][path][method]  # type: ignore[index]
+    request = (
+        operation.get("requestBody", {})
+        .get("content", {})
+        .get("application/json", {})
+        .get("schema")
+    )
+    response = (
+        operation["responses"][status]
+        .get("content", {})
+        .get("application/json", {})
+        .get("schema")
+    )
+    return request, response
