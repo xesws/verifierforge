@@ -2876,7 +2876,8 @@ sub-cent readiness/delete smoke under its `$1` cap.
 - [x] Focused/full validation and Supabase projection readback: `449 passed, 1
   skipped`; 10 arena cards, `$3,850` savings, projection SHA
   `2d5d919148e3f9cb54972b23cadaebc57d0449061bfe924e942b59020a7b5326`.
-- [ ] Secret scan, commit, push, tag, and record final R-wave HEAD.
+- [x] Secret scan, commit, and push. Contract wave `e03fe2d`; report/API/docs
+  wave `9a24337`; `frontend-api-v1.1` marks the completed R boundary.
 
 Stop conditions: any trainer/frozen-data mutation, secret exposure, destructive
 contract drift, non-held-out arena input, hand-authored database projection, or
