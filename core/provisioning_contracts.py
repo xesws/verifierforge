@@ -40,13 +40,15 @@ TERMINAL_PROVISION_STATES = frozenset(
     {ProvisionState.TERMINATED, ProvisionState.FAILED}
 )
 
-DEFAULT_GPU_MAPPINGS: dict[ProvisionProvider, dict[GPUClass, tuple[str, ...]]] = {
+# Ordered identity sets only. Provider adapters must rank these candidates by
+# current, queried price immediately before creating capacity.
+DEFAULT_GPU_CANDIDATES: dict[ProvisionProvider, dict[GPUClass, tuple[str, ...]]] = {
     ProvisionProvider.RUNPOD: {
         GPUClass.SMALL_ADA: (
             "NVIDIA RTX 2000 Ada Generation",
-            "NVIDIA RTX 4000 SFF Ada Generation",
             "NVIDIA RTX 4000 Ada Generation",
             "NVIDIA L4",
+            "NVIDIA A40",
         ),
         GPUClass.MID_AMPERE: ("NVIDIA A10", "NVIDIA A40"),
         GPUClass.H100: ("NVIDIA H100 PCIe",),
@@ -57,6 +59,10 @@ DEFAULT_GPU_MAPPINGS: dict[ProvisionProvider, dict[GPUClass, tuple[str, ...]]] =
         GPUClass.H100: ("H100 80GB",),
     },
 }
+
+# Compatibility alias for integrations written before candidate selection was
+# explicit. New adapter code must use DEFAULT_GPU_CANDIDATES.
+DEFAULT_GPU_MAPPINGS = DEFAULT_GPU_CANDIDATES
 
 BLOCKED_GPU_MODEL_FRAGMENTS = (
     "blackwell",

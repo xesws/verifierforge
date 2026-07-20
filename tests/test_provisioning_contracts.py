@@ -5,6 +5,7 @@ from pydantic import ValidationError
 
 from app.provisioning import ProvisioningPolicy
 from core.provisioning_contracts import (
+    DEFAULT_GPU_CANDIDATES,
     DEFAULT_GPU_MAPPINGS,
     GPUClass,
     ProvisionProvider,
@@ -37,19 +38,20 @@ def test_provision_spec_round_trip_and_gpu_mapping_excludes_blackwell() -> None:
 
     assert ProvisionSpec.model_validate_json(spec.model_dump_json()) == spec
     assert spec.gpu_class == GPUClass.SMALL_ADA
-    assert set(DEFAULT_GPU_MAPPINGS) == {
+    assert DEFAULT_GPU_MAPPINGS is DEFAULT_GPU_CANDIDATES
+    assert set(DEFAULT_GPU_CANDIDATES) == {
         ProvisionProvider.RUNPOD,
         ProvisionProvider.NEBIUS,
     }
-    mapping_text = repr(DEFAULT_GPU_MAPPINGS).lower()
+    mapping_text = repr(DEFAULT_GPU_CANDIDATES).lower()
     assert "blackwell" not in mapping_text
     assert "b200" not in mapping_text
     assert "sm_120" not in mapping_text
-    assert DEFAULT_GPU_MAPPINGS[ProvisionProvider.RUNPOD][GPUClass.SMALL_ADA] == (
+    assert DEFAULT_GPU_CANDIDATES[ProvisionProvider.RUNPOD][GPUClass.SMALL_ADA] == (
         "NVIDIA RTX 2000 Ada Generation",
-        "NVIDIA RTX 4000 SFF Ada Generation",
         "NVIDIA RTX 4000 Ada Generation",
         "NVIDIA L4",
+        "NVIDIA A40",
     )
 
 
