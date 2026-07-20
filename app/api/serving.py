@@ -1,0 +1,123 @@
+"""Invite-protected scale-to-zero serving wake and status routes."""
+
+from __future__ import annotations
+
+import base64
+import hmac
+import os
+import threading
+import time
+
+from fastapi import APIRouter, HTTPException, Request, Response
+
+from app.db import DatabaseOperationError, repository_gateway
+from app.serving.session import ServingControlError, ServingCoordinator
+from app.serving.settings import ServingSettings
+from core.serving_contracts import ServingStatus, ServingWakeRequest
+
+
+router = APIRouter()
+_COORDINATOR: ServingCoordinator | None = None
+_COORDINATOR_LOCK = threading.Lock()
+_REAPER_STARTED = False
+
+
+def serving_coordinator() -> ServingCoordinator:
+    global _COORDINATOR
+    if _COORDINATOR is None:
+        with _COORDINATOR_LOCK:
+            if _COORDINATOR is None:
+                _COORDINATOR = ServingCoordinator(
+                    gateway=repository_gateway(),
+                    settings=ServingSettings.from_env(),
+                )
+    return _COORDINATOR
+
+
+@router.post("/serving/wake", response_model=ServingStatus, status_code=202)
+def wake_serving(
+    request: ServingWakeRequest,
+    raw_request: Request,
+    response: Response,
+) -> ServingStatus:
+    _require_invitation(raw_request)
+    try:
+        status, created = serving_coordinator().request_wake(request.model_id)
+        response.status_code = 202 if created else 200
+        return status
+    except ServingControlError as error:
+        status_code = 404 if error.code in {"wake_disabled", "unknown_model"} else 409
+        raise HTTPException(status_code=status_code, detail=str(error)) from error
+    except (DatabaseOperationError, OSError, RuntimeError, ValueError):
+        raise HTTPException(status_code=503, detail="Serving control plane is unavailable") from None
+
+
+@router.get("/serving/status", response_model=ServingStatus)
+def serving_status(raw_request: Request, model_id: str | None = None) -> ServingStatus:
+    _require_invitation(raw_request)
+    try:
+        return serving_coordinator().status(model_id)
+    except (DatabaseOperationError, OSError, RuntimeError, ValueError):
+        raise HTTPException(status_code=503, detail="Serving status is unavailable") from None
+
+
+def start_serving_reaper() -> None:
+    global _REAPER_STARTED
+    try:
+        settings = ServingSettings.from_env()
+    except ValueError:
+        return
+    if not settings.enabled or _REAPER_STARTED:
+        return
+    _REAPER_STARTED = True
+    coordinator = serving_coordinator()
+
+    def loop() -> None:
+        try:
+            coordinator.reconcile_startup()
+        except Exception:
+            pass
+        while True:
+            time.sleep(max(30.0, settings.poll_seconds))
+            try:
+                coordinator.reap_once()
+            except Exception:
+                pass
+
+    threading.Thread(target=loop, daemon=True, name="vf-serving-idle-reaper").start()
+
+
+def reset_serving_state_for_tests() -> None:
+    global _COORDINATOR, _REAPER_STARTED
+    _COORDINATOR = None
+    _REAPER_STARTED = False
+
+
+def _require_invitation(request: Request) -> None:
+    expected = os.environ.get("VF_REVIEW_INVITE_CODE", "")
+    if not expected:
+        raise HTTPException(status_code=503, detail="Reviewer invitation is not configured")
+    value = request.headers.get("authorization", "")
+    supplied: str | None = None
+    if value.startswith("Basic "):
+        try:
+            decoded = base64.b64decode(value.removeprefix("Basic "), validate=True).decode()
+            username, separator, password = decoded.partition(":")
+            if separator and username == "judge":
+                supplied = password
+        except (ValueError, UnicodeDecodeError):
+            supplied = None
+    if supplied is None or not hmac.compare_digest(supplied, expected):
+        raise HTTPException(
+            status_code=401,
+            detail="Invitation required",
+            headers={"WWW-Authenticate": 'Basic realm="VerifierForge"'},
+        )
+
+
+__all__ = [
+    "reset_serving_state_for_tests",
+    "router",
+    "serving_coordinator",
+    "start_serving_reaper",
+]

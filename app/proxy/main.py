@@ -24,6 +24,7 @@ from app.proxy.clusters import cluster_id_for_system_prompt, system_prompt_hash
 from app.proxy.frozen_nl2sql import FROZEN_TRAINING_POOL
 from app.proxy.guardian import score_tuned_sql_completion
 from app.proxy.routing import DEFAULT_TARGET_UPSTREAM, get_route
+from app.proxy.serving_registry import RegistryTunedResolver, ResolvedTunedEndpoint
 from app.proxy.traffic import (
     DEFAULT_DB_PATH,
     DEFAULT_PRICING_PATH,
@@ -115,6 +116,13 @@ class RouteDecision:
     target_upstream: str | None
 
 
+@dataclass(frozen=True, repr=False)
+class SelectedUpstream:
+    location: str
+    api_key: str | None = None
+    model_id: str | None = None
+
+
 def create_app(
     *,
     settings: ProxySettings | None = None,
@@ -147,6 +155,15 @@ def create_app(
                         _LOGGER.warning("proxy database initialization failed")
         return database
     schedule_guardian = guardian_scheduler or _schedule_background
+    tuned_resolver = (
+        RegistryTunedResolver(
+            get_database,
+            model_id=os.environ.get("VF_SERVING_MODEL_ID", "vf-demo").strip() or "vf-demo",
+            environ=os.environ,
+        )
+        if settings is None
+        else None
+    )
     proxy = FastAPI(title="VerifierForge Proxy")
     proxy.state.tuned_upstream_status = "unknown"
 
@@ -162,7 +179,7 @@ def create_app(
             else None
         )
         decision = _route_decision(system_prompt, active_database, canary_draw)
-        selected_upstream = _selected_upstream(decision, resolved)
+        selected_upstream = _selected_upstream(decision, resolved, tuned_resolver)
         try:
             forwarded = _forward(
                 request,
@@ -235,7 +252,7 @@ def _fallback_from_tuned(
     _LOGGER.warning("tuned upstream unavailable; deterministic fallback selected")
     fallback = _forward(
         request,
-        upstream=settings.upstream,
+        upstream=SelectedUpstream(settings.upstream),
         settings=settings,
         real_forwarder=real_forwarder,
     )
@@ -245,27 +262,30 @@ def _fallback_from_tuned(
 def _forward(
     request: Mapping[str, Any],
     *,
-    upstream: str,
+    upstream: SelectedUpstream,
     settings: ProxySettings,
     real_forwarder: RealForwarder,
 ) -> ForwardedResponse:
-    if upstream == "fake":
+    location = upstream.location
+    if location == "fake":
         return fake_chat_completion(request)
-    if upstream == "fake-tuned":
+    if location == "fake-tuned":
         return fake_tuned_chat_completion(request, pool_path=settings.guardian_pool_path)
-    if upstream == "real":
+    if location == "real":
         llm = LLMSettings.from_env()
         return real_forwarder(request, base_url=llm.base_url, api_key=llm.api_key)
-    if upstream.startswith(("http://", "https://")):
-        if settings.tuned_api_key is None:
+    if location.startswith(("http://", "https://")):
+        api_key = upstream.api_key or settings.tuned_api_key
+        model_id = upstream.model_id or settings.tuned_model
+        if api_key is None:
             raise UpstreamRequestError("HTTP tuned upstream requires VF_PROXY_TUNED_API_KEY")
-        if settings.tuned_model is None:
+        if model_id is None:
             raise UpstreamRequestError("HTTP tuned upstream requires a served model ID")
-        tuned_request = {**request, "model": settings.tuned_model}
+        tuned_request = {**request, "model": model_id}
         return real_forwarder(
             tuned_request,
-            base_url=upstream,
-            api_key=settings.tuned_api_key,
+            base_url=location,
+            api_key=api_key,
         )
     raise UpstreamRequestError("configured upstream must be fake, fake-tuned, real, or an HTTP URL")
 
@@ -287,12 +307,21 @@ def _route_decision(
     return RouteDecision(cluster_id, "default", None)
 
 
-def _selected_upstream(decision: RouteDecision, settings: ProxySettings) -> str:
+def _selected_upstream(
+    decision: RouteDecision,
+    settings: ProxySettings,
+    resolver: RegistryTunedResolver | None,
+) -> SelectedUpstream:
     if decision.route_path != "tuned":
-        return settings.upstream
+        return SelectedUpstream(settings.upstream)
     if decision.target_upstream in {None, DEFAULT_TARGET_UPSTREAM}:
-        return settings.tuned_upstream
-    return decision.target_upstream
+        if resolver is None:
+            return SelectedUpstream(settings.tuned_upstream)
+        endpoint = resolver.resolve()
+        if endpoint is None:
+            return SelectedUpstream("registry-cold")
+        return SelectedUpstream(endpoint.url, endpoint.api_key, endpoint.model_id)
+    return SelectedUpstream(decision.target_upstream)
 
 
 def _validate_request(request: Mapping[str, Any]) -> None:

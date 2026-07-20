@@ -8,7 +8,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 from uuid import uuid4
 
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI, HTTPException, Response
 import uvicorn
 
 # ``python mock/server.py`` puts mock/ (rather than the repo root) on sys.path.
@@ -42,6 +42,7 @@ from core.p4_contracts import (
     StartForgeRequest,
 )
 from core.provisioning_contracts import ProvisionProvider
+from core.serving_contracts import ServingState, ServingStatus, ServingWakeRequest
 from app.api.agent import (
     AgentAnalyzeRequest,
     ApprovedSampleSourceRequest,
@@ -173,7 +174,7 @@ CLUSTERS: list[Cluster] = [
                 cluster_id=cluster.cluster_id,
                 enabled=True,
                 canary_percent=100,
-                target_model="vf-nl2sql-gain",
+                target_model="tuned",
             ),
             "live_pass_rate": _live_pass_rate(cluster.cluster_id),
         }
@@ -212,6 +213,11 @@ _AGENT_DECISIONS: dict[str, AgentAnalysisResponse] = {}
 _AGENT_APPROVALS: dict[str, ApprovalRecord] = {}
 _PROVIDER_CREDENTIALS: set[tuple[str, ProvisionProvider]] = set()
 _FORGE_EXECUTIONS: dict[str, ForgeExecutionStatus] = {}
+_SERVING_STATUS = ServingStatus(
+    model_id="vf-demo",
+    state=ServingState.COLD,
+    detail="No serving session is active",
+)
 
 
 @app.get("/jobs")
@@ -279,6 +285,11 @@ def put_cluster_routing(cluster_id: str, state: RoutingState) -> RoutingState:
     _require_cluster(cluster_id)
     if state.cluster_id != cluster_id:
         raise HTTPException(status_code=422, detail="routing cluster_id must match the path")
+    if state.target_model != "tuned":
+        raise HTTPException(
+            status_code=422,
+            detail="public routing accepts only the logical tuned target",
+        )
     _ROUTING_STATES[cluster_id] = state
     return state
 
@@ -531,6 +542,45 @@ def forge_execution(approval_id: str) -> ForgeExecutionStatus:
         created_at=approval.approved_at,
         updated_at=approval.approved_at,
     )
+
+
+@app.post("/serving/wake", response_model=ServingStatus, status_code=202)
+def wake_serving(request: ServingWakeRequest, response: Response) -> ServingStatus:
+    global _SERVING_STATUS
+    if os.environ.get("VF_SERVING_WAKE_ENABLED", "false").strip().lower() != "true":
+        raise HTTPException(
+            status_code=404,
+            detail="Scale-to-zero wake is disabled because VF_SERVING_WAKE_ENABLED=false",
+        )
+    if request.model_id != "vf-demo":
+        raise HTTPException(status_code=404, detail="Unknown serving model")
+    if _SERVING_STATUS.state is not ServingState.COLD:
+        response.status_code = 200
+        return _SERVING_STATUS
+    _SERVING_STATUS = ServingStatus(
+        session_id="sv-mock-session",
+        model_id="vf-demo",
+        state=ServingState.READY,
+        url="https://mock-serving.example.test/v1",
+        detail="Mock scale-to-zero endpoint is ready",
+        gpu_model="Mock RTX 2000 Ada",
+        hourly_price_usd=0.1,
+        cost_accrued_usd=0,
+        cold_start_seconds=0,
+        updated_at=datetime(2026, 7, 20, tzinfo=timezone.utc),
+    )
+    return _SERVING_STATUS
+
+
+@app.get("/serving/status", response_model=ServingStatus)
+def serving_status(model_id: str | None = None) -> ServingStatus:
+    if model_id not in {None, "vf-demo"}:
+        return ServingStatus(
+            model_id=model_id,
+            state=ServingState.COLD,
+            detail="No serving session is active",
+        )
+    return _SERVING_STATUS
 
 
 def _approval_context(approval_id: str) -> tuple[ApprovalRecord, AgentAnalysisResponse]:

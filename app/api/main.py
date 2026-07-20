@@ -15,6 +15,8 @@ from app.api.agent import router as agent_router
 from app.api.copilot import router as copilot_router
 from app.api.cors import configure_cors
 from app.api.provisioning import router as provisioning_router
+from app.api.serving import router as serving_router
+from app.api.serving import start_serving_reaper
 from app.db import DatabaseOperationError, repository_gateway
 from app.db.records import ClusterRecord as DatabaseClusterRecord
 from app.db.records import JobRecord as DatabaseJobRecord
@@ -43,6 +45,8 @@ configure_cors(app)
 app.include_router(copilot_router)
 app.include_router(agent_router)
 app.include_router(provisioning_router)
+app.include_router(serving_router)
+app.add_event_handler("startup", start_serving_reaper)
 
 
 def _runs_dir() -> Path:
@@ -295,6 +299,11 @@ def put_cluster_routing(cluster_id: str, state: RoutingState) -> RoutingState:
         raise HTTPException(status_code=409, detail="Demo artifact mode is read-only")
     if state.cluster_id != cluster_id:
         raise HTTPException(status_code=422, detail="routing cluster_id must match the path")
+    if state.target_model != "tuned":
+        raise HTTPException(
+            status_code=422,
+            detail="public routing accepts only the logical tuned target",
+        )
     try:
         route = put_route(
             RouteRecord(

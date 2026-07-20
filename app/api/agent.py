@@ -352,6 +352,9 @@ def discover_page() -> HTMLResponse:
     ).replace(
         "__VF_AUTOPROVISION_ENABLED__",
         "true" if os.environ.get("VF_AUTOPROVISION", "false").strip().lower() == "true" else "false",
+    ).replace(
+        "__VF_SERVING_WAKE_ENABLED__",
+        "true" if os.environ.get("VF_SERVING_WAKE_ENABLED", "false").strip().lower() == "true" else "false",
     )
     return HTMLResponse(content)
 

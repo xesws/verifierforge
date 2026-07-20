@@ -3097,7 +3097,7 @@ local/static fallback. No trainer or frozen-data work belongs to this patch.
   1,251.578 total seconds. Published manifest:
   `vf/jobs/d4-m3-1p5b-r1-v0125/artifacts/serving/step_350.manifest.json`;
   sanitized evidence: `docs/evidence/serving/v0.34.0-sv0-s3.json`.
-- [ ] **SV1 — endpoint registry and dynamic proxy resolution.** Thirty-second
+- [x] **SV1 — endpoint registry and dynamic proxy resolution.** Thirty-second
   descriptor cache; plaintext endpoint keys are never cached. Cold/non-ready
   state uses deterministic default fallback while artifact report/arena remain
   complete. Public routing accepts only the logical `tuned` alias.
@@ -3105,14 +3105,19 @@ local/static fallback. No trainer or frozen-data work belongs to this patch.
     single-active-slot constraint, idempotent reservation, CAS transitions,
     and append-only serving audit. Supabase reflection confirmed
     `serving_endpoints=true` and `serving_events=true`; validation was `463
-    passed, 1 skipped`. Dynamic proxy resolution remains the open half of SV1.
+    passed, 1 skipped`.
+  - [x] Proxy resolves the logical `tuned` alias from the registry with a
+    30-second descriptor-only cache. Fernet plaintext is decrypted per request
+    and never cached. Cold/non-ready resolves through `default-fallback`, so
+    Guardian does not score it and static reports remain complete.
 - [ ] **SV2 — recoverable ServingSession.** Capacity-aware `small_ada`,
   Blackwell blocked, database active-slot concurrency 1, `$5` session cap,
   120-minute runtime cap, S3 identity gate, vLLM + cloudflared readiness gate,
   durable reconcile and provider-side termination proof.
-- [ ] **SV3 — invite-protected wake/status and reviewer UI.** Independent
+- [x] **SV3 — invite-protected wake/status and reviewer UI.** Independent
   `VF_SERVING_WAKE_ENABLED=false` default; do not enable
-  `VF_AUTOPROVISION`. Real/mock contract count becomes 21.
+  `VF_AUTOPROVISION`. Real/mock contract count is 21; Discover exposes Wake
+  and polls the full serving lifecycle.
 - [ ] **SV4 — cold-start acceleration.** Timebox 45 minutes. Preferred image:
   official vLLM 0.10.2 linux-amd64 digest
   `sha256:df2607b26bdda2875de4832f4d08da0055b4b6e3570347f3a849bcc652771dd6`.

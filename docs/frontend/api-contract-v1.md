@@ -1,7 +1,7 @@
 # Frontend API Contract v1
 
-**Coverage:** **19 documented = 19 frozen = 19 real/mock parity**
-**Frozen:** v0.32.3 · 2026-07-20 · tags `frontend-api-v1`, `frontend-api-v1.1`
+**Coverage:** **21 documented = 21 frozen = 21 real/mock parity**
+**Frozen:** v0.34.0 · 2026-07-20 · tags `frontend-api-v1`, `frontend-api-v1.1`, `frontend-api-v1.2`
 
 This is the additive integration boundary for the Monday frontend. JSON field
 names and meanings below are frozen. The real API and `mock/server.py` use the
@@ -20,6 +20,44 @@ Authorization: Basic <base64("judge:<invite-code>")>
 
 Never put the invite code, provider key or database URL in source or browser
 logs. `/healthz` is the sandbox's only unauthenticated route.
+
+## Scale-to-zero serving
+
+Serving wake is separate from Forge training. It requires reviewer Basic Auth
+even on the direct API plus literal spend confirmation:
+
+```http
+POST /serving/wake
+Authorization: Basic <base64("judge:<invite-code>")>
+Content-Type: application/json
+
+{"model_id":"vf-demo","confirm_provider_spend":true}
+```
+
+A new session returns HTTP 202. An idempotent repeat during an active session
+returns HTTP 200 and never allocates a second GPU. Poll `GET /serving/status`
+with the same Basic header:
+
+```json
+{
+  "session_id": "sv-0123456789abcdef",
+  "model_id": "vf-demo",
+  "state": "ready",
+  "url": "https://example.trycloudflare.com/v1",
+  "detail": "S3 identity, vLLM, completion, and public tunnel gates passed",
+  "error_code": null,
+  "gpu_model": "NVIDIA L4",
+  "hourly_price_usd": 0.39,
+  "cost_accrued_usd": 0.08,
+  "cold_start_seconds": 420.0,
+  "updated_at": "2026-07-20T12:00:00Z"
+}
+```
+
+States are `cold | provisioning | loading | ready | draining`; only `ready`
+contains `url`. Endpoint key material is never returned. With
+`VF_SERVING_WAKE_ENABLED=false`, POST is an explicit 404 with zero provider
+mutation while status/report/arena reads remain available.
 
 ## Discover clusters
 
@@ -373,6 +411,7 @@ bash scripts/start_reviewer_sandbox.sh --mode full
 | `VF_AGENT_BINDING` | `real` | Use `mock` for deterministic zero-cost evaluation. |
 | `VF_DB_BACKEND` | `sqlite` | Set `postgres` to require `SUPABASE_DB_URL`; no silent fallback. |
 | `VF_AUTOPROVISION` | `false` | Hides Start Forge when off; approval remains available. |
+| `VF_SERVING_WAKE_ENABLED` | `false` | Independently gates one-GPU inference wake; status remains readable. |
 | `VF_PROVISION_BINDING` | `mock` | Provider adapter used only after Start Forge. |
 | `VF_API_DATA_MODE` | `hybrid` | `artifacts` is immutable, `hybrid` combines authoritative artifacts with relational facts, and `supabase` reads only derived DB projections. Legacy `runs` is internal compatibility only. |
 
@@ -382,7 +421,7 @@ available at `/docs` and `/openapi.json` for generated frontend clients.
 
 ## Internal and debug routes — frontend must not use
 
-These routes are intentionally outside the 19-operation frozen contract:
+These routes are intentionally outside the 21-operation frozen contract:
 
 - `GET /discover` — FastAPI-hosted demonstration page.
 - `POST /copilot/nl2sql/proposals` and `POST /copilot/nl2sql/validate` —
@@ -391,4 +430,4 @@ These routes are intentionally outside the 19-operation frozen contract:
   discovery and health surfaces.
 
 They may change without a frontend contract revision. Product code must use
-the 19 frozen operations above.
+the 21 frozen operations above.

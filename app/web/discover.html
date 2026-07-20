@@ -5,6 +5,7 @@
   <meta name="viewport" content="width=device-width,initial-scale=1">
   <meta name="vf-sample-source" content="__VF_DISCOVER_DATA_SOURCE__">
   <meta name="vf-autoprovision-enabled" content="__VF_AUTOPROVISION_ENABLED__">
+  <meta name="vf-serving-wake-enabled" content="__VF_SERVING_WAKE_ENABLED__">
   <title>VerifierForge Discover</title>
   <style>
     :root {
@@ -85,6 +86,10 @@
     .receipt-grid div { color: #cbd9e8; overflow-wrap: anywhere; }
     .safe { color: var(--teal); font-weight: 850; }
     .note { margin-top: 28px; color: #7086a4; font-size: 13px; }
+    .serving-bar { display: flex; flex-wrap: wrap; align-items: center; gap: 13px; margin: 24px 0 0; padding: 16px 18px; background: #0b1728; border: 1px solid #29415e; border-radius: 13px; }
+    .serving-copy { flex: 1 1 430px; }
+    .serving-copy strong { display: block; margin-bottom: 5px; }
+    .serving-copy span { color: var(--muted); font-size: 13px; }
     [hidden] { display: none !important; }
     @media (max-width: 650px) {
       main { padding: 34px 14px 60px; }
@@ -102,6 +107,14 @@
   <div class="eyebrow">VerifierForge · Discover</div>
   <h1>Which traffic deserves its own model?</h1>
   <p class="sub">Approve a sample source, inspect traffic evidence, and review the Agent's proposed Forge configuration before recording a human approval.</p>
+  <section class="serving-bar" aria-live="polite">
+    <div class="serving-copy">
+      <strong>Scale-to-zero tuned endpoint</strong>
+      <span id="serving-detail">Cold by default. Wake provisions one budget-capped GPU; 30 idle minutes drains it automatically.</span>
+    </div>
+    <span class="badge" id="serving-state">cold</span>
+    <button id="wake-model">Wake model</button>
+  </section>
   <section class="grid" id="grid" aria-live="polite"></section>
 
   <section class="detail" id="detail" aria-live="polite" hidden>
@@ -221,7 +234,8 @@
 const SQL_CLUSTER = "data-pull-sql";
 const DEFAULT_DATA_SOURCE = document.querySelector('meta[name="vf-sample-source"]').content;
 const AUTOPROVISION_ENABLED = document.querySelector('meta[name="vf-autoprovision-enabled"]').content === "true";
-const state = {clusters: new Map(), inputConfirmed: false, inputSource: DEFAULT_DATA_SOURCE, analysis: null, approval: null, pollTimer: null};
+const SERVING_WAKE_ENABLED = document.querySelector('meta[name="vf-serving-wake-enabled"]').content === "true";
+const state = {clusters: new Map(), inputConfirmed: false, inputSource: DEFAULT_DATA_SOURCE, analysis: null, approval: null, pollTimer: null, servingPollTimer: null};
 const grid = document.querySelector("#grid");
 const detail = document.querySelector("#detail");
 
@@ -353,6 +367,59 @@ async function analyze(cluster, button, result) {
     button.disabled = cluster.cluster_id === SQL_CLUSTER && !state.inputConfirmed;
   }
 }
+
+async function refreshServing() {
+  const button = document.querySelector("#wake-model");
+  const badge = document.querySelector("#serving-state");
+  const detailNode = document.querySelector("#serving-detail");
+  if (!SERVING_WAKE_ENABLED) {
+    button.disabled = true;
+    badge.textContent = "disabled";
+    detailNode.textContent = "Wake is disabled in this deployment; static reports and arena evidence remain available.";
+    return;
+  }
+  try {
+    const response = await fetch("/serving/status");
+    const payload = await response.json();
+    if (!response.ok) throw new Error(payload.detail || "Serving status unavailable");
+    badge.textContent = payload.state;
+    const facts = [payload.detail];
+    if (payload.gpu_model) facts.push(payload.gpu_model);
+    if (payload.hourly_price_usd != null) facts.push(`$${payload.hourly_price_usd.toFixed(2)}/hr`);
+    if (payload.cold_start_seconds != null) facts.push(`${Math.round(payload.cold_start_seconds)}s cold start`);
+    detailNode.textContent = facts.filter(Boolean).join(" · ");
+    button.disabled = payload.state !== "cold";
+    clearTimeout(state.servingPollTimer);
+    if (["provisioning", "loading", "draining"].includes(payload.state)) {
+      state.servingPollTimer = setTimeout(refreshServing, 2000);
+    }
+  } catch (error) {
+    badge.textContent = "unavailable";
+    detailNode.textContent = error.message;
+    button.disabled = false;
+  }
+}
+
+document.querySelector("#wake-model").addEventListener("click", async event => {
+  const button = event.currentTarget;
+  button.disabled = true;
+  document.querySelector("#serving-detail").textContent = "Requesting one bounded serving session…";
+  try {
+    const response = await fetch("/serving/wake", {
+      method: "POST",
+      headers: {"content-type": "application/json"},
+      body: JSON.stringify({model_id: "vf-demo", confirm_provider_spend: true})
+    });
+    const payload = await response.json();
+    if (!response.ok) throw new Error(payload.detail || "Wake failed");
+    document.querySelector("#serving-state").textContent = payload.state;
+    state.servingPollTimer = setTimeout(refreshServing, 1000);
+  } catch (error) {
+    document.querySelector("#serving-state").textContent = "cold";
+    document.querySelector("#serving-detail").textContent = error.message;
+    button.disabled = false;
+  }
+});
 
 function renderDetail(cluster, payload, approval) {
   detail.hidden = false;
@@ -526,6 +593,7 @@ document.querySelector("#approve-button").addEventListener("click", async event 
 });
 
 async function boot() {
+  refreshServing();
   try {
     const response = await fetch("/clusters");
     if (!response.ok) throw new Error("Cluster profiles are unavailable");

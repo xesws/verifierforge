@@ -14,7 +14,7 @@ or provider request.
 2. `artifacts` serves the frozen presentation, `hybrid` combines it with
    Supabase relationship facts, and `supabase` serves the deterministic
    `summary_json` projection. Artifacts/S3 remain authoritative if they differ.
-3. The contract has exactly 19 documented, frozen, and real/mock-parity
+3. The contract has exactly 21 documented, frozen, and real/mock-parity
    operations.
 4. Cluster GETs currently materialize the static catalog into the repository,
    so they update catalog timestamps while reading. No product value changed in
@@ -36,6 +36,7 @@ VF_DB_BACKEND=postgres \
 VF_AGENT_ENABLED=true \
 VF_AGENT_BINDING=mock \
 VF_AUTOPROVISION=false \
+VF_SERVING_WAKE_ENABLED=false \
 VF_PROVISION_BINDING=mock \
 VF_API_DATA_MODE=hybrid \
 VF_PROXY_DB_PATH=./runs/frontend-unused.sqlite3 \
@@ -82,6 +83,8 @@ environment. Generate it without echoing it into a command or log, store it in
 | `POST /approvals/{id}/start-forge` | none | `Content-Type: application/json` |
 | `PUT /clusters/{id}/routing` | none | `Content-Type: application/json` |
 | `PUT /settings/provider-credentials/{provider}` | none | `Content-Type: application/json`; never retain or log the key in the browser |
+| `POST /serving/wake` | reviewer invitation required, including loopback | Basic `Authorization`; `Content-Type: application/json` |
+| `GET /serving/status` | reviewer invitation required, including loopback | Basic `Authorization` |
 
 All GET routes are header-free on loopback. When the same calls go through the
 reviewer sandbox, add its Basic `Authorization` header to every row above.
@@ -113,6 +116,8 @@ was read directly where that claim applies.
 | 17 | `PUT /clusters/data-pull-sql/sample-source` | 200 | yes | local identity + Supabase metadata | yes |
 | 18 | `GET /settings/provider-credentials/nebius` | 200 | yes | Supabase | yes |
 | 19 | `PUT /settings/provider-credentials/nebius` | 200 | yes; key never returned | Supabase | yes |
+| 20 | `POST /serving/wake` | 404 by default | explicit disabled body; no provider action | flag gate | yes |
+| 21 | `GET /serving/status` | 200 | lifecycle shape; endpoint key absent | Supabase registry | yes |
 
 All scoped self-check Job, credential, and approval rows were removed. Routing
 and sample-source product values were restored, and
@@ -136,6 +141,7 @@ returned 128 real Supabase points; the latest rolling pass rate was `0.85`.
 | `VF_DB_BACKEND` | `.env`: `postgres` | Repositories require `SUPABASE_DB_URL`; there is no silent SQLite fallback. |
 | `VF_AGENT_ENABLED` | `.env`: `true` | Exposes Analyze, decision, approval, sample-source, and Discover routes. |
 | `VF_AUTOPROVISION` | unset/default `false` | Start Forge returns the explicit 404 above and cannot spend. |
+| `VF_SERVING_WAKE_ENABLED` | unset/default `false` | Independently gates one-GPU inference wake; status remains invitation-protected and readable. |
 | `VF_AGENT_BINDING` | launch override `mock` | Analyze is deterministic and makes no LLM request; decision metadata still lands in Supabase. |
 | `VF_API_DATA_MODE` | default `hybrid` | Public modes are `artifacts`, `hybrid`, and `supabase`; `runs` is deprecated local compatibility. |
 | `VF_CORS_ORIGINS` | unset/local default | Allows localhost and 127.0.0.1 on 3000, 5173, and 8080. Comma-separated values replace the list; only explicit `*` opens all origins. |
@@ -144,7 +150,8 @@ Analyze is advisory. Approve writes intent only. Start Forge is the only spend
 boundary and remains disabled in this launch. Do not treat `POST /jobs` as a
 training action; it only queues metadata.
 
-Public acceptance repeated all 19 operations. The flagship report contained
+The v0.33.0 public acceptance covered the then-current 19 operations; v0.34.0
+adds two serving operations, bringing frozen parity to 21. The flagship report contained
 400 main and 200 control points, ten held-out arena samples, `$3,850` projected
 savings, and `real_gain`. Twelve tuned requests succeeded and Guardian added a
 new point; the SQL route was restored to its prior 50% state afterward.

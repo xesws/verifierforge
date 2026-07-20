@@ -36,11 +36,13 @@ FROZEN_OPERATIONS = (
     ("put", "/clusters/{cluster_id}/sample-source", "200"),
     ("get", "/settings/provider-credentials/{provider}", "200"),
     ("put", "/settings/provider-credentials/{provider}", "200"),
+    ("post", "/serving/wake", "202"),
+    ("get", "/serving/status", "200"),
 )
 
 
 def test_mock_and_real_openapi_freeze_the_same_request_and_response_shapes() -> None:
-    assert len(FROZEN_OPERATIONS) == 19
+    assert len(FROZEN_OPERATIONS) == 21
     real = api_main.app.openapi()
     mock = mock_server.app.openapi()
 
