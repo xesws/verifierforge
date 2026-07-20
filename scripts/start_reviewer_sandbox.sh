@@ -140,29 +140,9 @@ else
 import os, sys
 from dotenv import dotenv_values
 values = {**dotenv_values(sys.argv[1]), **os.environ}
-required = ["SUPABASE_DB_URL", "VF_PROXY_TUNED_UPSTREAM", "VF_PROXY_TUNED_API_KEY", "VF_ENDPOINT_MODEL"]
+required = ["SUPABASE_DB_URL", "VF_CRED_KEY"]
 if any(not str(values.get(name, "")).strip() for name in required):
     raise SystemExit("full reviewer mode is missing required environment configuration")
-if not str(values["VF_PROXY_TUNED_UPSTREAM"]).startswith(("http://", "https://")):
-    raise SystemExit("full reviewer mode requires an HTTP tuned endpoint")
-PY
-    "$PYTHON_BIN" - "$ROOT_DIR/.env" <<'PY'
-import os, sys
-import httpx
-from dotenv import dotenv_values
-values = {**dotenv_values(sys.argv[1]), **os.environ}
-base = str(values["VF_PROXY_TUNED_UPSTREAM"]).rstrip("/")
-response = httpx.get(
-    f"{base}/models",
-    headers={"Authorization": f"Bearer {values['VF_PROXY_TUNED_API_KEY']}"},
-    timeout=15,
-)
-if response.status_code != 200:
-    raise SystemExit(f"configured tuned endpoint health returned HTTP {response.status_code}")
-body = response.json()
-if not isinstance(body, dict) or not isinstance(body.get("data"), list) or not body["data"]:
-    raise SystemExit("configured tuned endpoint returned no models")
-print("configured tuned endpoint health passed")
 PY
     command -v cloudflared >/dev/null || {
       echo "full reviewer mode requires cloudflared" >&2
@@ -175,8 +155,6 @@ PY
   chmod 600 "$RUNTIME_DIR/invite-code.txt"
   if [[ "$test_mode" == "true" ]]; then
     export VF_DB_BACKEND=sqlite VF_PROXY_DB_PATH="$RUNTIME_DIR/full.sqlite3"
-    export VF_PROXY_TUNED_UPSTREAM=fake-tuned
-    unset VF_PROXY_TUNED_API_KEY || true
   else
     export VF_DB_BACKEND=postgres
   fi

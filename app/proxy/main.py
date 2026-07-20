@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from collections.abc import Callable, Mapping
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from datetime import datetime, timezone
 import json
 import logging
@@ -48,9 +48,6 @@ _LOGGER = logging.getLogger(__name__)
 @dataclass(frozen=True)
 class ProxySettings:
     upstream: str = "fake"
-    tuned_upstream: str = "fake-tuned"
-    tuned_api_key: str | None = field(default=None, repr=False)
-    tuned_model: str | None = None
     db_path: Path = DEFAULT_DB_PATH
     pricing_path: Path = DEFAULT_PRICING_PATH
     guardian_sample_rate: float = 0.20
@@ -63,19 +60,6 @@ class ProxySettings:
         upstream = values.get("VF_PROXY_UPSTREAM", "fake").strip().lower() or "fake"
         if upstream not in {"fake", "real"}:
             raise ValueError("VF_PROXY_UPSTREAM must be fake or real")
-        tuned_upstream = values.get("VF_PROXY_TUNED_UPSTREAM", "fake-tuned").strip() or "fake-tuned"
-        tuned_api_key = values.get("VF_PROXY_TUNED_API_KEY", "").strip() or None
-        tuned_model = (
-            values.get("VF_PROXY_TUNED_MODEL", "").strip()
-            or values.get("VF_ENDPOINT_MODEL", "").strip()
-            or None
-        )
-        if tuned_upstream.startswith(("http://", "https://")) and tuned_api_key is None:
-            raise ValueError("VF_PROXY_TUNED_API_KEY is required for an HTTP tuned upstream")
-        if tuned_upstream.startswith(("http://", "https://")) and tuned_model is None:
-            raise ValueError(
-                "VF_PROXY_TUNED_MODEL or VF_ENDPOINT_MODEL is required for an HTTP tuned upstream"
-            )
         try:
             guardian_sample_rate = float(values.get("VF_PROXY_GUARDIAN_SAMPLE_RATE", "0.20"))
         except ValueError as error:
@@ -90,9 +74,6 @@ class ProxySettings:
             raise ValueError("VF_PROXY_GUARDIAN_ROLLING_WINDOW must be a positive integer")
         return cls(
             upstream=upstream,
-            tuned_upstream=tuned_upstream,
-            tuned_api_key=tuned_api_key,
-            tuned_model=tuned_model,
             db_path=Path(values.get("VF_PROXY_DB_PATH", str(DEFAULT_DB_PATH))).expanduser(),
             pricing_path=Path(values.get("VF_PROXY_PRICING_PATH", str(DEFAULT_PRICING_PATH))).expanduser(),
             guardian_sample_rate=guardian_sample_rate,
@@ -233,7 +214,11 @@ def create_app(
             draw=guardian_draw,
             gateway=active_database,
         )
-        return JSONResponse(content=forwarded.payload, status_code=forwarded.status_code)
+        return JSONResponse(
+            content=forwarded.payload,
+            status_code=forwarded.status_code,
+            headers={"X-VerifierForge-Route": decision.route_path},
+        )
 
     return proxy
 
@@ -275,12 +260,12 @@ def _forward(
         llm = LLMSettings.from_env()
         return real_forwarder(request, base_url=llm.base_url, api_key=llm.api_key)
     if location.startswith(("http://", "https://")):
-        api_key = upstream.api_key or settings.tuned_api_key
-        model_id = upstream.model_id or settings.tuned_model
+        api_key = upstream.api_key
+        model_id = upstream.model_id
         if api_key is None:
-            raise UpstreamRequestError("HTTP tuned upstream requires VF_PROXY_TUNED_API_KEY")
+            raise UpstreamRequestError("registry tuned endpoint has no credential")
         if model_id is None:
-            raise UpstreamRequestError("HTTP tuned upstream requires a served model ID")
+            raise UpstreamRequestError("registry tuned endpoint has no model ID")
         tuned_request = {**request, "model": model_id}
         return real_forwarder(
             tuned_request,
@@ -316,12 +301,12 @@ def _selected_upstream(
         return SelectedUpstream(settings.upstream)
     if decision.target_upstream in {None, DEFAULT_TARGET_UPSTREAM}:
         if resolver is None:
-            return SelectedUpstream(settings.tuned_upstream)
+            return SelectedUpstream("fake-tuned")
         endpoint = resolver.resolve()
         if endpoint is None:
             return SelectedUpstream("registry-cold")
         return SelectedUpstream(endpoint.url, endpoint.api_key, endpoint.model_id)
-    return SelectedUpstream(decision.target_upstream)
+    return SelectedUpstream("registry-cold")
 
 
 def _validate_request(request: Mapping[str, Any]) -> None:

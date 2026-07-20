@@ -98,6 +98,53 @@ def test_disabled_wake_has_no_provider_or_database_side_effect(tmp_path: Path) -
         gateway.close()
 
 
+def test_runtime_failure_returns_to_cold_with_visible_failure_detail(tmp_path: Path) -> None:
+    class FailingRuntime(MockServingRuntime):
+        async def start(
+            self,
+            *,
+            session_id,
+            model_id,
+            endpoint_api_key,
+            on_allocated,
+        ):
+            del model_id, endpoint_api_key
+            handle = ProvisionHandle(
+                provider=ProvisionProvider.RUNPOD,
+                external_id="mock-failed-pod",
+                job_id=f"serve-{session_id[:20]}",
+                approval_id=session_id,
+                labels={"gpu_model": "Mock Ada", "hourly_price_usd": "0.1"},
+            )
+            await on_allocated(handle, 0.0)
+            raise ServingRuntimeError("sanitized fixture failure")
+
+    gateway = RepositoryGateway(DatabaseSettings.sqlite(tmp_path / "failed.sqlite3"))
+    runtime = FailingRuntime()
+    service = ServingCoordinator(
+        gateway=gateway,
+        settings=ServingSettings(enabled=True),
+        environ={"VF_CRED_KEY": Fernet.generate_key().decode()},
+        runtime_factory=lambda _settings: runtime,
+    )
+    try:
+        service.request_wake("vf-demo")
+        deadline = time.monotonic() + 2
+        while time.monotonic() < deadline:
+            observed = service.status()
+            if observed.state is ServingState.COLD and observed.error_code:
+                break
+            time.sleep(0.01)
+        else:
+            raise AssertionError("failed serving session did not return to visible cold state")
+        assert observed.error_code == "runtime_failed"
+        assert "wake failed: runtime_failed" in observed.detail
+        assert "provider deletion confirmed" in observed.detail
+        assert runtime.terminations == 1
+    finally:
+        gateway.close()
+
+
 def test_s3_identity_and_callback_validation() -> None:
     files = [
         {"path": "config.json", "sha256": "a" * 64, "size_bytes": 2, "key": "one"},

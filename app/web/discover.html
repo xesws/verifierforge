@@ -382,8 +382,15 @@ async function refreshServing() {
     const response = await fetch("/serving/status");
     const payload = await response.json();
     if (!response.ok) throw new Error(payload.detail || "Serving status unavailable");
-    badge.textContent = payload.state;
-    const facts = [payload.detail];
+    badge.textContent = payload.error_code ? "failed" : payload.state;
+    const progress = {
+      cold: "Model is asleep. Reports and arena remain available; click Wake model for live inference.",
+      provisioning: "Finding and reserving capacity…",
+      loading: "GPU allocated. Verifying model bytes and starting vLLM…",
+      ready: "Live tuned endpoint is ready.",
+      draining: "Idle or failed session is being safely terminated…"
+    };
+    const facts = [progress[payload.state], payload.detail];
     if (payload.gpu_model) facts.push(payload.gpu_model);
     if (payload.hourly_price_usd != null) facts.push(`$${payload.hourly_price_usd.toFixed(2)}/hr`);
     if (payload.cold_start_seconds != null) facts.push(`${Math.round(payload.cold_start_seconds)}s cold start`);
@@ -415,8 +422,8 @@ document.querySelector("#wake-model").addEventListener("click", async event => {
     document.querySelector("#serving-state").textContent = payload.state;
     state.servingPollTimer = setTimeout(refreshServing, 1000);
   } catch (error) {
-    document.querySelector("#serving-state").textContent = "cold";
-    document.querySelector("#serving-detail").textContent = error.message;
+    document.querySelector("#serving-state").textContent = "failed";
+    document.querySelector("#serving-detail").textContent = `Wake failed: ${error.message}. Reports and arena are still available.`;
     button.disabled = false;
   }
 });

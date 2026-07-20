@@ -230,6 +230,11 @@ def test_discover_page_contains_analyze_and_approval_controls(monkeypatch) -> No
     assert "Approved sample JSONL address" in response.text
     assert "No GPU allocated" in response.text
     assert "No training started" in response.text
+    assert "Finding and reserving capacity" in response.text
+    assert "Verifying model bytes and starting vLLM" in response.text
+    assert "Live tuned endpoint is ready" in response.text
+    assert 'textContent = "failed"' in response.text
+    assert "Reports and arena are still available" in response.text
 
 
 def test_analyze_accepts_configured_source_and_rejects_other_paths(

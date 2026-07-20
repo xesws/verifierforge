@@ -8,9 +8,9 @@ from fastapi.testclient import TestClient
 import pytest
 
 from app.proxy.clusters import SYSTEM_PROMPTS_BY_CLUSTER
-from app.proxy.main import ProxySettings, create_app
+from app.proxy.main import ProxySettings, SelectedUpstream, create_app
 from app.proxy.traffic import estimate_cost
-from app.proxy.upstream import ForwardedResponse, UpstreamRequestError
+from app.proxy.upstream import ForwardedResponse
 
 
 def _request(*, system: str = "Extract support fields.", model: str = "vf-demo") -> dict[str, object]:
@@ -40,6 +40,7 @@ def test_fake_proxy_is_deterministic_and_records_openai_metadata(tmp_path: Path)
     second = client.post("/v1/chat/completions", json=_request())
 
     assert first.status_code == second.status_code == 200
+    assert first.headers["X-VerifierForge-Route"] == "default"
     assert first.json() == second.json()
     payload = first.json()
     assert payload["object"] == "chat.completion"
@@ -86,55 +87,25 @@ def test_real_mode_uses_canonical_llm_environment_and_returns_upstream_shape(mon
     }
 
 
-def test_http_tuned_upstream_uses_only_its_dedicated_key(monkeypatch, tmp_path: Path) -> None:
-    captured: dict[str, object] = {}
-
-    def real_forwarder(request, *, base_url: str, api_key: str) -> ForwardedResponse:
-        captured.update({"request": request, "base_url": base_url, "api_key": api_key})
-        return ForwardedResponse(200, {"object": "chat.completion"})
-
-    settings = ProxySettings(
-        upstream="fake",
-        tuned_upstream="https://tuned.example/v1",
-        tuned_api_key="endpoint-only-key",
-        tuned_model="served-step-350",
-        db_path=tmp_path / "traffic.db",
-    )
+def test_injected_tuned_route_is_deterministic_fake_only(monkeypatch, tmp_path: Path) -> None:
+    settings = ProxySettings(upstream="fake", db_path=tmp_path / "traffic.db")
     monkeypatch.setattr("app.proxy.main.get_route", lambda *_args, **_kwargs: __import__("app.proxy.routing", fromlist=["RouteRecord"]).RouteRecord("support-ticket-extraction", True, 100, "tuned"))
-    client = TestClient(
-        create_app(settings=settings, real_forwarder=real_forwarder, canary_draw=lambda: 0.0)
-    )
+    client = TestClient(create_app(settings=settings, canary_draw=lambda: 0.0))
 
-    assert client.post(
+    response = client.post(
         "/v1/chat/completions",
         json=_request(system=SYSTEM_PROMPTS_BY_CLUSTER["support-ticket-extraction"]),
-    ).status_code == 200
-    assert captured == {
-        "request": {
-            **_request(system=SYSTEM_PROMPTS_BY_CLUSTER["support-ticket-extraction"]),
-            "model": "served-step-350",
-        },
-        "base_url": "https://tuned.example/v1",
-        "api_key": "endpoint-only-key",
-    }
-    assert "endpoint-only-key" not in repr(settings)
+    )
+    assert response.status_code == 200
+    assert response.headers["X-VerifierForge-Route"] == "tuned"
+    assert "vf-fake-tuned-" in response.json()["choices"][0]["message"]["content"]
 
 
-def test_unreachable_tuned_upstream_falls_back_without_guardian_or_502(
+def test_cold_registry_falls_back_with_observable_route_without_guardian_or_502(
     monkeypatch, tmp_path: Path
 ) -> None:
     scheduled: list[object] = []
-
-    def unavailable(*_args, **_kwargs):
-        raise UpstreamRequestError("bounded fixture failure")
-
-    settings = ProxySettings(
-        upstream="fake",
-        tuned_upstream="https://tuned.example/v1",
-        tuned_api_key="endpoint-only-key",
-        tuned_model="served-step-350",
-        db_path=tmp_path / "traffic.db",
-    )
+    settings = ProxySettings(upstream="fake", db_path=tmp_path / "traffic.db")
     monkeypatch.setattr(
         "app.proxy.main.get_route",
         lambda *_args, **_kwargs: __import__(
@@ -143,10 +114,13 @@ def test_unreachable_tuned_upstream_falls_back_without_guardian_or_502(
     )
     app = create_app(
         settings=settings,
-        real_forwarder=unavailable,
         canary_draw=lambda: 0.0,
         guardian_draw=lambda: 0.0,
         guardian_scheduler=scheduled.append,
+    )
+    monkeypatch.setattr(
+        "app.proxy.main._selected_upstream",
+        lambda *_args, **_kwargs: SelectedUpstream("registry-cold"),
     )
     response = TestClient(app).post(
         "/v1/chat/completions",
@@ -157,27 +131,22 @@ def test_unreachable_tuned_upstream_falls_back_without_guardian_or_502(
     assert response.json()["choices"][0]["message"]["content"].startswith(
         "vf-fake-completion-"
     )
+    assert response.headers["X-VerifierForge-Route"] == "default-fallback"
     assert app.state.tuned_upstream_status == "degraded"
     assert scheduled == []
 
 
-def test_http_tuned_upstream_never_falls_back_to_llm_key(monkeypatch) -> None:
+def test_static_tuned_environment_is_ignored(monkeypatch) -> None:
     monkeypatch.setenv("VF_PROXY_TUNED_UPSTREAM", "https://tuned.example/v1")
+    monkeypatch.setenv("VF_PROXY_TUNED_API_KEY", "stale-key")
+    monkeypatch.setenv("VF_PROXY_TUNED_MODEL", "stale-model")
+    monkeypatch.setenv("VF_ENDPOINT_MODEL", "stale-model")
     monkeypatch.setenv("VF_LLM_API_KEY", "wrong-key")
-    monkeypatch.delenv("VF_PROXY_TUNED_API_KEY", raising=False)
-
-    with pytest.raises(ValueError, match="VF_PROXY_TUNED_API_KEY"):
-        ProxySettings.from_env()
-
-
-def test_http_tuned_upstream_requires_environment_discovered_model(monkeypatch) -> None:
-    monkeypatch.setenv("VF_PROXY_TUNED_UPSTREAM", "https://tuned.example/v1")
-    monkeypatch.setenv("VF_PROXY_TUNED_API_KEY", "endpoint-key")
-    monkeypatch.delenv("VF_PROXY_TUNED_MODEL", raising=False)
-    monkeypatch.delenv("VF_ENDPOINT_MODEL", raising=False)
-
-    with pytest.raises(ValueError, match="VF_PROXY_TUNED_MODEL or VF_ENDPOINT_MODEL"):
-        ProxySettings.from_env()
+    settings = ProxySettings.from_env()
+    rendered = repr(settings)
+    assert "tuned.example" not in rendered
+    assert "stale-key" not in rendered
+    assert "stale-model" not in rendered
 
 
 def test_database_failure_never_blocks_fake_completion(tmp_path: Path) -> None:

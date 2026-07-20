@@ -96,7 +96,31 @@ class ServingCoordinator:
             )
         return status_from_record(record)
 
-    def drain(self, model_id: str, *, reason: str, actor: str = "idle-reaper") -> ServingStatus:
+    def drain(
+        self,
+        model_id: str,
+        *,
+        reason: str,
+        actor: str = "idle-reaper",
+        error_code: str | None = None,
+    ) -> ServingStatus:
+        return asyncio.run(
+            self._drain_async(
+                model_id,
+                reason=reason,
+                actor=actor,
+                error_code=error_code,
+            )
+        )
+
+    async def _drain_async(
+        self,
+        model_id: str,
+        *,
+        reason: str,
+        actor: str = "idle-reaper",
+        error_code: str | None = None,
+    ) -> ServingStatus:
         record = self._get(model_id)
         if record.state == ServingState.COLD.value:
             return status_from_record(record)
@@ -115,10 +139,16 @@ class ServingCoordinator:
             )
             self._audit(record, action="drain.requested", actor=actor)
         if not record.external_id:
-            return status_from_record(self._cold(record, detail="drained before provider allocation"))
+            return status_from_record(
+                self._cold(
+                    record,
+                    detail="drained before provider allocation",
+                    error_code=error_code,
+                )
+            )
         runtime = self.runtime_factory(self.settings)
         try:
-            receipt = asyncio.run(runtime.terminate(_handle(record)))
+            receipt = await runtime.terminate(_handle(record))
         except Exception:
             failed = replace(
                 record,
@@ -139,10 +169,15 @@ class ServingCoordinator:
         cold = self._cold(
             record,
             detail=(
-                "Provider deletion confirmed; managed inventory is zero"
+                f"{reason}; provider deletion confirmed; managed inventory is zero"
+                if error_code is not None and receipt.vf_auto_prefix_count == 0
+                else f"{reason}; provider deletion confirmed"
+                if error_code is not None
+                else "Provider deletion confirmed; managed inventory is zero"
                 if receipt.vf_auto_prefix_count == 0
                 else "Provider deletion confirmed"
             ),
+            error_code=error_code,
         )
         self._audit(cold, action="drain.completed", actor=actor)
         return status_from_record(cold)
@@ -273,10 +308,11 @@ class ServingCoordinator:
             )
             if current.external_id:
                 try:
-                    self.drain(
+                    await self._drain_async(
                         model_id,
                         reason=f"wake failed: {code}",
                         actor="serving-orchestrator",
+                        error_code=code,
                     )
                     current = self._get(model_id)
                 except ServingControlError:
