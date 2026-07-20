@@ -1,0 +1,19 @@
+{
+  "availability": [
+    {"cloud_type": "COMMUNITY", "display_name": "RTX 4000 Ada", "gpu_model": "NVIDIA RTX 4000 Ada Generation", "hourly_price_usd": 0.2, "stock_status": "Low"},
+    {"cloud_type": "SECURE", "display_name": "RTX 2000 Ada", "gpu_model": "NVIDIA RTX 2000 Ada Generation", "hourly_price_usd": 0.24, "stock_status": "Low"},
+    {"cloud_type": "SECURE", "display_name": "L4", "gpu_model": "NVIDIA L4", "hourly_price_usd": 0.39, "stock_status": "Low"},
+    {"cloud_type": "SECURE", "display_name": "A40", "gpu_model": "NVIDIA A40", "hourly_price_usd": 0.44, "stock_status": "High"}
+  ],
+  "budget_cap_usd": 1.0,
+  "cleanup": {"target_get_absent": true, "vf_auto_prefix_count": 0},
+  "elapsed_seconds": 5.225,
+  "estimated_cost_usd": 0.00029,
+  "finished_at": "2026-07-20T04:17:45.598452+00:00",
+  "max_live_minutes": 5,
+  "preflight": {"account_pod_count": 8, "cheapest_reserved_cost_usd": 0.016667, "vf_auto_prefix_count": 0},
+  "selected": {"cloud_type": "COMMUNITY", "display_name": "RTX 4000 Ada", "external_id": "ol2xt6tn71b8oc", "gpu_model": "NVIDIA RTX 4000 Ada Generation", "hourly_price_usd": 0.2},
+  "started_at": "2026-07-20T04:17:40.373045+00:00",
+  "status": "passed",
+  "version": "v0.32.0"
+}

@@ -2885,13 +2885,13 @@ sub-cent readiness/delete smoke under its `$1` cap.
   `$0.39/hr` / `Low`; A40 Secure `$0.44/hr` / `High`. Null Community offers
   for RTX 2000/L4/A40 were treated as unavailable. Prices are evidence only
   and must never be hardcoded.
-- [ ] Replace bundled create mapping with query/filter/live-price ranking and
+- [x] Replace bundled create mapping with query/filter/live-price ranking and
   one-model bounded fallback; keep Blackwell blocked.
-- [ ] Persist selected model/cloud/hourly price in the created audit; converge
+- [x] Persist selected model/cloud/hourly price in the created audit; converge
   exhaustion to explicit `no_capacity` FAILED.
-- [ ] Pass dry-run scenarios: first unavailable, all unavailable, third
+- [x] Pass dry-run scenarios: first unavailable, all unavailable, third
   available and create-race fallback; full pytest and secret scan.
-- [ ] Push implementation before one ≤`$1` query→create→immediate-delete live
+- [x] Push implementation before one ≤`$1` query→create→immediate-delete live
   proof; commit sanitized evidence, update README and tag
   `provisioner-capacity-aware`.
 
@@ -2899,3 +2899,11 @@ Stop conditions: auth/schema failure, candidate outside the approved set,
 Blackwell visibility, estimated spend above `$1`, ownership mismatch, deletion
 failure, target still present or raw `vf-auto-*` residue. This wave does not
 train.
+
+**Result:** implementation `e1a3f03` was pushed only after `439 passed, 1
+skipped`, focused capacity tests, compilation, diff checks and secret scan.
+The one live mutation selected RTX 4000 Ada Community at `$0.20/hr`, created
+Pod `ol2xt6tn71b8oc`, then deleted it immediately. The 5.225-second wall-clock
+estimate was `$0.000290`; target GET absence and a new account inventory with
+`vf-auto-* = 0` closed the cleanup gate. Sanitized evidence:
+`docs/evidence/provisioner/v0.32.0-capacity-live-pass.json`.
