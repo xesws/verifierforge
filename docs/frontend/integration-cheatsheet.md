@@ -1,9 +1,9 @@
 # Frontend integration cheatsheet
 
-Last verified: **2026-07-20 · v0.33.0** from the fixed Railway public origin
-against Supabase Postgres and the real tuned endpoint. The Forge Agent was
-deterministic mock; autoprovision was off, so the check made no paid LLM, GPU,
-or provider request.
+Last verified: **2026-07-20 · v0.34.0** from the fixed Railway public origin
+against Supabase Postgres and the dynamic serving registry. The Forge Agent is
+deterministic mock and training autoprovision is off. Serving wake is an
+independent, invite-protected action with explicit spend confirmation.
 
 ## Read this first: intentional data split
 
@@ -116,7 +116,7 @@ was read directly where that claim applies.
 | 17 | `PUT /clusters/data-pull-sql/sample-source` | 200 | yes | local identity + Supabase metadata | yes |
 | 18 | `GET /settings/provider-credentials/nebius` | 200 | yes | Supabase | yes |
 | 19 | `PUT /settings/provider-credentials/nebius` | 200 | yes; key never returned | Supabase | yes |
-| 20 | `POST /serving/wake` | 404 by default | explicit disabled body; no provider action | flag gate | yes |
+| 20 | `POST /serving/wake` | 404 by code default; 202 on accepted hosted wake | lifecycle shape; literal spend confirmation | Supabase + RunPod | yes |
 | 21 | `GET /serving/status` | 200 | lifecycle shape; endpoint key absent | Supabase registry | yes |
 
 All scoped self-check Job, credential, and approval rows were removed. Routing
@@ -131,8 +131,9 @@ and sample-source product values were restored, and
 | `invoice-field-extraction` | 180,000 | $6,000 | `forge` |
 | `data-pull-sql` | 95,000 | $5,500 | `forge` |
 
-The SQL route read back as enabled with canary `50`, target `tuned`. Guardian
-returned 128 real Supabase points; the latest rolling pass rate was `0.85`.
+After live acceptance the SQL route read back disabled with canary `0`, target
+`tuned`. Guardian returned 143 real Supabase points; the latest rolling pass
+rate was `0.95`.
 
 ## Flags and frontend-visible behavior
 
@@ -141,7 +142,7 @@ returned 128 real Supabase points; the latest rolling pass rate was `0.85`.
 | `VF_DB_BACKEND` | `.env`: `postgres` | Repositories require `SUPABASE_DB_URL`; there is no silent SQLite fallback. |
 | `VF_AGENT_ENABLED` | `.env`: `true` | Exposes Analyze, decision, approval, sample-source, and Discover routes. |
 | `VF_AUTOPROVISION` | unset/default `false` | Start Forge returns the explicit 404 above and cannot spend. |
-| `VF_SERVING_WAKE_ENABLED` | unset/default `false` | Independently gates one-GPU inference wake; status remains invitation-protected and readable. |
+| `VF_SERVING_WAKE_ENABLED` | code default `false`; hosted acceptance `true` | Independently gates one-GPU inference wake; Basic invitation, explicit confirmation, concurrency/budget fuses, and idle deletion still apply. |
 | `VF_AGENT_BINDING` | launch override `mock` | Analyze is deterministic and makes no LLM request; decision metadata still lands in Supabase. |
 | `VF_API_DATA_MODE` | default `hybrid` | Public modes are `artifacts`, `hybrid`, and `supabase`; `runs` is deprecated local compatibility. |
 | `VF_CORS_ORIGINS` | unset/local default | Allows localhost and 127.0.0.1 on 3000, 5173, and 8080. Comma-separated values replace the list; only explicit `*` opens all origins. |
@@ -151,7 +152,9 @@ boundary and remains disabled in this launch. Do not treat `POST /jobs` as a
 training action; it only queues metadata.
 
 The v0.33.0 public acceptance covered the then-current 19 operations; v0.34.0
-adds two serving operations, bringing frozen parity to 21. The flagship report contained
+adds two serving operations, bringing frozen parity to 21. The live serving
+acceptance reached ready twice, served 111 default / 89 tuned requests without
+fallback, and returned provider inventory to zero twice. The flagship report contained
 400 main and 200 control points, ten held-out arena samples, `$3,850` projected
 savings, and `real_gain`. Twelve tuned requests succeeded and Guardian added a
 new point; the SQL route was restored to its prior 50% state afterward.

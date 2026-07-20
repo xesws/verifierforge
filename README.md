@@ -31,15 +31,17 @@ Other completed gates are equally explicit:
 | Forge Agent | Live 12-scenario Gate C on `gpt-5.6-luna`: decision `1.0`, chain `1.0`, illegal actions `0`, config legality `1.0`; feature flag remains off by default. |
 | Product decision | A source-less production Analyze returned `need_more_data`; after a human-approved 50-row source, a fresh run returned `forge` at confidence `0.98` and created an approval in Supabase. |
 | Database | SQLite remains local default; the same async SQLAlchemy repositories and Alembic schema passed a real Supabase Postgres migration, reconciliation, and product smoke. |
-| Delivery | The reviewer API/proxy is a single fixed Railway service separated from GPU inference. Public H2 acceptance passed 19/19 operations, Basic Auth, CORS, 12 real tuned calls, and a new Guardian point. The earlier 200-request canary proof split 120 default / 80 tuned at LivePassRate `0.85`. |
+| Delivery | The reviewer API/proxy is a fixed Railway control plane; tuned GPU inference is now scale-to-zero. Public acceptance covers 21/21 operations. Two RunPod wake cycles reached ready in 282.14s and 266.68s, served real traffic, then idled to provider-inventory zero. The live 200-request proof split 111 default / 89 tuned with no fallback and Guardian `0.95`. |
 | Provisioning | P-1 mock lifecycle/fuses pass. P-2 executed an approved 0.5B/100-step S3 run and deleted the pod. P-4 then proved the separate web approval → explicit Start Forge → real RunPod readiness → delete wiring. Before every allocation, RunPod live capacity is queried, approved offers are price-ranked with bounded fallback, and the chosen GPU/rate is audited; the live proof selected RTX 4000 Ada at `$0.20/hr` and deleted it immediately. |
 
 ## Architecture
 
 ```text
-Vercel frontend ──▶ Railway reviewer API + proxy ──▶ GPU vLLM only
-                           │                 │
-                           │                 └── guardian/verifier
+Vercel frontend ──▶ Railway reviewer API + proxy ──▶ on-demand GPU vLLM
+                           │          │                  ▲
+                           │          └── guardian       │ wake/idle reap
+                           │                             │
+                           ├── serving registry ─────────┘
                            ▼
                 Supabase facts + S3 evidence
                            │
@@ -57,7 +59,9 @@ source of truth.
 
 The deployable reviewer image is intentionally separate from GPU execution. It
 is a single non-root Uvicorn service with no torch, vLLM, verl, Ray, or
-Transformers dependency; the independently hosted GPU runs inference only.
+Transformers dependency. An invite-protected wake allocates one capacity-aware
+serving GPU, verifies the frozen S3 model, starts vLLM, and publishes its
+ephemeral endpoint into Supabase; an idle reaper deletes it again.
 The browser sets `VITE_VF_API_BASE_URL` to the reviewer origin, so a backend
 rollback or tuned-endpoint rotation does not require a frontend rebuild unless
 the reviewer origin itself changes.
@@ -118,9 +122,9 @@ decision/approval locally without a paid call.
 
 The fixed full reviewer is available at
 `https://verifierforge-production.up.railway.app`; product paths require the
-separately shared Basic Auth invitation. The hosted flags are mock Agent,
-mock provisioner, and `VF_AUTOPROVISION=false`, so a judge cannot start paid
-compute.
+separately shared Basic Auth invitation. Training autoprovision remains off.
+Serving wake has its own explicit confirmation, one-session concurrency limit,
+`$5` cap, and idle reaper; report and arena evidence do not require a live GPU.
 
 Owners can expose the full product composition—Supabase repositories, the
 configured real tuned endpoint, mock Agent, mock provisioner and Guardian—via
@@ -138,8 +142,8 @@ hosting. `VF_AUTOPROVISION` is enabled only inside this launcher together with
 
 For permanent reviewer hosting, build the root `Dockerfile` and run
 `scripts/start_hosted_backend.sh`. The hosted service uses Supabase, S3,
-invitation auth, mock Agent/provisioner bindings, and the independently hosted
-tuned endpoint. Deployment and one-variable inference rollback are documented
+invitation auth, mock Agent/training-provisioner bindings, and the dynamic
+serving registry. Deployment and inference rollback are documented
 in
 [docs/infrastructure/v0.33.0-hosted-backend.md](docs/infrastructure/v0.33.0-hosted-backend.md).
 
@@ -156,6 +160,13 @@ strict structured submission, and no provisioning or training handle. Gate C
 passed, but `VF_AGENT_ENABLED` stays false unless an operator opts in. The web
 approval remains a database write. `Start Forge` is a separate endpoint behind
 the stricter default-off `VF_AUTOPROVISION` flag; approval alone never spends.
+
+Serving uses the same disposable-node discipline as training but a separate
+state machine: `cold → provisioning → loading → ready → draining → cold`.
+The pod receives presigned model objects, not AWS credentials, and must prove
+all 13 file hashes, the canonical tree, `/v1/models`, and one completion before
+the registry becomes ready. A cold or failed endpoint falls back without
+breaking the static flagship report.
 
 ## Database operations
 
@@ -196,10 +207,10 @@ BYO credentials through Settings and keep that fallback unset.
 
 - The demonstrated quality result is one NL→SQL task family with 50 training
   rows and a 60-row held-out set; it is not a broad benchmark claim.
-- The reviewer uses a fixed Railway subdomain, but its independent GPU model
-  route still uses an ephemeral Cloudflare quick tunnel rather than a serving
-  SLA. The reviewer degrades to artifact reports and deterministic proxy
-  fallback if inference disappears.
+- The reviewer uses a fixed Railway subdomain, but each on-demand GPU session
+  still uses an ephemeral Cloudflare quick tunnel rather than a serving SLA.
+  The reviewer degrades to artifact reports and deterministic proxy fallback
+  while inference is cold or unavailable.
 - P-4 proves real approval/Start/provision/delete wiring, not a second complete
   training run from the web. `VF_AUTOPROVISION` remains default-off. The P-4
   smoke estimate was `$0.000623`; final provider billing remains asynchronous.

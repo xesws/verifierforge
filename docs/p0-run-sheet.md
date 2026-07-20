@@ -3110,7 +3110,7 @@ local/static fallback. No trainer or frozen-data work belongs to this patch.
     30-second descriptor-only cache. Fernet plaintext is decrypted per request
     and never cached. Cold/non-ready resolves through `default-fallback`, so
     Guardian does not score it and static reports remain complete.
-- [ ] **SV2 — recoverable ServingSession.** Capacity-aware `small_ada`,
+- [x] **SV2 — recoverable ServingSession.** Capacity-aware `small_ada`,
   Blackwell blocked, database active-slot concurrency 1, `$5` session cap,
   120-minute runtime cap, S3 identity gate, vLLM + cloudflared readiness gate,
   durable reconcile and provider-side termination proof.
@@ -3118,7 +3118,7 @@ local/static fallback. No trainer or frozen-data work belongs to this patch.
   `VF_SERVING_WAKE_ENABLED=false` default; do not enable
   `VF_AUTOPROVISION`. Real/mock contract count is 21; Discover exposes Wake
   and polls the full serving lifecycle.
-- [ ] **SV4 — cold-start acceleration.** Timebox 45 minutes. Preferred image:
+- [x] **SV4 — cold-start acceleration.** Timebox 45 minutes. Preferred image:
   official vLLM 0.10.2 linux-amd64 digest
   `sha256:df2607b26bdda2875de4832f4d08da0055b4b6e3570347f3a849bcc652771dd6`.
   Fall back to the verified install path without weakening gates.
@@ -3129,7 +3129,7 @@ local/static fallback. No trainer or frozen-data work belongs to this patch.
     retry confirmed target absent and `vf-auto-* = 0`, and restart
     reconciliation wrote `cold`. Selected fallback: verified PyTorch
     2.8/cu128 image plus locked `vllm==0.10.2`; all later gates unchanged.
-  - [ ] Fallback experiment `sv-736af20e591c46e6915c3ec3` allocated an RTX
+  - [x] Fallback experiment `sv-736af20e591c46e6915c3ec3` allocated an RTX
     4000 Ada at `$0.20/hr`. Its S3 callback proves the locked install, all 13
     downloads, canonical tree identity, and quick tunnel completed, but at
     T+13 minutes Cloudflare returned 530 and the RunPod HTTP proxy returned
@@ -3144,15 +3144,27 @@ local/static fallback. No trainer or frozen-data work belongs to this patch.
     `2026-07-20T11:16:17Z`. Corrective scope: install the already-proven
     Transformers 4.57.6 / tokenizers 0.22.2 / huggingface-hub 0.36.2 locks with
     vLLM 0.10.2; no gate relaxation.
-- [ ] **SV5-A — first live cycle.** Wake to ready, record cold-start duration,
+  - [x] Locked fallback reached ready twice on RTX 4000 Ada at `$0.20/hr`.
+    Cold starts were 282.14 seconds and 266.68 seconds; the official-image
+    shortcut remains rejected, while the verified install path is accepted.
+- [x] **SV5-A — first live cycle.** Wake to ready, record cold-start duration,
   canary 50%, send 200 SQL requests, require 40–60% tuned, no tuned fallback,
-  and at least one new Guardian point; restore canary to zero.
-- [ ] **SV5-B — idle and second wake.** Acceptance idle override 3 minutes,
+  and at least one new Guardian point; restore canary to zero. Result: 200/200
+  requests succeeded in 35.937 seconds; Supabase recorded 111 default / 89
+  tuned / 0 fallback (44.5% tuned). Guardian added 13 points and ended at
+  0.95. Canary was restored to zero before idle observation.
+- [x] **SV5-B — idle and second wake.** Acceptance idle override 3 minutes,
   drain/delete/list-zero/billing schedule, cold, wake to ready again, one real
-  completion, then clean termination back to cold.
-- [ ] **SV6 — closeout.** README/JUDGES/contract/run-sheet, full tests, secret
-  scan, `frontend-api-v1.2` and `serving-scale-to-zero` tags, push, then report
-  that only owner may decide whether to stop the old L4.
+  completion, then clean termination back to cold. Both cycles reached cold
+  through the idle reaper; each provider target was absent and raw
+  `vf-auto-*` inventory was zero. The second-cycle proxy completion returned
+  HTTP 200 with content and its relational route evidence was exactly `tuned`.
+- [x] **SV6 — closeout.** README/JUDGES/contract/run-sheet and sanitized live
+  evidence are synchronized. Final validation: `474 passed, 1 skipped`, secret
+  scan passed, route restored to disabled/zero, registry cold, and raw managed
+  provider inventory empty. Tags `frontend-api-v1.2` and
+  `serving-scale-to-zero` point at the closeout commit. The old L4 was never
+  stopped or reconfigured; only the owner may decide whether to stop it.
 
 Stop conditions: an item blocked over 30 minutes is recorded and skipped; an
 S3 identity mismatch, migration failure, leaked secret, budget/runtime fuse,

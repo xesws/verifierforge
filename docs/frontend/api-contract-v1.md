@@ -46,10 +46,10 @@ with the same Basic header:
   "url": "https://example.trycloudflare.com/v1",
   "detail": "S3 identity, vLLM, completion, and public tunnel gates passed",
   "error_code": null,
-  "gpu_model": "NVIDIA L4",
-  "hourly_price_usd": 0.39,
-  "cost_accrued_usd": 0.08,
-  "cold_start_seconds": 420.0,
+  "gpu_model": "NVIDIA RTX 4000 Ada Generation",
+  "hourly_price_usd": 0.2,
+  "cost_accrued_usd": 0.015458,
+  "cold_start_seconds": 282.1415,
   "updated_at": "2026-07-20T12:00:00Z"
 }
 ```
@@ -58,6 +58,11 @@ States are `cold | provisioning | loading | ready | draining`; only `ready`
 contains `url`. Endpoint key material is never returned. With
 `VF_SERVING_WAKE_ENABLED=false`, POST is an explicit 404 with zero provider
 mutation while status/report/arena reads remain available.
+
+Public acceptance reached ready twice in 282.14 and 266.68 seconds, proved a
+200-request 44.5% tuned canary with no fallback, and returned the registry and
+provider inventory to cold/zero after each idle cycle. These measurements are
+evidence, not additional contract fields.
 
 ## Discover clusters
 

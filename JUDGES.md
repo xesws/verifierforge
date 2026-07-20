@@ -11,7 +11,7 @@ python -m pip install -r requirements-app.txt
 pytest -q
 ```
 
-Expected at this revision: `455 passed, 1 skipped`. The skip is the explicitly
+Expected at this revision: `474 passed, 1 skipped`. The skip is the explicitly
 credential-gated live S3 test.
 
 ## 2. Start the reviewer sandbox (about 1 minute)
@@ -38,11 +38,19 @@ The accepted public reviewer is:
 https://verifierforge-production.up.railway.app
 ```
 
-It uses Supabase, the real tuned endpoint, deterministic mock Agent, and the
-same 19-operation contract. It requires HTTP Basic Auth: username `judge`,
+It uses Supabase, deterministic mock Agent, and the same 21-operation contract.
+Tuned inference is scale-to-zero rather than a permanently rented endpoint. It
+requires HTTP Basic Auth: username `judge`,
 invitation code shared separately. A request without auth returns 401;
 `/healthz` remains public. `VF_AUTOPROVISION=false`, so Start Forge returns an
 explicit disabled response and cannot create a paid resource.
+
+On Discover, **Wake model** is a separate, explicitly confirmed serving action.
+It permits only one session, has a `$5` session cap, and normally reaches ready
+in about 4.5 minutes. The page polls `cold → provisioning → loading → ready`;
+after 30 idle minutes the production reaper deletes the pod. Reports and arena
+remain usable throughout cold start. Do not confuse this with Start Forge:
+training autoprovision remains disabled.
 
 If the hosted service is unavailable, the owner may recreate the local full
 fallback with:
@@ -131,9 +139,9 @@ hardening.
 ## Honest boundary
 
 - One NL→SQL vertical is not a broad benchmark.
-- The reviewer has a fixed Railway URL. The independently hosted GPU inference
-  route still uses a temporary Cloudflare quick tunnel and is not an SLA;
-  report reads fall back safely if it expires.
+- The reviewer has a fixed Railway URL. Each on-demand GPU inference session
+  uses a temporary Cloudflare quick tunnel and is not an SLA; the registry
+  drops back to cold and report reads remain safe when a session is absent.
 - Forge Agent remains default-off despite passing Gate C.
 - P-2 completed the separately authorized RunPod path: orphan cleanup, a
   0.5B/100-step S3 run, post-training vLLM models/completion gate, 137-object
@@ -143,5 +151,9 @@ hardening.
   wiring at a `$0.000623` provider estimate. `VF_AUTOPROVISION` remains
   default-off; the reviewer full sandbox explicitly uses the mock adapter.
 - Nebius is the next adapter on the roadmap and is not implemented.
+- Live scale-to-zero acceptance ran twice on RTX 4000 Ada at `$0.20/hr`:
+  282.14s and 266.68s cold starts, 200/200 traffic with 111 default / 89 tuned,
+  Guardian 0.95, and provider inventory zero after both idle reaps. Evidence is
+  `docs/evidence/serving/v0.34.0-sv5-live.json`.
 - The repository contains no weights, credentials, raw traffic bodies, or
   requirement for a paid provider during review.

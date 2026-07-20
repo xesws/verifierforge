@@ -1,0 +1,60 @@
+{
+  "schema_version": 1,
+  "accepted_at": "2026-07-20",
+  "model_id": "vf-demo",
+  "canonical_tree_sha256": "7bde853af7c82405fd1356de9bad9b6c421de45a45ce747f63ea2f8a27eda658",
+  "runtime": {
+    "gpu_model": "NVIDIA RTX 4000 Ada Generation",
+    "hourly_price_usd": 0.2,
+    "image": "runpod/pytorch:1.0.2-cu1281-torch280-ubuntu2404",
+    "vllm": "0.10.2",
+    "transformers": "4.57.6",
+    "tokenizers": "0.22.2",
+    "huggingface_hub": "0.36.2"
+  },
+  "diagnostic_trial": {
+    "session_id": "sv-4619b7d4656d41cfac8e0574",
+    "phase": "failed",
+    "return_code": 1,
+    "error": "AttributeError: Qwen2Tokenizer has no attribute all_special_tokens_extended",
+    "target_absent": true,
+    "vf_auto_prefix_count": 0,
+    "deletion_checked_at": "2026-07-20T11:16:17.500070Z"
+  },
+  "cycle_one": {
+    "session_id": "sv-6c5f29f858f44b27bf24eba6",
+    "cold_start_seconds": 282.1415295172483,
+    "reported_cost_usd_at_ready": 0.015458,
+    "traffic": {
+      "sent": 200,
+      "success": 200,
+      "failed": 0,
+      "elapsed_seconds": 35.937,
+      "default": 111,
+      "tuned": 89,
+      "default_fallback": 0,
+      "tuned_percent": 44.5
+    },
+    "guardian": {
+      "points_before": 130,
+      "points_after": 143,
+      "new_points": 13,
+      "latest_pass_rate": 0.95
+    },
+    "idle_reaped": true,
+    "target_absent": true,
+    "vf_auto_prefix_count": 0
+  },
+  "cycle_two": {
+    "session_id": "sv-cde6234b38754674bba4dda0",
+    "cold_start_seconds": 266.68479481339455,
+    "reported_cost_usd_at_ready": 0.014597,
+    "completion_http_status": 200,
+    "completion_has_content": true,
+    "route_taken": "tuned",
+    "idle_reaped": true,
+    "target_absent": true,
+    "vf_auto_prefix_count": 0
+  },
+  "billing_evidence_policy": "DELETE plus managed-inventory-zero is the synchronous gate; provider billing records are reconciled asynchronously at plus-1h and plus-6h."
+}
