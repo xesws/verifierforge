@@ -1,8 +1,9 @@
 # Frontend integration cheatsheet
 
-Last verified: **2026-07-20 · v0.32.3** against the real FastAPI process and
-Supabase Postgres. The Forge Agent was deterministic mock; autoprovision was
-off, so the check made no paid LLM, GPU, or provider request.
+Last verified: **2026-07-20 · v0.33.0** from the fixed Railway public origin
+against Supabase Postgres and the real tuned endpoint. The Forge Agent was
+deterministic mock; autoprovision was off, so the check made no paid LLM, GPU,
+or provider request.
 
 ## Read this first: intentional data split
 
@@ -49,6 +50,17 @@ Use this frontend base URL:
 ```text
 http://127.0.0.1:8010
 ```
+
+For the hosted reviewer, set exactly one frontend variable (no trailing slash):
+
+```text
+VITE_VF_API_BASE_URL=https://verifierforge-production.up.railway.app
+```
+
+The hosted origin requires HTTP Basic Auth on product requests; username is
+`judge` and the invitation code is shared out-of-band. `GET /healthz` and CORS
+preflights do not require credentials. A tuned-endpoint outage may change
+health to `degraded`, but report reads and proxy fallback remain available.
 
 Loopback routes require no authentication. Every JSON POST/PUT uses
 `Content-Type: application/json`; GET requests need no special header. The
@@ -131,3 +143,8 @@ returned 128 real Supabase points; the latest rolling pass rate was `0.85`.
 Analyze is advisory. Approve writes intent only. Start Forge is the only spend
 boundary and remains disabled in this launch. Do not treat `POST /jobs` as a
 training action; it only queues metadata.
+
+Public acceptance repeated all 19 operations. The flagship report contained
+400 main and 200 control points, ten held-out arena samples, `$3,850` projected
+savings, and `real_gain`. Twelve tuned requests succeeded and Guardian added a
+new point; the SQL route was restored to its prior 50% state afterward.

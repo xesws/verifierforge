@@ -31,31 +31,36 @@ Other completed gates are equally explicit:
 | Forge Agent | Live 12-scenario Gate C on `gpt-5.6-luna`: decision `1.0`, chain `1.0`, illegal actions `0`, config legality `1.0`; feature flag remains off by default. |
 | Product decision | A source-less production Analyze returned `need_more_data`; after a human-approved 50-row source, a fresh run returned `forge` at confidence `0.98` and created an approval in Supabase. |
 | Database | SQLite remains local default; the same async SQLAlchemy repositories and Alembic schema passed a real Supabase Postgres migration, reconciliation, and product smoke. |
-| Delivery | A public Cloudflare quick tunnel served the selected model; 200 canary requests split 120 default / 80 tuned and produced Guardian LivePassRate `0.85`, then canary zero sent 20 / 20 requests to default. |
+| Delivery | The reviewer API/proxy is a single fixed Railway service separated from GPU inference. Public H2 acceptance passed 19/19 operations, Basic Auth, CORS, 12 real tuned calls, and a new Guardian point. The earlier 200-request canary proof split 120 default / 80 tuned at LivePassRate `0.85`. |
 | Provisioning | P-1 mock lifecycle/fuses pass. P-2 executed an approved 0.5B/100-step S3 run and deleted the pod. P-4 then proved the separate web approval → explicit Start Forge → real RunPod readiness → delete wiring. Before every allocation, RunPod live capacity is queried, approved offers are price-ranked with bounded fallback, and the chosen GPU/rate is audited; the live proof selected RTX 4000 Ada at `$0.20/hr` and deleted it immediately. |
 
 ## Architecture
 
 ```text
-OpenAI-compatible traffic ──▶ proxy ──▶ default / tuned model
-          │                    │                │
-          ▼                    └── guardian ────┘
-   Discover clusters                 verifier score
-          │
-          ▼
- Forge Agent (read-only tools) ──▶ human approval ──▶ provisioner
-          │                                               │
-          ▼                                               ▼
- Supabase / SQLite                         disposable verl + vLLM worker
-                                                          │
-                                                          ▼
-                                        LocalStorage or manifest-last S3
+Vercel frontend ──▶ Railway reviewer API + proxy ──▶ GPU vLLM only
+                           │                 │
+                           │                 └── guardian/verifier
+                           ▼
+                Supabase facts + S3 evidence
+                           │
+                           ▼
+ Forge Agent (read-only) ──▶ human approval ──▶ explicit Start Forge
+                                                    │
+                                                    ▼
+                                      disposable training executor
 ```
 
 Pydantic contracts sit at each boundary. Product metadata, decisions,
 approvals, routing, and audit events use one repository layer. Full Agent
 traces and training objects remain in S3. A GPU worker is an executor, never a
 source of truth.
+
+The deployable reviewer image is intentionally separate from GPU execution. It
+is a single non-root Uvicorn service with no torch, vLLM, verl, Ray, or
+Transformers dependency; the independently hosted GPU runs inference only.
+The browser sets `VITE_VF_API_BASE_URL` to the reviewer origin, so a backend
+rollback or tuned-endpoint rotation does not require a frontend rebuild unless
+the reviewer origin itself changes.
 
 ### Data ownership and API read modes
 
@@ -111,6 +116,12 @@ Open `http://127.0.0.1:8012/docs` for the API. The optional mock Agent demo is
 documented in [JUDGES.md](JUDGES.md); it uses the real Discover UI and stores a
 decision/approval locally without a paid call.
 
+The fixed full reviewer is available at
+`https://verifierforge-production.up.railway.app`; product paths require the
+separately shared Basic Auth invitation. The hosted flags are mock Agent,
+mock provisioner, and `VF_AUTOPROVISION=false`, so a judge cannot start paid
+compute.
+
 Owners can expose the full product composition—Supabase repositories, the
 configured real tuned endpoint, mock Agent, mock provisioner and Guardian—via
 an authenticated Cloudflare quick tunnel:
@@ -124,6 +135,13 @@ code file. Reviewers authenticate as Basic Auth user `judge`; the code must be
 shared separately. Quick tunnels are temporary evidence, not production
 hosting. `VF_AUTOPROVISION` is enabled only inside this launcher together with
 `VF_PROVISION_BINDING=mock`, so Start Forge cannot create a paid resource.
+
+For permanent reviewer hosting, build the root `Dockerfile` and run
+`scripts/start_hosted_backend.sh`. The hosted service uses Supabase, S3,
+invitation auth, mock Agent/provisioner bindings, and the independently hosted
+tuned endpoint. Deployment and one-variable inference rollback are documented
+in
+[docs/infrastructure/v0.33.0-hosted-backend.md](docs/infrastructure/v0.33.0-hosted-backend.md).
 
 ## Engineering boundaries
 
@@ -178,8 +196,10 @@ BYO credentials through Settings and keep that fallback unset.
 
 - The demonstrated quality result is one NL→SQL task family with 50 training
   rows and a 60-row held-out set; it is not a broad benchmark claim.
-- The successful public model proof used an ephemeral Cloudflare quick tunnel,
-  not a durable production hostname or SLA.
+- The reviewer uses a fixed Railway subdomain, but its independent GPU model
+  route still uses an ephemeral Cloudflare quick tunnel rather than a serving
+  SLA. The reviewer degrades to artifact reports and deterministic proxy
+  fallback if inference disappears.
 - P-4 proves real approval/Start/provision/delete wiring, not a second complete
   training run from the web. `VF_AUTOPROVISION` remains default-off. The P-4
   smoke estimate was `$0.000623`; final provider billing remains asynchronous.

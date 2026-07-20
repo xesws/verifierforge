@@ -2891,9 +2891,9 @@ failure to preserve the two pre-existing provisioning billing modifications.
   complete environment inventory.
 - [x] H1: build a sub-1GB non-root container and pass local 19-operation,
   invitation, CORS, proxy, Guardian, and degraded-mode gates.
-- [ ] H2: deploy one always-on Railway Hobby service and repeat the matrix from
+- [x] H2: deploy one always-on Railway service and repeat the matrix from
   its fixed public subdomain.
-- [ ] H3: only after H2 green, retire old sandbox processes while preserving
+- [x] H3: only after H2 green, retire old sandbox processes while preserving
   vLLM; establish fixed-port or one-variable tunnel rotation.
 - [ ] H4: update JUDGES/README/frontend/infrastructure handoff, validate,
   commit/tag/push, and write the owner checklist.
@@ -2907,7 +2907,71 @@ H0/H1 evidence: image `98,709,804` bytes; imported heavy-module set `[]`;
 19/19 expected API statuses; localhost and Vercel CORS at API/proxy; tuned
 completion HTTP 200; Guardian 129 points; unreachable tuned endpoint fell back
 with HTTP 200 and `{"status":"degraded","tuned_upstream_reachable":false}`.
-The old local reviewer (`:8014`) and quick tunnel remain running pending H2.
+The old local reviewer (`:8014`) and quick tunnel remained running through the
+entire H2 gate and were retired only after public acceptance.
+
+### H2 launch record
+
+- Railway browserless authorization completed as `Jerry-Qian`; the account
+  already contained one project (`invigorating-growth`) with exactly one
+  service (`verifierforge`). It was reused to avoid the forbidden duplicate
+  environment. Serverless is disabled (`sleepApplication=false`) and the
+  manifest requests one `sfo` replica.
+- The pre-existing deployment failed because only Railway metadata variables
+  existed. Sanitized root cause: `DatabaseConfigurationError:
+  SUPABASE_DB_URL is required when VF_DB_BACKEND=postgres`.
+- Twenty-two allowlisted product variables were added through stdin with
+  deploy triggering suppressed. OpenAI, OpenRouter, and RunPod provisioning
+  variable count: zero. The local `.env` was not uploaded.
+- Local-source deployment `dc6a6b5a-64e8-4afa-a735-cd005db547ab` was started
+  against the sole service. Generated fixed origin:
+  `https://verifierforge-production.up.railway.app`.
+- Railway injected `PORT=8080`, but the generated domain was initially mapped
+  to 8000 and returned `502 Application failed to respond`. The container log
+  showed successful Alembic/projection startup and Uvicorn on 8080. Updating
+  the existing domain target to 8080 fixed the public route without a rebuild.
+- Public acceptance: 19/19 documented operations returned expected statuses
+  and fields; Start Forge returned its intentional disabled 404; unauthenticated
+  product traffic returned 401; localhost API/proxy CORS passed and an
+  untrusted origin was rejected. The flagship report returned before/after
+  `0.5833333333333334 / 0.7833333333333333`, 400/200 curve points, ten held-out
+  arena cards, `$3,850`, and `real_gain`.
+- Twelve real tuned completions returned 200 and Guardian grew from 129 to
+  130, proving the path did not use `default-fallback`. Routing was restored to
+  50%; H2 temporary Job, decision, approval, credential, and two S3 trace
+  objects were removed.
+- Plan metadata currently reports `trial`, not confirmed Hobby. Before the URL
+  is treated as an always-on judge endpoint, the owner must confirm/upgrade to
+  Hobby, retain Serverless-off, and configure a usage alert.
+
+### H3 read-only endpoint investigation
+
+- The configured Cloudflare inference route returned `/v1/models` HTTP 200
+  with one model. `https://e5bae2au0f867m-8000.proxy.runpod.net/v1/models`
+  returned HTTP 404, confirming that undeclared RunPod port 8000 is not a
+  stable route.
+- Rotation changes only hosted `VF_PROXY_TUNED_UPSTREAM`. On outage, hosted
+  health becomes degraded, tuned requests use `default-fallback`, Guardian
+  skips the fallback response, and artifact reports remain complete.
+- After the H2 public matrix was green, the old laptop reviewer PID 15865 and
+  Cloudflare PID 16091 received TERM and exited. The configured GPU vLLM still
+  returned `/v1/models` HTTP 200 with one model. A vfserve process audit showed
+  only vLLM and its inference Cloudflare tunnel; no API/proxy/reviewer process
+  remains on the GPU host.
+
+### OWNER morning checklist
+
+1. **1 minute — share reviewer access.** Send the invitation code separately
+   to judges; verify `https://verifierforge-production.up.railway.app/healthz`.
+2. **2 minutes — make hosting durable.** Railway currently reports `trial`:
+   confirm/upgrade to Hobby, keep Serverless disabled, and add a monthly usage
+   alert. No command follows because this is an account/billing dashboard action.
+3. **5 minutes — merge the frontend.** Set
+   `VITE_VF_API_BASE_URL=https://verifierforge-production.up.railway.app` in
+   Vercel and add its exact production origin to Railway `VF_CORS_ORIGINS`.
+4. **5 minutes when the GPU tunnel rotates — update one variable.** Set Railway
+   `VF_PROXY_TUNED_UPSTREAM=https://<new-tunnel>/v1` and restart the sole
+   service; reports remain available during the degraded interval.
 
 ## 2026-07-19 v0.32.0 — P-2.5 capacity-aware RunPod selection
 

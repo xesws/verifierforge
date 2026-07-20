@@ -11,7 +11,7 @@ python -m pip install -r requirements-app.txt
 pytest -q
 ```
 
-Expected at this revision: `433 passed, 1 skipped`. The skip is the explicitly
+Expected at this revision: `455 passed, 1 skipped`. The skip is the explicitly
 credential-gated live S3 test.
 
 ## 2. Start the reviewer sandbox (about 1 minute)
@@ -30,25 +30,33 @@ Proxy: http://127.0.0.1:8013/v1/chat/completions
 The API reads immutable committed evidence; the proxy uses a deterministic fake
 upstream. This fallback remains the no-secret path for a fresh clone.
 
-### Owner-hosted full sandbox
+### Hosted full reviewer
 
-The owner may instead run:
+The accepted public reviewer is:
+
+```text
+https://verifierforge-production.up.railway.app
+```
+
+It uses Supabase, the real tuned endpoint, deterministic mock Agent, and the
+same 19-operation contract. It requires HTTP Basic Auth: username `judge`,
+invitation code shared separately. A request without auth returns 401;
+`/healthz` remains public. `VF_AUTOPROVISION=false`, so Start Forge returns an
+explicit disabled response and cannot create a paid resource.
+
+If the hosted service is unavailable, the owner may recreate the local full
+fallback with:
 
 ```bash
 bash scripts/start_reviewer_sandbox.sh --mode full
 ```
 
-This publishes one ephemeral `trycloudflare.com` URL backed by Supabase, the
+This publishes an ephemeral `trycloudflare.com` URL backed by Supabase, the
 configured real tuned endpoint, mock Agent and mock Start Forge lifecycle. It
 requires HTTP Basic Auth: username `judge`, invitation code shared separately.
 The launcher never prints the code; it records it only in the ignored runtime
 path it reports. A request without auth returns 401. This full path calls no
-paid LLM and provisions no GPU.
-
-Current owner-hosted quick URL:
-`https://functioning-become-revelation-meanwhile.trycloudflare.com`. Because it
-is a quick tunnel, verify availability with the owner and request the separate
-invitation code before review.
+paid LLM and provisions no GPU. It is a fallback, not the current public URL.
 
 ## 3. Inspect the training result (about 2 minutes)
 
@@ -91,15 +99,16 @@ Open `http://127.0.0.1:8014/discover`. On **Data Pull SQL**:
 2. click **Input**, keep the default repository source, and confirm;
 3. click **Analyze** to see the mock-bound decision, rationale and config;
 4. click **Approve & Forge** and observe the durable approval receipt;
-5. on the owner-hosted full sandbox, confirm the separate spend boundary and
-   click **Start Forge**; it runs the mock provisioner and polls to `done`.
+5. on the hosted reviewer, confirm the separate spend boundary and click
+   **Start Forge**; the default-off flag visibly rejects it without spending.
 
 This UI path is structurally real but intentionally zero-cost. The separate
 live Gate C evidence is `1.0 / 1.0 / 0 / 1.0` under tag
 `agent-gate-c-pass`; the production source/decision/approval record is in
 [`docs/p0-run-sheet.md`](docs/p0-run-sheet.md). Approval writes intent only—it
 does not launch a GPU from the browser. Start is a distinct action; the public
-reviewer sandbox binds it to the mock provisioner.
+reviewer is configured with the mock provisioner but keeps the autoprovision
+gate closed.
 
 Frontend implementers can use the frozen request/response examples in
 [`docs/frontend/api-contract-v1.md`](docs/frontend/api-contract-v1.md); the
@@ -122,7 +131,9 @@ hardening.
 ## Honest boundary
 
 - One NL→SQL vertical is not a broad benchmark.
-- The public endpoint was a temporary Cloudflare quick tunnel, not an SLA.
+- The reviewer has a fixed Railway URL. The independently hosted GPU inference
+  route still uses a temporary Cloudflare quick tunnel and is not an SLA;
+  report reads fall back safely if it expires.
 - Forge Agent remains default-off despite passing Gate C.
 - P-2 completed the separately authorized RunPod path: orphan cleanup, a
   0.5B/100-step S3 run, post-training vLLM models/completion gate, 137-object
