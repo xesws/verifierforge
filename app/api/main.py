@@ -46,7 +46,7 @@ app.include_router(copilot_router)
 app.include_router(agent_router)
 app.include_router(provisioning_router)
 app.include_router(serving_router)
-app.add_event_handler("startup", start_serving_reaper)
+app.router.add_event_handler("startup", start_serving_reaper)
 
 
 def _runs_dir() -> Path:
