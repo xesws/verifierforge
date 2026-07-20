@@ -3129,6 +3129,13 @@ local/static fallback. No trainer or frozen-data work belongs to this patch.
     retry confirmed target absent and `vf-auto-* = 0`, and restart
     reconciliation wrote `cold`. Selected fallback: verified PyTorch
     2.8/cu128 image plus locked `vllm==0.10.2`; all later gates unchanged.
+  - [ ] Fallback experiment `sv-736af20e591c46e6915c3ec3` allocated an RTX
+    4000 Ada at `$0.20/hr`. Its S3 callback proves the locked install, all 13
+    downloads, canonical tree identity, and quick tunnel completed, but at
+    T+13 minutes Cloudflare returned 530 and the RunPod HTTP proxy returned
+    502 because port 8000 had no listener. Before another paid attempt, add a
+    redacted phase/error callback so vLLM startup failures are evidence-bearing
+    and fail fast; SSH is deliberately not part of the runtime contract.
 - [ ] **SV5-A — first live cycle.** Wake to ready, record cold-start duration,
   canary 50%, send 200 SQL requests, require 40–60% tuned, no tuned fallback,
   and at least one new Guardian point; restore canary to zero.
