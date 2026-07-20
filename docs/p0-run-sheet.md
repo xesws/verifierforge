@@ -2787,3 +2787,18 @@ default responses then a real tuned HTTP 200/non-empty completion. Follow-up
 traffic added Guardian point 127 from 126; final rolling pass rate remained
 0.85. The invitation remains only in ignored mode-0600 runtime storage.
 Tracked proof: `docs/evidence/reviewer/v0.30.0-full-public-proof.json`.
+
+## 2026-07-19 v0.31.0 — frontend API contract v1 freeze
+
+- [x] Reserve version, backend area and final contract document before code.
+- [ ] Land additive core fields (`Cluster.analyzer_decision`,
+  `JobCreateRequest`) in a serialized contract-only wave.
+- [ ] Implement/verify real and mock cluster aggregation plus queued
+  `POST /jobs`; preserve all existing fields.
+- [ ] Fill endpoint request/response examples, field notes, auth and launch/env
+  matrix in `docs/frontend/api-contract-v1.md`.
+- [ ] Prove real/mock parity and full regression; commit/push and tag
+  `frontend-api-v1`.
+
+Hard stop: destructive contract drift, a prose-only endpoint, feature-flag
+default change, or any endpoint that can spend without Start confirmation.
