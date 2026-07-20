@@ -9,7 +9,6 @@ from pathlib import Path
 from uuid import uuid4
 
 from fastapi import FastAPI, HTTPException
-from fastapi.middleware.cors import CORSMiddleware
 import uvicorn
 
 # ``python mock/server.py`` puts mock/ (rather than the repo root) on sys.path.
@@ -49,17 +48,12 @@ from app.api.agent import (
     ApprovedSampleSourceRequest,
     agent_enabled,
 )
+from app.api.cors import configure_cors
 from app.proxy.clusters import list_cluster_profiles
 
 
 app = FastAPI(title="VerifierForge Mock API")
-app.add_middleware(
-    CORSMiddleware,
-    allow_origins=["*"],
-    allow_credentials=False,
-    allow_methods=["*"],
-    allow_headers=["*"],
-)
+configure_cors(app)
 
 
 def _job(

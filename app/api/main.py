@@ -9,11 +9,11 @@ from pathlib import Path
 from uuid import uuid4
 
 from fastapi import FastAPI, HTTPException
-from fastapi.middleware.cors import CORSMiddleware
 
 from app.api.artifacts import ArtifactDataError, ArtifactStore
 from app.api.agent import router as agent_router
 from app.api.copilot import router as copilot_router
+from app.api.cors import configure_cors
 from app.api.provisioning import router as provisioning_router
 from app.db import DatabaseOperationError, repository_gateway
 from app.db.records import ClusterRecord as DatabaseClusterRecord
@@ -39,13 +39,7 @@ from core.contracts import (
 
 
 app = FastAPI(title="VerifierForge API")
-app.add_middleware(
-    CORSMiddleware,
-    allow_origins=["*"],
-    allow_credentials=False,
-    allow_methods=["*"],
-    allow_headers=["*"],
-)
+configure_cors(app)
 app.include_router(copilot_router)
 app.include_router(agent_router)
 app.include_router(provisioning_router)

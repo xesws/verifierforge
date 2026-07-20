@@ -166,7 +166,10 @@ def _require_execution_enabled() -> None:
     except ValueError:
         raise HTTPException(status_code=503, detail="Provisioning policy is invalid") from None
     if not policy.autoprovision_enabled:
-        raise HTTPException(status_code=404, detail="Not found")
+        raise HTTPException(
+            status_code=404,
+            detail="Start Forge is disabled because VF_AUTOPROVISION=false",
+        )
 
 
 def _system_budget_cap() -> float:

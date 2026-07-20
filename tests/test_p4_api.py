@@ -95,10 +95,11 @@ def test_settings_reports_system_fallback_without_exposing_value(
     assert "system-fixture-secret" not in response.text
 
 
-def test_start_forge_is_hidden_while_flag_is_off(tmp_path: Path, monkeypatch) -> None:
-    gateway = _gateway(tmp_path / "off.sqlite3")
-    _seed(gateway)
-    monkeypatch.setattr(provisioning_api, "repository_gateway", lambda: gateway)
+def test_start_forge_is_hidden_while_flag_is_off(monkeypatch) -> None:
+    def unexpected_gateway():
+        raise AssertionError("disabled Start Forge must not reach persistence")
+
+    monkeypatch.setattr(provisioning_api, "repository_gateway", unexpected_gateway)
     monkeypatch.setenv("VF_AGENT_ENABLED", "true")
     monkeypatch.delenv("VF_AUTOPROVISION", raising=False)
 
@@ -108,6 +109,9 @@ def test_start_forge_is_hidden_while_flag_is_off(tmp_path: Path, monkeypatch) ->
     )
 
     assert response.status_code == 404
+    assert response.json() == {
+        "detail": "Start Forge is disabled because VF_AUTOPROVISION=false"
+    }
 
 
 def test_discover_injects_autoprovision_state_without_enabling_it_by_default(
