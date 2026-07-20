@@ -2744,3 +2744,17 @@ states target absent and raw `vf-auto-* = 0`. Billing remains unsettled; local
 tmux sessions `vf-billing-p4-1h` and `vf-billing-p4-6h` will perform the
 supporting reads if the laptop remains awake. Sanitized tracked evidence:
 `docs/evidence/provisioner/v0.29.0-p4-live-pass.json`.
+
+## 2026-07-19 v0.30.0 — reviewer sandbox full mode
+
+- [x] Reserve version plus infrastructure/submission/provisioner area docs.
+- [ ] Preserve default artifact/fake fallback and add one authenticated
+  full-mode composite: Supabase + real tuned endpoint + mock Agent + mock Start.
+- [ ] Capture a Cloudflare quick-tunnel URL, verify invite rejection/acceptance,
+  and record the ephemeral URL without committing the invite code.
+- [ ] Align JUDGES and README; mark `NebiusAdapter` as next, not implemented.
+- [ ] Full regression, secret scan, commit/push, tag `reviewer-sandbox-full`.
+
+Stop without weakening the boundary if database, public model health,
+invitation auth or cloudflared readiness fails. This stage performs zero GPU,
+provider-provisioning and paid-LLM mutations.
