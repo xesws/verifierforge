@@ -4,6 +4,7 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width,initial-scale=1">
   <meta name="vf-sample-source" content="__VF_DISCOVER_DATA_SOURCE__">
+  <meta name="vf-autoprovision-enabled" content="__VF_AUTOPROVISION_ENABLED__">
   <title>VerifierForge Discover</title>
   <style>
     :root {
@@ -47,7 +48,7 @@
     .actions { display: flex; flex-wrap: wrap; gap: 9px; align-items: center; }
     .input-panel { margin: 12px 0; padding: 13px; background: #0a1626; border: 1px solid #29415e; border-radius: 11px; }
     label { display: block; margin-bottom: 7px; color: #c9d7ea; font-size: 12px; font-weight: 750; }
-    input[type="text"] { width: 100%; border: 1px solid #38516f; border-radius: 8px; background: #06101d; color: var(--text); padding: 10px 11px; font: 12px ui-monospace, SFMono-Regular, monospace; }
+    input[type="text"], input[type="password"] { width: 100%; border: 1px solid #38516f; border-radius: 8px; background: #06101d; color: var(--text); padding: 10px 11px; font: 12px ui-monospace, SFMono-Regular, monospace; }
     .input-panel .actions { margin-top: 10px; }
     .input-status, .error { margin: 9px 0 0; font-size: 12px; }
     .input-status { color: var(--teal); }
@@ -182,7 +183,34 @@
           <div><strong>Recorded at</strong><br><span id="receipt-time"></span></div>
         </div>
         <p class="safe">No GPU allocated · No training started</p>
-        <p>A future execution service still requires separate authorization.</p>
+        <p id="execution-boundary-copy">A future execution service still requires separate authorization.</p>
+        <div id="start-forge-panel" hidden>
+          <div class="boundary">
+            <h4>Start Forge is the separate spend boundary.</h4>
+            <ul>
+              <li>Uses the approved schema and the lower of its budget cap and the system cap.</li>
+              <li>May allocate a GPU in your provider account and begin a separately audited job.</li>
+              <li>Lifecycle is visible as approved → provisioning → running → collecting → done.</li>
+            </ul>
+          </div>
+          <div class="approver">
+            <label for="provider-key">RunPod API key (optional when the local demo fallback is configured)</label>
+            <input id="provider-key" type="password" autocomplete="off" placeholder="Stored encrypted; never read back">
+            <div class="actions">
+              <button class="secondary" id="save-provider-key">Save provider credential</button>
+            </div>
+            <p class="input-status" id="credential-status"></p>
+          </div>
+          <div class="check-row">
+            <input id="start-ack" type="checkbox">
+            <label for="start-ack">I confirm this separate action may provision a billable provider resource within the displayed cap.</label>
+          </div>
+          <p class="error" id="start-error" hidden></p>
+          <div class="actions">
+            <button class="approve" id="start-forge-button" disabled>Start Forge</button>
+            <span class="badge" id="forge-state">approved</span>
+          </div>
+        </div>
       </div>
     </section>
   </section>
@@ -192,7 +220,8 @@
 <script>
 const SQL_CLUSTER = "data-pull-sql";
 const DEFAULT_DATA_SOURCE = document.querySelector('meta[name="vf-sample-source"]').content;
-const state = {clusters: new Map(), inputConfirmed: false, inputSource: DEFAULT_DATA_SOURCE, analysis: null};
+const AUTOPROVISION_ENABLED = document.querySelector('meta[name="vf-autoprovision-enabled"]').content === "true";
+const state = {clusters: new Map(), inputConfirmed: false, inputSource: DEFAULT_DATA_SOURCE, analysis: null, approval: null, pollTimer: null};
 const grid = document.querySelector("#grid");
 const detail = document.querySelector("#detail");
 
@@ -374,14 +403,45 @@ function resetApprovalForm() {
   document.querySelector("#approval-ack").checked = false;
   document.querySelector("#approve-button").disabled = true;
   document.querySelector("#approval-error").hidden = true;
+  document.querySelector("#start-forge-panel").hidden = true;
 }
 
 function renderReceipt(approval) {
+  state.approval = approval;
   document.querySelector("#approval-form").hidden = true;
   document.querySelector("#approval-receipt").hidden = false;
   document.querySelector("#receipt-id").textContent = approval.approval_id;
   document.querySelector("#receipt-owner").textContent = approval.approved_by;
   document.querySelector("#receipt-time").textContent = new Date(approval.approved_at).toLocaleString();
+  if (AUTOPROVISION_ENABLED) {
+    document.querySelector("#execution-boundary-copy").textContent = "Approval is complete. Start Forge still requires the separate confirmation below.";
+    document.querySelector("#start-forge-panel").hidden = false;
+    refreshExecution();
+  }
+}
+
+async function refreshCredential() {
+  if (!state.approval) return;
+  const response = await fetch(`/settings/provider-credentials/runpod?user_id=${encodeURIComponent(state.approval.approved_by)}`);
+  if (!response.ok) return;
+  const payload = await response.json();
+  const labels = {stored: "Encrypted BYO key configured", system_env: "Local demo fallback configured", missing: "No provider key configured"};
+  document.querySelector("#credential-status").textContent = labels[payload.source];
+}
+
+async function refreshExecution() {
+  if (!state.approval) return;
+  const response = await fetch(`/approvals/${state.approval.approval_id}/forge-execution`);
+  if (!response.ok) return;
+  const payload = await response.json();
+  document.querySelector("#forge-state").textContent = `${payload.state} · cap ${formatMoney(payload.budget_usd_cap)}`;
+  const terminal = ["done", "failed"].includes(payload.state);
+  document.querySelector("#start-forge-button").disabled = terminal || !document.querySelector("#start-ack").checked || payload.state !== "approved";
+  if (!terminal && payload.state !== "approved") {
+    clearTimeout(state.pollTimer);
+    state.pollTimer = setTimeout(refreshExecution, 1500);
+  }
+  refreshCredential();
 }
 
 document.querySelector("#review-schema").addEventListener("click", () => showStep("schema"));
@@ -390,6 +450,51 @@ document.querySelector("#continue-approval").addEventListener("click", () => sho
 document.querySelector("#approval-back").addEventListener("click", () => showStep("schema"));
 document.querySelector("#approval-ack").addEventListener("change", event => {
   document.querySelector("#approve-button").disabled = !event.target.checked;
+});
+document.querySelector("#start-ack").addEventListener("change", event => {
+  document.querySelector("#start-forge-button").disabled = !event.target.checked;
+});
+document.querySelector("#save-provider-key").addEventListener("click", async event => {
+  const keyInput = document.querySelector("#provider-key");
+  const value = keyInput.value.trim();
+  if (!value || !state.approval) return;
+  event.currentTarget.disabled = true;
+  try {
+    const response = await fetch("/settings/provider-credentials/runpod", {
+      method: "PUT",
+      headers: {"content-type": "application/json"},
+      body: JSON.stringify({user_id: state.approval.approved_by, api_key: value})
+    });
+    const payload = await response.json();
+    if (!response.ok) throw new Error(payload.detail || "Credential save failed");
+    keyInput.value = "";
+    document.querySelector("#credential-status").textContent = "Encrypted BYO key configured";
+  } catch (error) {
+    document.querySelector("#credential-status").textContent = error.message;
+  } finally {
+    event.currentTarget.disabled = false;
+  }
+});
+document.querySelector("#start-forge-button").addEventListener("click", async event => {
+  if (!state.approval) return;
+  const errorNode = document.querySelector("#start-error");
+  event.currentTarget.disabled = true;
+  errorNode.hidden = true;
+  try {
+    const response = await fetch(`/approvals/${state.approval.approval_id}/start-forge`, {
+      method: "POST",
+      headers: {"content-type": "application/json"},
+      body: JSON.stringify({requested_by: state.approval.approved_by, confirm_provider_spend: true})
+    });
+    const payload = await response.json();
+    if (!response.ok) throw new Error(payload.detail || "Start Forge failed");
+    document.querySelector("#forge-state").textContent = `${payload.state} · cap ${formatMoney(payload.budget_usd_cap)}`;
+    state.pollTimer = setTimeout(refreshExecution, 800);
+  } catch (error) {
+    errorNode.textContent = error.message;
+    errorNode.hidden = false;
+    event.currentTarget.disabled = false;
+  }
 });
 document.querySelector("#approve-button").addEventListener("click", async event => {
   const button = event.currentTarget;

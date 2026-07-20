@@ -13,6 +13,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from app.api.artifacts import ArtifactDataError, ArtifactStore
 from app.api.agent import router as agent_router
 from app.api.copilot import router as copilot_router
+from app.api.provisioning import router as provisioning_router
 from app.db import repository_gateway
 from app.db.records import ClusterRecord as DatabaseClusterRecord
 from app.db.records import JobRecord as DatabaseJobRecord
@@ -42,6 +43,7 @@ app.add_middleware(
 )
 app.include_router(copilot_router)
 app.include_router(agent_router)
+app.include_router(provisioning_router)
 
 
 def _runs_dir() -> Path:

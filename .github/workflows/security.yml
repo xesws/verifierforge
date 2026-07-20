@@ -19,4 +19,4 @@ jobs:
             requirements-dev.txt
       - run: python -m pip install -r requirements-dev.txt
       - run: python -m scripts.scan_secrets
-      - run: pytest -q tests/test_database_settings.py tests/test_database_credentials.py tests/test_database_failures.py tests/test_secret_scan.py
+      - run: pytest -q tests/test_database_settings.py tests/test_database_credentials.py tests/test_database_failures.py tests/test_p4_api.py tests/test_p4_product.py tests/test_secret_scan.py

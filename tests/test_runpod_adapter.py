@@ -269,3 +269,31 @@ def test_http_error_preserves_status_and_bounded_provider_body() -> None:
         await client.aclose()
 
     _run(scenario())
+
+
+def test_credential_provider_is_resolved_per_http_call_and_redacted() -> None:
+    async def scenario() -> None:
+        calls = 0
+
+        def credential() -> str:
+            nonlocal calls
+            calls += 1
+            return "rotating-secret"
+
+        client = httpx.AsyncClient(
+            transport=httpx.MockTransport(
+                lambda _request: httpx.Response(
+                    403, text="provider echoed rotating-secret"
+                )
+            )
+        )
+        adapter = RunPodAdapter(api_key_provider=credential, client=client)
+        for _ in range(2):
+            with pytest.raises(ProvisionProviderError) as captured:
+                await adapter.list_account_pods()
+            assert "rotating-secret" not in str(captured.value)
+            assert "[REDACTED]" in str(captured.value)
+        assert calls == 2
+        await client.aclose()
+
+    _run(scenario())

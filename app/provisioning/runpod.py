@@ -5,6 +5,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from datetime import datetime, timezone
 import math
+from collections.abc import Callable
 from typing import Any, Mapping
 
 import httpx
@@ -40,15 +41,22 @@ class RunPodAdapter:
 
     def __init__(
         self,
-        api_key: str,
+        api_key: str | None = None,
         *,
+        api_key_provider: Callable[[], str] | None = None,
         client: httpx.AsyncClient | None = None,
         base_url: str = RUNPOD_API_BASE_URL,
         timeout_s: float = 30.0,
     ) -> None:
-        if not api_key.strip():
-            raise ValueError("RUNPOD_API_KEY is required")
-        self._api_key = api_key.strip()
+        if api_key_provider is not None and api_key is not None:
+            raise ValueError("provide api_key or api_key_provider, not both")
+        if api_key_provider is None:
+            value = (api_key or "").strip()
+            if not value:
+                raise ValueError("RUNPOD_API_KEY is required")
+            self._api_key_provider = lambda: value
+        else:
+            self._api_key_provider = api_key_provider
         self.base_url = base_url.rstrip("/")
         self._owns_client = client is None
         self.client = client or httpx.AsyncClient(timeout=timeout_s)
@@ -279,8 +287,11 @@ class RunPodAdapter:
         expected: set[int],
         **kwargs: Any,
     ) -> httpx.Response:
+        api_key = self._api_key_provider().strip()
+        if not api_key:
+            raise ProvisionProviderError("RunPod credential is unavailable")
         headers = dict(kwargs.pop("headers", {}))
-        headers["Authorization"] = f"Bearer {self._api_key}"
+        headers["Authorization"] = f"Bearer {api_key}"
         headers["Content-Type"] = "application/json"
         try:
             response = await self.client.request(
@@ -291,7 +302,7 @@ class RunPodAdapter:
                 f"RunPod {method} {path} transport failed: {type(error).__name__}"
             ) from error
         if response.status_code not in expected:
-            body = response.text[:_ERROR_BODY_LIMIT]
+            body = response.text[:_ERROR_BODY_LIMIT].replace(api_key, "[REDACTED]")
             raise ProvisionProviderError(
                 f"RunPod {method} {path} returned HTTP {response.status_code}: {body}",
                 status_code=response.status_code,

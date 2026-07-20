@@ -349,6 +349,9 @@ def discover_page() -> HTMLResponse:
     content = page.read_text(encoding="utf-8").replace(
         "__VF_DISCOVER_DATA_SOURCE__",
         html.escape(_configured_source_label(), quote=True),
+    ).replace(
+        "__VF_AUTOPROVISION_ENABLED__",
+        "true" if os.environ.get("VF_AUTOPROVISION", "false").strip().lower() == "true" else "false",
     )
     return HTMLResponse(content)
 

@@ -2711,9 +2711,9 @@ evidence is `docs/evidence/provisioner/v0.28.5-p2-live-pass.json`; semantic tag
 
 - [x] Reserve version and affected provisioner/database/backend/frontend docs
   before implementation.
-- [ ] P4-1: write-only Settings API, Fernet-at-rest credential storage, exact
+- [x] P4-1: write-only Settings API, Fernet-at-rest credential storage, exact
   call-boundary decryption and documented local `RUNPOD_API_KEY` fallback.
-- [ ] P4-2: preserve approval-only semantics; add separately confirmed Start
+- [x] P4-2: preserve approval-only semantics; add separately confirmed Start
   Forge, bounded config translation and pollable lifecycle states.
 - [ ] P4-3: prove mock full lifecycle, then one real RunPod create/terminate
   smoke under `$1`; archive sanitized provider evidence.
@@ -2722,3 +2722,14 @@ evidence is `docs/evidence/provisioner/v0.28.5-p2-live-pass.json`; semantic tag
 
 Hard stops: any secret exposure, config/budget mismatch, provider cleanup
 failure, raw `vf-auto-*` residue, or cumulative wave spend above `$5`.
+
+P4-1/P4-2 zero-cost result: additive Pydantic shapes landed in the serialized
+core wave, Settings never returns key material, and the P-4 RunPod adapter path
+uses a resolver callback so decryption/environment fallback occurs separately
+for every provider HTTP call. Provider bodies are stripped of the exact key
+before a bounded error can escape. Start binds an approval to one execution,
+persists the visible lifecycle in `jobs.summary_json`, and uses the lesser
+config/system budget. The FastAPI demo hides the second action while
+`VF_AUTOPROVISION` is false. Mock execution completed the full state path.
+Validation: `423 passed, 1 skipped`; secret scan and JavaScript/shell syntax
+checks passed.
