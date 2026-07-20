@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import asyncio
 import json
 import os
 from datetime import datetime, timezone
@@ -264,7 +265,7 @@ def list_clusters() -> list[Cluster]:
     """Return the stable product profiles used by Discover and the mock API."""
     profiles = list_cluster_profiles()
     _materialize_clusters_best_effort(profiles)
-    return [_cluster_with_product_state(profile) for profile in profiles]
+    return _clusters_with_product_state(profiles)
 
 
 @app.get("/clusters/{cluster_id}", response_model=Cluster)
@@ -360,7 +361,7 @@ def _materialize_clusters_best_effort(profiles: list[Cluster]) -> None:
     timestamp = datetime.now(timezone.utc)
 
     async def write(repositories) -> None:
-        for profile in profiles:
+        async def upsert(profile: Cluster) -> None:
             existing = await repositories.clusters.get(profile.cluster_id)
             source = (
                 profile.approved_sample_source.model_dump(mode="json")
@@ -384,6 +385,8 @@ def _materialize_clusters_best_effort(profiles: list[Cluster]) -> None:
                 )
             )
 
+        await asyncio.gather(*(upsert(profile) for profile in profiles))
+
     try:
         repository_gateway().call(write)
     except (OSError, RuntimeError, ValueError):
@@ -392,32 +395,53 @@ def _materialize_clusters_best_effort(profiles: list[Cluster]) -> None:
 
 
 def _cluster_with_product_state(profile: Cluster) -> Cluster:
+    return _clusters_with_product_state([profile])[0]
+
+
+def _clusters_with_product_state(profiles: list[Cluster]) -> list[Cluster]:
     if _data_mode() == "artifacts":
-        updates: dict[str, object] = {}
-        try:
-            updates["routing"] = _artifact_store().routing(profile.cluster_id)
-        except KeyError:
-            pass
-        try:
-            updates["live_pass_rate"] = _artifact_store().live_pass_rate(
-                profile.cluster_id
-            )
-        except KeyError:
-            pass
-        return profile.model_copy(update=updates)
+        enriched: list[Cluster] = []
+        for profile in profiles:
+            updates: dict[str, object] = {}
+            try:
+                updates["routing"] = _artifact_store().routing(profile.cluster_id)
+            except KeyError:
+                pass
+            try:
+                updates["live_pass_rate"] = _artifact_store().live_pass_rate(
+                    profile.cluster_id
+                )
+            except KeyError:
+                pass
+            enriched.append(profile.model_copy(update=updates))
+        return enriched
+
+    async def read_one(repositories, profile: Cluster):
+        values = await asyncio.gather(
+            repositories.clusters.get(profile.cluster_id),
+            repositories.routing.get(profile.cluster_id),
+            repositories.live_pass_rate.list_points(profile.cluster_id),
+            repositories.agent_decisions.latest_for_cluster(profile.cluster_id),
+        )
+        return tuple(values)
 
     async def read(repositories):
-        return (
-            await repositories.clusters.get(profile.cluster_id),
-            await repositories.routing.get(profile.cluster_id),
-            await repositories.live_pass_rate.list_points(profile.cluster_id),
-            await repositories.agent_decisions.latest_for_cluster(profile.cluster_id),
+        return await asyncio.gather(
+            *(read_one(repositories, profile) for profile in profiles)
         )
 
     try:
-        record, route, points, decision_record = repository_gateway().call(read)
+        records = repository_gateway().call(read)
     except (DatabaseOperationError, OSError, RuntimeError, ValueError):
-        return profile
+        return profiles
+    return [
+        _apply_cluster_product_state(profile, values)
+        for profile, values in zip(profiles, records, strict=True)
+    ]
+
+
+def _apply_cluster_product_state(profile: Cluster, values) -> Cluster:
+    record, route, points, decision_record = values
     updates: dict[str, object] = {}
     if record is not None and record.approved_sample_source is not None:
         updates["approved_sample_source"] = ApprovedSampleSource.model_validate(
