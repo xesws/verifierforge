@@ -2863,3 +2863,39 @@ and response schemas match for all 16 frozen operations. Full validation:
 No trainer, frozen dataset, paid LLM request, or flagship training run was
 changed in this wave. P4's only provider mutation was the already documented
 sub-cent readiness/delete smoke under its `$1` cap.
+
+## 2026-07-19 v0.32.0 — P-2.5 capacity-aware RunPod selection
+
+- [x] Reserve v0.32.0 and affected provisioner/infrastructure/design docs
+  before implementation.
+- [x] Official interface investigation: current REST OpenAPI index exposes Pod
+  CRUD but no standalone GPU availability route. Exact inventory endpoint is
+  `POST https://api.runpod.io/graphql`, Bearer-authenticated, query
+  `gpuTypes(input: GpuTypeFilter)`.
+- [x] Exact queried fields: parent `id`, `displayName`, `memoryInGb`,
+  `secureCloud`, `communityCloud`, `securePrice`, `communityPrice`,
+  `maxGpuCount`, `maxGpuCountCommunityCloud`,
+  `maxGpuCountSecureCloud`; per-cloud `lowestPrice(input:
+  GpuLowestPriceInput)` fields `gpuTypeId`, `uninterruptablePrice`,
+  `stockStatus`, `availableGpuCounts`, `maxUnreservedGpuCount`, `countryCode`.
+  Official spec: <https://graphql-spec.runpod.io/>. Pod creation remains
+  `POST https://rest.runpod.io/v1/pods` per the official REST API.
+- [x] Read-only live probe, no region restriction: RTX 4000 Ada Community
+  `$0.20/hr` / `Low`; RTX 2000 Ada Secure `$0.24/hr` / `Low`; L4 Secure
+  `$0.39/hr` / `Low`; A40 Secure `$0.44/hr` / `High`. Null Community offers
+  for RTX 2000/L4/A40 were treated as unavailable. Prices are evidence only
+  and must never be hardcoded.
+- [ ] Replace bundled create mapping with query/filter/live-price ranking and
+  one-model bounded fallback; keep Blackwell blocked.
+- [ ] Persist selected model/cloud/hourly price in the created audit; converge
+  exhaustion to explicit `no_capacity` FAILED.
+- [ ] Pass dry-run scenarios: first unavailable, all unavailable, third
+  available and create-race fallback; full pytest and secret scan.
+- [ ] Push implementation before one ≤`$1` query→create→immediate-delete live
+  proof; commit sanitized evidence, update README and tag
+  `provisioner-capacity-aware`.
+
+Stop conditions: auth/schema failure, candidate outside the approved set,
+Blackwell visibility, estimated spend above `$1`, ownership mismatch, deletion
+failure, target still present or raw `vf-auto-*` residue. This wave does not
+train.

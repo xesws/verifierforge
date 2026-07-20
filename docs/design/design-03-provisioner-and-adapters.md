@@ -76,6 +76,11 @@ ProvisionStatus:
 - 通道:REST API(pods 资源)或官方 Python SDK,二选一实现,另一个留作诊断。
 - 职责映射:gpu_class → RunPod gpuTypeIds(默认表拉黑 Blackwell 全系);ports/env/container_disk 直传;创建时启用 SSH。
 - 已知语义:直连 SSH 端口在实例迁移/重启后会变 —— 编排器在每次状态轮询时刷新连接信息,不缓存旧端点(本周实战教训固化)。
+- P-2.5 容量语义:每个 `gpu_class` 映射到候选型号集合。创建前通过
+  官方 GraphQL `gpuTypes` + `lowestPrice` 查询实时库存与按需价格,
+  过滤无货/拉黑型号后按价格升序逐型号创建;每型号至多一次。全部
+  耗尽返回 `no_capacity`,审计 FAILED,不进入状态轮询。选中型号、
+  cloud type 与每小时价格进入 `provision.created` 审计。
 
 ### 6.2 NebiusAdapter(第二适配器)
 - 按 Nebius 官方 compute API 实现同一契约;具体端点与鉴权以其当前文档为准,实现期核对,不在本设计文档预写细节。
