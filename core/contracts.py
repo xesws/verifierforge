@@ -66,6 +66,33 @@ class Arena(BaseModel):
     samples: list[ArenaSample]
 
 
+class SavingsProjection(BaseModel):
+    """Auditable recurring-cost estimate shown with a completed report."""
+
+    current_monthly_cost_usd: float = Field(ge=0)
+    projected_monthly_cost_usd: float = Field(ge=0)
+    projected_monthly_savings_usd: float
+    formula: str
+    assumptions: list[str]
+
+
+class ReportProjectionSource(BaseModel):
+    """One authoritative input used to derive a report projection."""
+
+    path: str
+    sha256: str = Field(pattern=r"^[0-9a-f]{64}$")
+
+
+class ReportProjectionProvenance(BaseModel):
+    """Identity of a reproducible, derived report presentation."""
+
+    artifact_version: str
+    s3_prefix: str | None = None
+    generated_at: datetime
+    content_sha256: str = Field(pattern=r"^[0-9a-f]{64}$")
+    sources: list[ReportProjectionSource]
+
+
 class Report(BaseModel):
     baseline_pass_at_1: float
     final_pass_at_1: float
@@ -74,6 +101,8 @@ class Report(BaseModel):
     narrative: str
     projected_monthly_savings_usd: float | None = None
     arena: Arena | None = None
+    savings_projection: SavingsProjection | None = None
+    provenance: ReportProjectionProvenance | None = None
 
 
 class Endpoint(BaseModel):

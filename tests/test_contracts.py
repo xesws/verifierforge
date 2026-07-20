@@ -15,8 +15,11 @@ from core.contracts import (
     LivePassRatePoint,
     Metrics,
     Report,
+    ReportProjectionProvenance,
+    ReportProjectionSource,
     ReportVerdict,
     RoutingState,
+    SavingsProjection,
 )
 
 
@@ -65,6 +68,8 @@ def test_legacy_report_json_without_new_fields_still_validates() -> None:
 
     assert report.projected_monthly_savings_usd is None
     assert report.arena is None
+    assert report.savings_projection is None
+    assert report.provenance is None
 
 
 def test_cluster_and_live_pass_rate_round_trip() -> None:
@@ -132,6 +137,22 @@ def test_report_arena_extension_round_trip() -> None:
                 )
             ],
         ),
+        savings_projection=SavingsProjection(
+            current_monthly_cost_usd=5500.0,
+            projected_monthly_cost_usd=1650.0,
+            projected_monthly_savings_usd=3850.0,
+            formula="current_monthly_cost_usd - projected_monthly_cost_usd",
+            assumptions=["Tuned inference costs 30% of the current workflow."],
+        ),
+        provenance=ReportProjectionProvenance(
+            artifact_version="v0.32.3",
+            s3_prefix=None,
+            generated_at=datetime(2026, 7, 20, tzinfo=timezone.utc),
+            content_sha256="a" * 64,
+            sources=[
+                ReportProjectionSource(path="evidence.jsonl", sha256="b" * 64)
+            ],
+        ),
     )
 
     restored = Report.model_validate_json(report.model_dump_json())
@@ -139,3 +160,7 @@ def test_report_arena_extension_round_trip() -> None:
     assert restored.projected_monthly_savings_usd == 4300.0
     assert restored.arena is not None
     assert restored.arena.win_rate == 0.95
+    assert restored.savings_projection is not None
+    assert restored.savings_projection.projected_monthly_savings_usd == 3850.0
+    assert restored.provenance is not None
+    assert restored.provenance.sources[0].path == "evidence.jsonl"
