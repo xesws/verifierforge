@@ -9,7 +9,13 @@ import pytest
 
 from app.db.gateway import RepositoryGateway
 from app.db.settings import DatabaseSettings
-from app.serving.runtime import MockServingRuntime, _verified_callback, _verified_files
+from app.serving.bootstrap import BOOTSTRAP_SOURCE
+from app.serving.runtime import (
+    MockServingRuntime,
+    ServingRuntimeError,
+    _verified_callback,
+    _verified_files,
+)
 from app.serving.runtime import _terminate_with_one_retry
 from app.provisioning.errors import ProvisionProviderError
 from app.serving.session import ServingControlError, ServingCoordinator
@@ -108,9 +114,40 @@ def test_s3_identity_and_callback_validation() -> None:
     expected = digest.hexdigest()
     assert _verified_files({"files": files}, expected) == files
     assert _verified_callback(
-        {"url": "https://example.trycloudflare.com", "tree_sha256": expected},
+        {
+            "phase": "ready",
+            "url": "https://example.trycloudflare.com",
+            "tree_sha256": expected,
+        },
         expected,
     ) == "https://example.trycloudflare.com"
+    assert _verified_callback(
+        {
+            "phase": "vllm_starting",
+            "url": "https://example.trycloudflare.com",
+            "tree_sha256": expected,
+        },
+        expected,
+    ) is None
+    with pytest.raises(ServingRuntimeError, match="return_code=2"):
+        _verified_callback(
+            {
+                "phase": "failed",
+                "return_code": 2,
+                "diagnostic": "usage: api_server",
+                "url": "https://example.trycloudflare.com",
+                "tree_sha256": expected,
+            },
+            expected,
+        )
+
+
+def test_bootstrap_redacts_secrets_and_waits_for_local_vllm_readiness() -> None:
+    assert '"phase": "vllm_starting"' in BOOTSTRAP_SOURCE
+    assert '"phase": "ready"' in BOOTSTRAP_SOURCE
+    assert '"phase": "failed"' in BOOTSTRAP_SOURCE
+    assert "redacted_tail(vllm_log)" in BOOTSTRAP_SOURCE
+    assert "http://127.0.0.1:8000/v1/models" in BOOTSTRAP_SOURCE
 
 
 def test_serving_settings_keep_paid_wake_off_and_budget_bounded() -> None:

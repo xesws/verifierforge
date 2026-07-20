@@ -231,7 +231,7 @@ class RunPodServingRuntime:
                 callback = await asyncio.to_thread(self._read_callback, callback_key)
                 if callback is not None:
                     url = _verified_callback(callback, self.settings.expected_tree_sha256)
-                    if await _smoke_endpoint(
+                    if url is not None and await _smoke_endpoint(
                         client,
                         url=url,
                         api_key=endpoint_api_key,
@@ -403,7 +403,9 @@ def _verified_files(
     return files
 
 
-def _verified_callback(value: dict[str, object], expected_tree_sha256: str) -> str:
+def _verified_callback(
+    value: dict[str, object], expected_tree_sha256: str
+) -> str | None:
     url = value.get("url")
     if (
         not isinstance(url, str)
@@ -412,7 +414,18 @@ def _verified_callback(value: dict[str, object], expected_tree_sha256: str) -> s
         or value.get("tree_sha256") != expected_tree_sha256
     ):
         raise ServingRuntimeError("serving callback identity is invalid")
-    return url
+    phase = value.get("phase")
+    if phase == "failed":
+        diagnostic = value.get("diagnostic")
+        return_code = value.get("return_code")
+        safe = diagnostic if isinstance(diagnostic, str) else "diagnostic unavailable"
+        safe = safe[-8000:]
+        raise ServingRuntimeError(
+            f"vLLM bootstrap failed (return_code={return_code}): {safe}"
+        )
+    if phase not in {None, "vllm_starting", "ready"}:
+        raise ServingRuntimeError("serving callback phase is invalid")
+    return url if phase in {None, "ready"} else None
 
 
 def _json_object(value: bytes) -> dict[str, object]:
