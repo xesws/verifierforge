@@ -140,7 +140,7 @@ else
 import os, sys
 from dotenv import dotenv_values
 values = {**dotenv_values(sys.argv[1]), **os.environ}
-required = ["SUPABASE_DB_URL", "VF_PROXY_TUNED_UPSTREAM", "VF_PROXY_TUNED_API_KEY"]
+required = ["SUPABASE_DB_URL", "VF_PROXY_TUNED_UPSTREAM", "VF_PROXY_TUNED_API_KEY", "VF_ENDPOINT_MODEL"]
 if any(not str(values.get(name, "")).strip() for name in required):
     raise SystemExit("full reviewer mode is missing required environment configuration")
 if not str(values["VF_PROXY_TUNED_UPSTREAM"]).startswith(("http://", "https://")):

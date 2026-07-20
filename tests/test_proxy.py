@@ -90,13 +90,14 @@ def test_http_tuned_upstream_uses_only_its_dedicated_key(monkeypatch, tmp_path: 
     captured: dict[str, object] = {}
 
     def real_forwarder(request, *, base_url: str, api_key: str) -> ForwardedResponse:
-        captured.update({"base_url": base_url, "api_key": api_key})
+        captured.update({"request": request, "base_url": base_url, "api_key": api_key})
         return ForwardedResponse(200, {"object": "chat.completion"})
 
     settings = ProxySettings(
         upstream="fake",
         tuned_upstream="https://tuned.example/v1",
         tuned_api_key="endpoint-only-key",
+        tuned_model="served-step-350",
         db_path=tmp_path / "traffic.db",
     )
     monkeypatch.setattr("app.proxy.main.get_route", lambda *_args, **_kwargs: __import__("app.proxy.routing", fromlist=["RouteRecord"]).RouteRecord("support-ticket-extraction", True, 100, "tuned"))
@@ -109,6 +110,10 @@ def test_http_tuned_upstream_uses_only_its_dedicated_key(monkeypatch, tmp_path: 
         json=_request(system=SYSTEM_PROMPTS_BY_CLUSTER["support-ticket-extraction"]),
     ).status_code == 200
     assert captured == {
+        "request": {
+            **_request(system=SYSTEM_PROMPTS_BY_CLUSTER["support-ticket-extraction"]),
+            "model": "served-step-350",
+        },
         "base_url": "https://tuned.example/v1",
         "api_key": "endpoint-only-key",
     }
@@ -121,6 +126,16 @@ def test_http_tuned_upstream_never_falls_back_to_llm_key(monkeypatch) -> None:
     monkeypatch.delenv("VF_PROXY_TUNED_API_KEY", raising=False)
 
     with pytest.raises(ValueError, match="VF_PROXY_TUNED_API_KEY"):
+        ProxySettings.from_env()
+
+
+def test_http_tuned_upstream_requires_environment_discovered_model(monkeypatch) -> None:
+    monkeypatch.setenv("VF_PROXY_TUNED_UPSTREAM", "https://tuned.example/v1")
+    monkeypatch.setenv("VF_PROXY_TUNED_API_KEY", "endpoint-key")
+    monkeypatch.delenv("VF_PROXY_TUNED_MODEL", raising=False)
+    monkeypatch.delenv("VF_ENDPOINT_MODEL", raising=False)
+
+    with pytest.raises(ValueError, match="VF_PROXY_TUNED_MODEL or VF_ENDPOINT_MODEL"):
         ProxySettings.from_env()
 
 

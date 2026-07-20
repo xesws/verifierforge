@@ -2767,3 +2767,11 @@ and quick-tunnel URL capture. Basic Auth protects every product/proxy path;
 only `/healthz` is public. Local full-mode tests use SQLite/fake-tuned and no
 tunnel or external call. Validation: `426 passed, 1 skipped`; secret scan and
 shell syntax passed.
+
+First public proxy proof diagnosis: invitation auth, Supabase routing and the
+product chain were healthy; the last 12 rows split 7 tuned / 5 default. Tuned
+requests returned vLLM HTTP 404 because the frontend label
+`verifierforge-step-350` was forwarded as the service model ID. v0.30.0 now
+requires `VF_PROXY_TUNED_MODEL` or falls back to `VF_ENDPOINT_MODEL`, and
+rewrites only the tuned request copy. Focused tests and the full suite passed
+after the repair (`427 passed, 1 skipped`).
