@@ -2706,3 +2706,19 @@ evidence is `docs/evidence/provisioner/v0.28.5-p2-live-pass.json`; semantic tag
   and $5,500 monthly cost. Relative links all exist.
 - [x] Validation: `383 passed, 1 skipped`; secret scan, shell syntax and
   `git diff --check` passed. No model, GPU or provider call occurred.
+
+## 2026-07-19 v0.29.0 — P-4 product wiring
+
+- [x] Reserve version and affected provisioner/database/backend/frontend docs
+  before implementation.
+- [ ] P4-1: write-only Settings API, Fernet-at-rest credential storage, exact
+  call-boundary decryption and documented local `RUNPOD_API_KEY` fallback.
+- [ ] P4-2: preserve approval-only semantics; add separately confirmed Start
+  Forge, bounded config translation and pollable lifecycle states.
+- [ ] P4-3: prove mock full lifecycle, then one real RunPod create/terminate
+  smoke under `$1`; archive sanitized provider evidence.
+- [ ] Full regression and secret scan; commit, push and tag
+  `provisioner-p4-complete` only after every P-4 gate passes.
+
+Hard stops: any secret exposure, config/budget mismatch, provider cleanup
+failure, raw `vf-auto-*` residue, or cumulative wave spend above `$5`.
