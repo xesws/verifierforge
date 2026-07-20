@@ -19,11 +19,15 @@ def test_done_job_includes_savings_and_arena() -> None:
     response = client.get("/jobs/nl2sql-gain")
     assert response.status_code == 200
     report = response.json()["report"]
-    assert report["projected_monthly_savings_usd"] == 4300.0
-    assert report["arena"]["win_rate"] == 0.95
+    assert report["projected_monthly_savings_usd"] == 3850.0
+    assert report["arena"]["win_rate"] == 0.2
     samples = report["arena"]["samples"]
-    assert 6 <= len(samples) <= 8
+    assert len(samples) == 10
+    assert sum(sample["tuned_score"] == 1 > sample["baseline_score"] for sample in samples) == 6
+    assert sum(sample["tuned_score"] < 1 and sample["baseline_score"] < 1 for sample in samples) == 2
     assert all(sample["tuned_score"] >= sample["baseline_score"] for sample in samples)
+    assert report["savings_projection"]["projected_monthly_cost_usd"] == 1650.0
+    assert report["provenance"]["artifact_version"] == "v0.32.3"
 
 
 def test_post_jobs_creates_queued_in_memory() -> None:

@@ -57,6 +57,21 @@ approvals, routing, and audit events use one repository layer. Full Agent
 traces and training objects remain in S3. A GPU worker is an executor, never a
 source of truth.
 
+### Data ownership and API read modes
+
+The mixed backend is deliberate. Supabase owns relational facts: traffic,
+clusters, routing, Guardian points, the Jobs ledger, Agent decisions, and
+approvals. Artifacts/S3 own immutable curves, raw held-out arena evidence, and
+evidence bundles. The full Job stored in `jobs.summary_json` is a deterministic
+presentation projection with source hashes; it is never hand-authored. If a
+projection conflicts with artifacts/S3, the artifact evidence wins and the
+projection is rebuilt.
+
+`VF_API_DATA_MODE=hybrid` is the default reviewer/product mode. `artifacts` is
+the immutable offline reviewer mode, while `supabase` proves the relational
+projection can serve the same report without local files. Legacy `runs` remains
+only as a temporary local fake-trainer compatibility mode.
+
 ## Product workflow
 
 1. The proxy records hashes and usage metadata, not prompt bodies, then groups

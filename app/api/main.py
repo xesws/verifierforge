@@ -50,11 +50,14 @@ def _runs_dir() -> Path:
 
 
 def _data_mode() -> str:
-    mode = os.environ.get("VF_API_DATA_MODE", "runs").strip().lower()
-    if mode not in {"runs", "artifacts", "hybrid"}:
+    mode = os.environ.get("VF_API_DATA_MODE", "hybrid").strip().lower()
+    if mode not in {"runs", "artifacts", "hybrid", "supabase"}:
         raise HTTPException(
             status_code=500,
-            detail="VF_API_DATA_MODE must be runs, artifacts, or hybrid",
+            detail=(
+                "VF_API_DATA_MODE must be artifacts, hybrid, or supabase "
+                "(runs is a deprecated local compatibility mode)"
+            ),
         )
     return mode
 
@@ -179,6 +182,11 @@ def get_job(job_id: str) -> Job:
         except KeyError as error:
             if mode == "artifacts":
                 raise HTTPException(status_code=404, detail="Job not found") from error
+    if mode in {"hybrid", "supabase"}:
+        database_job = _database_job(job_id)
+        if database_job is None:
+            raise HTTPException(status_code=404, detail="Job not found")
+        return database_job
     root = _runs_dir().resolve()
     candidate = (root / job_id).resolve()
     if candidate.parent != root:
@@ -232,6 +240,11 @@ def job_metrics(job_id: str) -> Metrics:
         except KeyError as error:
             if mode == "artifacts":
                 raise HTTPException(status_code=404, detail="Job not found") from error
+    if mode in {"hybrid", "supabase"}:
+        database_job = _database_job(job_id)
+        if database_job is None:
+            raise HTTPException(status_code=404, detail="Job not found")
+        return database_job.metrics
     root = _runs_dir().resolve()
     candidate = (root / job_id).resolve()
     if candidate.parent == root and candidate.is_dir():

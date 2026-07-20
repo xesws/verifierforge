@@ -1818,12 +1818,129 @@
   },
   "model": "Qwen/Qwen2.5-1.5B-Instruct",
   "report": {
-    "arena": null,
+    "arena": {
+      "samples": [
+        {
+          "baseline_output": "```sql\nSELECT DISTINCT T2.name FROM projects AS T1 JOIN employee_projects AS T3 ON T1.id = T3.project_id JOIN employees AS T2 ON T2.id = T3.employee_id WHERE T1.status = 'planned' ORDER BY T2.name;\n```",
+          "baseline_score": 0.5,
+          "prompt": "What are the names of all projects with a status of 'planned', sorted by name?",
+          "tuned_output": "```sql\nSELECT p.name \nFROM projects p \nWHERE p.status = 'planned' \nORDER BY p.name;\n```",
+          "tuned_score": 1.0
+        },
+        {
+          "baseline_output": "```sql\nSELECT p.name \nFROM projects p\nWHERE p.status = 'Planned'\nORDER BY p.name ASC;\n```",
+          "baseline_score": 0.5,
+          "prompt": "Retrieve the names of projects that are planned, ordered alphabetically.",
+          "tuned_output": "```sql\nSELECT name \nFROM projects \nWHERE status = 'planned' \nORDER BY name ASC;\n```",
+          "tuned_score": 1.0
+        },
+        {
+          "baseline_output": "SELECT e.id, e.name \nFROM employees e\nWHERE e.salary = (SELECT MAX(salary) FROM employees);",
+          "baseline_score": 0.5,
+          "prompt": "Identify the employee who has the highest salary.",
+          "tuned_output": "SELECT name FROM employees ORDER BY salary DESC LIMIT 1;",
+          "tuned_score": 1.0
+        },
+        {
+          "baseline_output": "```sql\nSELECT T1.name \nFROM departments AS T1 \nJOIN employees AS T2 ON T1.id = T2.department_id \nWHERE T1.location = 'New York';\n```",
+          "baseline_score": 0.5,
+          "prompt": "What is the name of the department based in New York?",
+          "tuned_output": "SELECT name FROM departments WHERE location = 'New York'",
+          "tuned_score": 1.0
+        },
+        {
+          "baseline_output": "SELECT COUNT(e.id) AS employee_count, d.id FROM employees e JOIN departments d ON e.department_id = d.id GROUP BY d.id;",
+          "baseline_score": 0.5,
+          "prompt": "For every department id, return the total count of employees assigned to it.",
+          "tuned_output": "```sql\nSELECT d.id AS dept_id, COUNT(e.id) AS emp_count \nFROM departments d \nLEFT JOIN employees e ON d.id = e.department_id \nGROUP BY d.id;\n```",
+          "tuned_score": 1.0
+        },
+        {
+          "baseline_output": "```sql\nSELECT T3.name \nFROM employees AS T1 \nJOIN employee_projects AS T2 ON T1.id = T2.employee_id \nJOIN (SELECT MAX(salary) as max_salary FROM employees WHERE salary >= 150000 AND active = 1) AS T3 \nON T1.salary = T3.max_salary \nWHERE T1.active = 1;\n```",
+          "baseline_score": 0.2,
+          "prompt": "List the names of staff who are paid 150000 or more, with the highest salary first and ties resolved by name alphabetically.",
+          "tuned_output": "```sql\nSELECT e.name \nFROM employees e \nWHERE e.salary >= 150000 \nORDER BY e.salary DESC, e.name ASC;\n```",
+          "tuned_score": 1.0
+        },
+        {
+          "baseline_output": "```sql\nSELECT d.id AS dept_id, COUNT(*) AS emp_headcount FROM employees e JOIN departments d ON e.department_id = d.id GROUP BY d.id;\n```",
+          "baseline_score": 1.0,
+          "prompt": "List each department id alongside its employee headcount.",
+          "tuned_output": "```sql\nSELECT d.id AS dept_id, COUNT(e.id) AS emp_count \nFROM departments d \nLEFT JOIN employees e ON d.id = e.department_id \nGROUP BY d.id;\n```",
+          "tuned_score": 1.0
+        },
+        {
+          "baseline_output": "SELECT name FROM employees ORDER BY name ASC",
+          "baseline_score": 1.0,
+          "prompt": "Return the names of every employee arranged from A to Z.",
+          "tuned_output": "SELECT name FROM employees ORDER BY name ASC;",
+          "tuned_score": 1.0
+        },
+        {
+          "baseline_output": "```sql\nSELECT p.id, p.name, p.budget, e.hours\nFROM projects p\nJOIN employee_projects ep ON p.id = ep.project_id\nJOIN employees e ON p.lead_employee_id = e.id\nWHERE p.status = 'active'\nORDER BY p.budget DESC;\n```",
+          "baseline_score": 0.2,
+          "prompt": "List each project whose status equals active, in order of decreasing budget.",
+          "tuned_output": "```sql\nSELECT p.name AS project_name\nFROM projects p\nJOIN employee_projects ep ON p.id = ep.project_id\nWHERE p.status = 'active'\nORDER BY p.budget DESC;\n```",
+          "tuned_score": 0.5
+        },
+        {
+          "baseline_output": "```sql\nSELECT p.name\nFROM projects p\nJOIN employee_projects ep ON p.id = ep.project_id\nWHERE p.active = 1\nORDER BY p.budget DESC;\n```",
+          "baseline_score": 0.2,
+          "prompt": "Show the names of all projects with an active status, ordered from highest to lowest budget.",
+          "tuned_output": "```sql\nSELECT p.name \nFROM projects p \nJOIN employee_projects ep ON p.id = ep.project_id \nWHERE p.active = 1 \nORDER BY p.budget DESC;\n```",
+          "tuned_score": 0.2
+        }
+      ],
+      "win_rate": 0.2
+    },
     "baseline_pass_at_1": 0.5833333333333334,
     "control_final_pass_at_1": 0.4,
     "final_pass_at_1": 0.7833333333333333,
     "narrative": "Held-out selection chose step 350 by maximum pass@1; the random-reward control is included as a falsification reference, not proof of causality.",
-    "projected_monthly_savings_usd": null,
+    "projected_monthly_savings_usd": 3850.0,
+    "provenance": {
+      "artifact_version": "v0.32.3",
+      "content_sha256": "2d5d919148e3f9cb54972b23cadaebc57d0449061bfe924e942b59020a7b5326",
+      "generated_at": "2026-07-17T05:34:13.189221Z",
+      "s3_prefix": null,
+      "sources": [
+        {
+          "path": "runs/d4-m3-1p5b-r1-v0125/metrics.jsonl",
+          "sha256": "be3fdb965dc72a2333761a8f50181053af3c4b5355e83624c3784b6be30cd433"
+        },
+        {
+          "path": "runs/d4-m4-0p5b-random-v0126/metrics.jsonl",
+          "sha256": "b9acd2c38c702dc6b32b481425010f8c0afc780b52937ce62a09e6c11f76c14f"
+        },
+        {
+          "path": "runs/d4-m3-1p5b-r1-v0125/artifacts/heldout/v0.12.7-report.json",
+          "sha256": "ebe29fb19d02ac3072ff09a0f1756d18373bfb1d1eb4d123f07457e9b9b5ceb8"
+        },
+        {
+          "path": "data/nl2sql/v0.10.0-heldout.jsonl",
+          "sha256": "482f0e7678e7603311f72aeead381364cd92f0596c20745cc58c96916a9177e8"
+        },
+        {
+          "path": "runs/p0-gate-a/v0.10.1-e2-heldout-samples.jsonl",
+          "sha256": "7b1500857a6f4368c70fff10cf0245180b377e37faf4e5a201c4cc311c3f16da"
+        },
+        {
+          "path": "runs/d4-m3-1p5b-r1-v0125/evidence/heldout-after-v0127/step_350/gate-a-samples.jsonl",
+          "sha256": "0a3c4ba3c1ede7d37e901e2f1ea3d3f35b926bc0efbaa8da8f510161a06331de"
+        }
+      ]
+    },
+    "savings_projection": {
+      "assumptions": [
+        "Current monthly cost is the data-pull-sql Discover product fact for 95,000 calls.",
+        "Tuned inference is estimated at 30% of the current recurring workflow cost.",
+        "One-time training and provisioning costs are excluded from recurring savings."
+      ],
+      "current_monthly_cost_usd": 5500.0,
+      "formula": "projected_monthly_savings_usd = current_monthly_cost_usd - (current_monthly_cost_usd * 0.30)",
+      "projected_monthly_cost_usd": 1650.0,
+      "projected_monthly_savings_usd": 3850.0
+    },
     "verdict": "real_gain"
   },
   "status": "done",

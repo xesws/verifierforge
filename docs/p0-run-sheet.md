@@ -2864,6 +2864,24 @@ No trainer, frozen dataset, paid LLM request, or flagship training run was
 changed in this wave. P4's only provider mutation was the already documented
 sub-cent readiness/delete smoke under its `$1` cap.
 
+## 2026-07-20 v0.32.3 — report contract reconciliation
+
+- [x] Reserve the patch version and backend/frontend/database area documents
+  before implementation.
+- [x] R1: derive the held-out arena, savings, and projection provenance; prove
+  artifact/hybrid/Supabase report parity.
+- [x] R2: reconcile 19 documented operations with 19 frozen and 19 real/mock
+  parity operations.
+- [x] R3: document the deliberate Supabase + artifacts/S3 data-source split.
+- [x] Focused/full validation and Supabase projection readback: `449 passed, 1
+  skipped`; 10 arena cards, `$3,850` savings, projection SHA
+  `2d5d919148e3f9cb54972b23cadaebc57d0449061bfe924e942b59020a7b5326`.
+- [ ] Secret scan, commit, push, tag, and record final R-wave HEAD.
+
+Stop conditions: any trainer/frozen-data mutation, secret exposure, destructive
+contract drift, non-held-out arena input, hand-authored database projection, or
+failure to preserve the two pre-existing provisioning billing modifications.
+
 ## 2026-07-19 v0.32.0 — P-2.5 capacity-aware RunPod selection
 
 - [x] Reserve v0.32.0 and affected provisioner/infrastructure/design docs

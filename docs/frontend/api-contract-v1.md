@@ -1,6 +1,7 @@
 # Frontend API Contract v1
 
-**Frozen:** v0.31.0 · 2026-07-19 · tag `frontend-api-v1`
+**Coverage:** **19 documented = 19 frozen = 19 real/mock parity**
+**Frozen:** v0.32.3 · 2026-07-20 · tags `frontend-api-v1`, `frontend-api-v1.1`
 
 This is the additive integration boundary for the Monday frontend. JSON field
 names and meanings below are frozen. The real API and `mock/server.py` use the
@@ -263,17 +264,37 @@ The normal four UI states are `queued | running | done | failed`;
     "control_final_pass_at_1": 0.20,
     "verdict": "real_gain",
     "narrative": "Held-out pass@1 improved beyond the random-reward control.",
-    "projected_monthly_savings_usd": 4300.0,
+    "projected_monthly_savings_usd": 3850.0,
     "arena": {
-      "win_rate": 0.95,
+      "win_rate": 0.20,
       "samples": [
         {
-          "prompt": "List open invoices over $10k for Acme.",
-          "baseline_output": "SELECT * FROM invoices WHERE company = 'Acme';",
-          "tuned_output": "SELECT invoice_id, amount FROM invoices WHERE customer = 'Acme' AND amount > 10000 AND status = 'open';",
-          "baseline_score": 0.4,
-          "tuned_score": 0.95
+          "prompt": "What is the name of the department based in New York?",
+          "baseline_output": "SELECT ... JOIN employees ...",
+          "tuned_output": "SELECT name FROM departments WHERE location = 'New York'",
+          "baseline_score": 0.5,
+          "tuned_score": 1.0
         }
+      ]
+    },
+    "savings_projection": {
+      "current_monthly_cost_usd": 5500.0,
+      "projected_monthly_cost_usd": 1650.0,
+      "projected_monthly_savings_usd": 3850.0,
+      "formula": "projected_monthly_savings_usd = current_monthly_cost_usd - (current_monthly_cost_usd * 0.30)",
+      "assumptions": [
+        "Current cost is the Discover product fact for 95,000 calls.",
+        "Tuned inference is estimated at 30% of recurring workflow cost.",
+        "One-time training and provisioning costs are excluded."
+      ]
+    },
+    "provenance": {
+      "artifact_version": "v0.32.3",
+      "s3_prefix": null,
+      "generated_at": "2026-07-17T05:34:13.189221Z",
+      "content_sha256": "2d5d919148e3f9cb54972b23cadaebc57d0449061bfe924e942b59020a7b5326",
+      "sources": [
+        {"path": "data/nl2sql/v0.10.0-heldout.jsonl", "sha256": "482f0e7678e7603311f72aeead381364cd92f0596c20745cc58c96916a9177e8"}
       ]
     }
   },
@@ -288,6 +309,10 @@ The normal four UI states are `queued | running | done | failed`;
 random-reward comparison. Before/after quality comes only from held-out
 evaluation. `verdict` is `real_gain | suspect_formatting | collapsed`.
 `GET /jobs/{job_id}/metrics` returns only the `metrics` object.
+
+The real payload contains exactly ten arena samples: six deterministic
+baseline-fail/tuned-pass examples, two both-pass examples, and two both-fail
+examples. The JSON above shows one card to keep the contract readable.
 
 ## Routing and Guardian
 
@@ -349,8 +374,21 @@ bash scripts/start_reviewer_sandbox.sh --mode full
 | `VF_DB_BACKEND` | `sqlite` | Set `postgres` to require `SUPABASE_DB_URL`; no silent fallback. |
 | `VF_AUTOPROVISION` | `false` | Hides Start Forge when off; approval remains available. |
 | `VF_PROVISION_BINDING` | `mock` | Provider adapter used only after Start Forge. |
-| `VF_API_DATA_MODE` | `runs` | `artifacts` is immutable; `hybrid` combines artifact jobs with DB product state. |
+| `VF_API_DATA_MODE` | `hybrid` | `artifacts` is immutable, `hybrid` combines authoritative artifacts with relational facts, and `supabase` reads only derived DB projections. Legacy `runs` is internal compatibility only. |
 
 The automated parity suite validates shared contract parsing and real/mock
 response keys for jobs, clusters, Settings and Start Forge. OpenAPI remains
 available at `/docs` and `/openapi.json` for generated frontend clients.
+
+## Internal and debug routes — frontend must not use
+
+These routes are intentionally outside the 19-operation frozen contract:
+
+- `GET /discover` — FastAPI-hosted demonstration page.
+- `POST /copilot/nl2sql/proposals` and `POST /copilot/nl2sql/validate` —
+  verifier-authoring/internal workflow.
+- `GET /docs`, `GET /openapi.json`, and reviewer `GET /healthz` — operational
+  discovery and health surfaces.
+
+They may change without a frontend contract revision. Product code must use
+the 19 frozen operations above.

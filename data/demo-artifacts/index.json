@@ -12,5 +12,5 @@
       "metrics_path": "jobs/d4-m4-0p5b-random-v0126/metrics.jsonl"
     }
   ],
-  "schema_version": 1
+  "schema_version": 2
 }

@@ -24,6 +24,7 @@ def test_get_job_returns_job_shape(tmp_path: Path, monkeypatch) -> None:
     }
     metrics_path.write_text(json.dumps(record) + "\n", encoding="utf-8")
     monkeypatch.setenv("VF_RUNS_DIR", str(tmp_path))
+    monkeypatch.setenv("VF_API_DATA_MODE", "runs")
 
     response = TestClient(app).get("/jobs/demo-api")
 

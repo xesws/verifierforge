@@ -3,6 +3,8 @@
 from __future__ import annotations
 
 import argparse
+from dataclasses import replace
+from datetime import datetime
 import hashlib
 import json
 import os
@@ -11,15 +13,47 @@ import uuid
 from pathlib import Path
 from typing import Any
 
-from core.contracts import Control, Job, JobStatus, MetricRecord, Metrics, Report, ReportVerdict
+from app.api.report_projection import (
+    ARENA_SELECTOR_VERSION,
+    ReportEvidence,
+    build_arena,
+    build_savings_projection,
+    projection_content_sha256,
+    projection_sources,
+)
+from app.db import repository_gateway
+from app.db.records import JobRecord
+from core.contracts import (
+    Control,
+    Job,
+    JobStatus,
+    MetricRecord,
+    Metrics,
+    Report,
+    ReportProjectionProvenance,
+    ReportVerdict,
+)
 
 
 MAIN_JOB = "d4-m3-1p5b-r1-v0125"
 CONTROL_JOB = "d4-m4-0p5b-random-v0126"
 HELDOUT_REPORT = "artifacts/heldout/v0.12.7-report.json"
+ARTIFACT_VERSION = "v0.32.3"
+REPOSITORY_ROOT = Path(__file__).resolve().parents[1]
+HELDOUT_DATASET = REPOSITORY_ROOT / "data/nl2sql/v0.10.0-heldout.jsonl"
+BASELINE_SAMPLES = REPOSITORY_ROOT / "runs/p0-gate-a/v0.10.1-e2-heldout-samples.jsonl"
+TUNED_SAMPLES = (
+    REPOSITORY_ROOT
+    / "runs/d4-m3-1p5b-r1-v0125/evidence/heldout-after-v0127/step_350/gate-a-samples.jsonl"
+)
 
 
-def build(*, runs_dir: Path, destination: Path) -> dict[str, Any]:
+def build(
+    *,
+    runs_dir: Path,
+    destination: Path,
+    evidence: ReportEvidence | None = None,
+) -> dict[str, Any]:
     """Create a replace-atomically demo dataset from the completed D4 evidence."""
     runs_dir = Path(runs_dir)
     destination = Path(destination)
@@ -29,6 +63,27 @@ def build(*, runs_dir: Path, destination: Path) -> dict[str, Any]:
     heldout = _read_json(heldout_path)
     before = _triplet(heldout, "before")
     after = _triplet(heldout, "after")
+    report_evidence = evidence or ReportEvidence(
+        heldout_dataset=HELDOUT_DATASET,
+        baseline_samples=BASELINE_SAMPLES,
+        tuned_samples=TUNED_SAMPLES,
+    )
+    selection = build_arena(report_evidence)
+    savings = build_savings_projection()
+    generated_at = _generated_at(heldout)
+    source_inputs = [
+        (f"runs/{MAIN_JOB}/metrics.jsonl", runs_dir / MAIN_JOB / "metrics.jsonl"),
+        (f"runs/{CONTROL_JOB}/metrics.jsonl", runs_dir / CONTROL_JOB / "metrics.jsonl"),
+        (f"runs/{MAIN_JOB}/{HELDOUT_REPORT}", heldout_path),
+        ("data/nl2sql/v0.10.0-heldout.jsonl", report_evidence.heldout_dataset),
+        ("runs/p0-gate-a/v0.10.1-e2-heldout-samples.jsonl", report_evidence.baseline_samples),
+        (
+            "runs/d4-m3-1p5b-r1-v0125/evidence/heldout-after-v0127/"
+            "step_350/gate-a-samples.jsonl",
+            report_evidence.tuned_samples,
+        ),
+    ]
+    sources = projection_sources(source_inputs)
 
     temporary = destination.with_name(f".{destination.name}.{uuid.uuid4().hex}.tmp")
     temporary.mkdir(parents=True, exist_ok=False)
@@ -50,8 +105,31 @@ def build(*, runs_dir: Path, destination: Path) -> dict[str, Any]:
                     "Held-out selection chose step 350 by maximum pass@1; the random-reward "
                     "control is included as a falsification reference, not proof of causality."
                 ),
+                projected_monthly_savings_usd=savings.projected_monthly_savings_usd,
+                arena=selection.arena,
+                savings_projection=savings,
+                provenance=ReportProjectionProvenance(
+                    artifact_version=ARTIFACT_VERSION,
+                    s3_prefix=None,
+                    generated_at=generated_at,
+                    content_sha256="0" * 64,
+                    sources=sources,
+                ),
             ),
             endpoint=None,
+        )
+        projection_hash = projection_content_sha256(main_job.model_dump(mode="json"))
+        assert main_job.report is not None and main_job.report.provenance is not None
+        main_job = main_job.model_copy(
+            update={
+                "report": main_job.report.model_copy(
+                    update={
+                        "provenance": main_job.report.provenance.model_copy(
+                            update={"content_sha256": projection_hash}
+                        )
+                    }
+                )
+            }
         )
         control_job = Job(
             job_id=CONTROL_JOB,
@@ -85,7 +163,7 @@ def build(*, runs_dir: Path, destination: Path) -> dict[str, Any]:
             },
         )
         index = {
-            "schema_version": 1,
+            "schema_version": 2,
             "jobs": [
                 {
                     "job_id": MAIN_JOB,
@@ -105,11 +183,20 @@ def build(*, runs_dir: Path, destination: Path) -> dict[str, Any]:
         _write_json(
             temporary / "manifest.json",
             {
-                "schema_version": 1,
+                "schema_version": 2,
                 "main_job": MAIN_JOB,
                 "control_job": CONTROL_JOB,
                 "heldout_before": before,
                 "heldout_after": after,
+                "arena_selector": {
+                    "version": ARENA_SELECTOR_VERSION,
+                    "sample_index": 1,
+                    "quota": {"improved": 6, "both_pass": 2, "both_fail": 2},
+                    "population_categories": selection.categories,
+                    "selected_record_ids": selection.selected_record_ids,
+                },
+                "report_projection_sha256": projection_hash,
+                "report_sources": [source.model_dump(mode="json") for source in sources],
                 "files": _file_manifest(temporary),
             },
         )
@@ -118,6 +205,32 @@ def build(*, runs_dir: Path, destination: Path) -> dict[str, Any]:
         if temporary.exists():
             shutil.rmtree(temporary)
     return _read_json(destination / "manifest.json")
+
+
+def sync_job_projection(destination: Path) -> JobRecord:
+    """Idempotently persist the artifact-derived flagship Job presentation."""
+    job = Job.model_validate(_read_json(destination / "jobs" / MAIN_JOB / "job.json"))
+    assert job.report is not None and job.report.provenance is not None
+
+    async def write(repositories):
+        existing = await repositories.jobs.get(job.job_id)
+        record = JobRecord(
+            job_id=job.job_id,
+            template=job.template,
+            status=job.status.value,
+            config_json={"model": job.model} if existing is None else existing.config_json,
+            created_at=job.created_at,
+            s3_prefix=job.report.provenance.s3_prefix,
+            summary_json={
+                "job": job.model_dump(mode="json"),
+                "projection": job.report.provenance.model_dump(mode="json"),
+            },
+        )
+        if existing is not None:
+            record = replace(record, created_at=existing.created_at)
+        return await repositories.jobs.put(record)
+
+    return repository_gateway().call(write)
 
 
 def _read_metrics(path: Path) -> list[MetricRecord]:
@@ -147,6 +260,16 @@ def _triplet(payload: Any, name: str) -> dict[str, float]:
         return {field: float(values[field]) for field in ("pass_at_1", "pass_at_8", "mixed_fraction")}
     except (KeyError, TypeError, ValueError) as error:
         raise RuntimeError(f"held-out report has invalid {name} triplet") from error
+
+
+def _generated_at(payload: dict[str, Any]) -> datetime:
+    value = payload.get("generated_at")
+    if not isinstance(value, str):
+        raise RuntimeError("held-out report is missing generated_at")
+    try:
+        return datetime.fromisoformat(value.replace("Z", "+00:00"))
+    except ValueError as error:
+        raise RuntimeError("held-out report has invalid generated_at") from error
 
 
 def _write_job(root: Path, job: Job, source_metrics: Path) -> None:
@@ -188,8 +311,10 @@ def _write_json(path: Path, payload: dict[str, Any]) -> None:
 def _write_readme(root: Path) -> None:
     (root / "README.md").write_text(
         "# VerifierForge demo artifacts\n\n"
-        "This directory contains reviewer-safe D4 metrics and held-out report metadata. "
-        "It intentionally excludes model weights, checkpoints, credentials, and raw traffic. "
+        "This directory contains reviewer-safe D4 metrics and a complete, derived held-out "
+        "report projection. Its ten arena cards come from the frozen M5 evidence identified "
+        "in manifest.json. It intentionally excludes model weights, checkpoints, credentials, "
+        "raw traffic, and the full 60x8 sample evidence. "
         "Run `VF_API_DATA_MODE=artifacts uvicorn app.api.main:app` to serve it.\n",
         encoding="utf-8",
     )
@@ -213,13 +338,33 @@ def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description="Build committed reviewer demo artifacts from D4 evidence")
     parser.add_argument("--runs-dir", type=Path, default=Path(os.environ.get("VF_RUNS_DIR", "./runs")))
     parser.add_argument("--destination", type=Path, default=Path("data/demo-artifacts"))
+    parser.add_argument(
+        "--sync-db",
+        action="store_true",
+        help="idempotently backfill the configured relational Job store",
+    )
     return parser.parse_args()
 
 
 def main() -> None:
     args = parse_args()
     manifest = build(runs_dir=args.runs_dir, destination=args.destination)
-    print(json.dumps({"main_job": manifest["main_job"], "control_job": manifest["control_job"]}, sort_keys=True))
+    if args.sync_db:
+        from dotenv import load_dotenv
+
+        load_dotenv()
+        sync_job_projection(args.destination)
+    print(
+        json.dumps(
+            {
+                "main_job": manifest["main_job"],
+                "control_job": manifest["control_job"],
+                "projection_sha256": manifest["report_projection_sha256"],
+                "database_synced": args.sync_db,
+            },
+            sort_keys=True,
+        )
+    )
 
 
 if __name__ == "__main__":

@@ -6,6 +6,7 @@ from pathlib import Path
 from fastapi.testclient import TestClient
 
 import app.api.main as api_main
+import app.api.agent as api_agent
 from app.db import repository_gateway
 from app.db.records import AgentDecisionRecord, GuardianScoreRecord, RoutingRecord
 from app.db.settings import DatabaseSettings
@@ -19,10 +20,13 @@ FROZEN_OPERATIONS = (
     ("get", "/jobs", "200"),
     ("post", "/jobs", "201"),
     ("get", "/jobs/{job_id}", "200"),
+    ("get", "/jobs/{job_id}/metrics", "200"),
     ("get", "/clusters", "200"),
     ("get", "/clusters/{cluster_id}", "200"),
     ("post", "/clusters/{cluster_id}/agent/analyze", "200"),
+    ("get", "/clusters/{cluster_id}/agent/decision", "200"),
     ("post", "/agent-decisions/{decision_id}/approvals", "200"),
+    ("get", "/agent-decisions/{decision_id}/approval", "200"),
     ("post", "/approvals/{approval_id}/start-forge", "200"),
     ("get", "/approvals/{approval_id}/forge-execution", "200"),
     ("get", "/clusters/{cluster_id}/routing", "200"),
@@ -36,6 +40,7 @@ FROZEN_OPERATIONS = (
 
 
 def test_mock_and_real_openapi_freeze_the_same_request_and_response_shapes() -> None:
+    assert len(FROZEN_OPERATIONS) == 19
     real = api_main.app.openapi()
     mock = mock_server.app.openapi()
 
@@ -150,6 +155,28 @@ def test_mock_start_forge_and_settings_use_the_real_contract_shapes(monkeypatch)
     assert ForgeExecutionStatus.model_validate(finished.json()).state.value == "done"
     assert set(credential.json()) == set(ProviderCredentialStatus.model_fields)
     assert set(started.json()) == set(ForgeExecutionStatus.model_fields)
+
+
+def test_newly_frozen_reads_share_explicit_missing_resource_semantics(
+    tmp_path: Path, monkeypatch
+) -> None:
+    gateway = repository_gateway(DatabaseSettings.sqlite(tmp_path / "missing.sqlite3"))
+    monkeypatch.setattr(api_main, "repository_gateway", lambda: gateway)
+    monkeypatch.setattr(api_agent, "repository_gateway", lambda: gateway)
+    monkeypatch.setenv("VF_AGENT_ENABLED", "true")
+    monkeypatch.setenv("VF_API_DATA_MODE", "artifacts")
+    real = TestClient(api_main.app)
+    mock = TestClient(mock_server.app)
+
+    for path in (
+        "/jobs/missing/metrics",
+        "/clusters/invoice-field-extraction/agent/decision",
+        "/agent-decisions/missing/approval",
+    ):
+        real_response = real.get(path)
+        mock_response = mock.get(path)
+        assert real_response.status_code == mock_response.status_code == 404
+        assert "detail" in real_response.json() and "detail" in mock_response.json()
 
 
 def _operation_shapes(

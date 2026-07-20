@@ -16,8 +16,6 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
 from core.contracts import (
     ApprovedSampleSource,
-    Arena,
-    ArenaSample,
     Cluster,
     Job,
     JobCreateRequest,
@@ -25,6 +23,7 @@ from core.contracts import (
     LivePassRate,
     LivePassRatePoint,
     Metrics,
+    Report,
     RoutingState,
 )
 from core.agent_contracts import (
@@ -62,7 +61,7 @@ def _job(
     template: str,
     status: str,
     metrics: dict[str, list[int] | list[float]],
-    report: dict | None = None,
+    report: dict | Report | None = None,
     endpoint: dict[str, str] | None = None,
     control: dict[str, list[float]] | None = None,
     model: str = "Qwen/Qwen2.5-1.5B-Instruct",
@@ -80,78 +79,15 @@ def _job(
     )
 
 
-_ARENA_SAMPLES = [
-    ArenaSample(
-        prompt="List open invoices over $10k for Acme.",
-        baseline_output="SELECT * FROM invoices WHERE company = 'Acme';",
-        tuned_output=(
-            "SELECT invoice_id, amount FROM invoices "
-            "WHERE customer = 'Acme' AND amount > 10000 AND status = 'open';"
-        ),
-        baseline_score=0.4,
-        tuned_score=0.95,
-    ),
-    ArenaSample(
-        prompt="How many support tickets were escalated last week?",
-        baseline_output="SELECT count(*) FROM tickets WHERE escalated = 1;",
-        tuned_output=(
-            "SELECT COUNT(*) AS escalated_count FROM tickets "
-            "WHERE escalated = TRUE AND created_at >= DATE('now', '-7 day');"
-        ),
-        baseline_score=0.55,
-        tuned_score=0.92,
-    ),
-    ArenaSample(
-        prompt="Top 5 SKUs by revenue in Q1.",
-        baseline_output="SELECT sku FROM sales ORDER BY revenue;",
-        tuned_output=(
-            "SELECT sku, SUM(revenue) AS revenue FROM sales "
-            "WHERE quarter = 'Q1' GROUP BY sku ORDER BY revenue DESC LIMIT 5;"
-        ),
-        baseline_score=0.35,
-        tuned_score=0.9,
-    ),
-    ArenaSample(
-        prompt="Average handle time for billing tickets.",
-        baseline_output="SELECT AVG(time) FROM tickets;",
-        tuned_output=(
-            "SELECT AVG(handle_minutes) AS avg_handle_time FROM tickets "
-            "WHERE category = 'billing';"
-        ),
-        baseline_score=0.5,
-        tuned_score=0.88,
-    ),
-    ArenaSample(
-        prompt="Employees hired in 2025 in Engineering.",
-        baseline_output="SELECT * FROM employees WHERE year = 2025;",
-        tuned_output=(
-            "SELECT employee_id, name FROM employees "
-            "WHERE hire_year = 2025 AND department = 'Engineering';"
-        ),
-        baseline_score=0.45,
-        tuned_score=0.93,
-    ),
-    ArenaSample(
-        prompt="Refunds issued yesterday above $50.",
-        baseline_output="SELECT * FROM refunds WHERE amount > 50;",
-        tuned_output=(
-            "SELECT refund_id, amount FROM refunds "
-            "WHERE amount > 50 AND refunded_on = DATE('now', '-1 day');"
-        ),
-        baseline_score=0.42,
-        tuned_score=0.91,
-    ),
-    ArenaSample(
-        prompt="Active subscriptions churned in March.",
-        baseline_output="SELECT * FROM subs WHERE churned;",
-        tuned_output=(
-            "SELECT subscription_id FROM subscriptions "
-            "WHERE status = 'churned' AND churn_month = '2026-03';"
-        ),
-        baseline_score=0.38,
-        tuned_score=0.87,
-    ),
-]
+def _flagship_report() -> Report:
+    path = (
+        Path(__file__).resolve().parents[1]
+        / "data/demo-artifacts/jobs/d4-m3-1p5b-r1-v0125/job.json"
+    )
+    job = Job.model_validate_json(path.read_text(encoding="utf-8"))
+    if job.report is None:
+        raise RuntimeError("committed flagship artifact is missing its report")
+    return job.report
 
 
 JOBS: list[Job] = [
@@ -188,17 +124,7 @@ JOBS: list[Job] = [
             "pass_at_1": [0.16, 0.36, 0.62, 0.76],
             "entropy": [1.45, 1.12, 0.87, 0.71],
         },
-        report={
-            "baseline_pass_at_1": 0.16,
-            "final_pass_at_1": 0.76,
-            "control_final_pass_at_1": 0.2,
-            "verdict": "real_gain",
-            "narrative": "Verifier performance improved well beyond the control run.",
-            "projected_monthly_savings_usd": 4300.0,
-            "arena": Arena(win_rate=0.95, samples=_ARENA_SAMPLES).model_dump(
-                mode="json"
-            ),
-        },
+        report=_flagship_report(),
         endpoint={
             "base_url": "http://localhost:8080/v1",
             "model_name": "vf-nl2sql-gain",
