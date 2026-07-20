@@ -3170,3 +3170,16 @@ Stop conditions: an item blocked over 30 minutes is recorded and skipped; an
 S3 identity mismatch, migration failure, leaked secret, budget/runtime fuse,
 readiness failure, or unproven provider deletion blocks live promotion and the
 semantic tag. Existing L4 service is out of scope and must remain untouched.
+
+## 2026-07-20 v0.34.1 — L4 retirement readiness
+
+**Status:** in progress. No old-L4 process may be contacted or mutated.
+
+- [x] Read-only inventory found Supabase `vf-demo` cold with `url=NULL`, SQL
+  routing disabled/canary zero/target `tuned`, and zero managed serving pods.
+- [ ] Remove four stale physical tuned-endpoint variables from Railway and the
+  active local-full configuration path; deploy registry-only resolution.
+- [ ] Prove the complete public reviewer surface in cold state and prove an
+  explicitly forced tuned request produces observable automatic fallback.
+- [ ] Verify Wake status messaging, update JUDGES, run full tests/secret scan,
+  commit, push, and issue the explicit old-L4 shutdown conclusion.
