@@ -14,6 +14,7 @@ from app.provisioning import (
     MockAdapter,
     MockFailureMode,
     ProvisionAuditError,
+    ProvisionNoCapacity,
     ProvisioningPolicy,
     ProvisionRejected,
 )
@@ -111,6 +112,54 @@ def test_run_to_completion_uses_mock_adapter_and_leaves_no_active_handle() -> No
 
     assert status.state == ProvisionState.TERMINATED
     assert _run(adapter.list_active()) == []
+
+
+class _NoCapacityAdapter(MockAdapter):
+    async def provision(self, spec: ProvisionSpec) -> ProvisionHandle:
+        raise ProvisionNoCapacity("no_capacity: all approved candidates are unavailable")
+
+
+def test_no_capacity_converges_to_failed_with_explicit_audit() -> None:
+    orchestrator, adapter, audit = _orchestrator(_NoCapacityAdapter())
+
+    status = _run(orchestrator.run_to_completion(_spec()))
+
+    assert status.state == ProvisionState.FAILED
+    assert status.detail == "no_capacity: all approved candidates are unavailable"
+    failed = next(event for event in audit.events if event.action == "provision.failed")
+    assert failed.after_state == ProvisionState.FAILED
+    assert failed.reason == "no_capacity"
+    assert _run(adapter.list_active()) == []
+
+
+class _SelectedGPUAdapter(MockAdapter):
+    async def provision(self, spec: ProvisionSpec) -> ProvisionHandle:
+        handle = await super().provision(spec)
+        return handle.model_copy(
+            update={
+                "labels": {
+                    **handle.labels,
+                    "gpu_model": "NVIDIA RTX 4000 Ada Generation",
+                    "gpu_display_name": "RTX 4000 Ada",
+                    "cloud_type": "COMMUNITY",
+                    "hourly_price_usd": "0.200000",
+                }
+            }
+        )
+
+
+def test_created_audit_carries_selected_gpu_and_numeric_price() -> None:
+    orchestrator, _adapter, audit = _orchestrator(_SelectedGPUAdapter())
+
+    _run(orchestrator.request(_spec()))
+
+    created = next(event for event in audit.events if event.action == "provision.created")
+    assert created.detail == {
+        "gpu_model": "NVIDIA RTX 4000 Ada Generation",
+        "gpu_display_name": "RTX 4000 Ada",
+        "cloud_type": "COMMUNITY",
+        "hourly_price_usd": 0.2,
+    }
 
 
 def test_workload_observations_advance_running_and_collecting_without_provider_leakage() -> None:

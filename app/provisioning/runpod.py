@@ -2,17 +2,20 @@
 
 from __future__ import annotations
 
+import asyncio
+import json
+from collections.abc import Callable
 from dataclasses import dataclass
 from datetime import datetime, timezone
 import math
-from collections.abc import Callable
 from typing import Any, Mapping
 
 import httpx
 
-from app.provisioning.errors import ProvisionProviderError
+from app.provisioning.errors import ProvisionNoCapacity, ProvisionProviderError
 from core.provisioning_contracts import (
-    DEFAULT_GPU_MAPPINGS,
+    BLOCKED_GPU_MODEL_FRAGMENTS,
+    DEFAULT_GPU_CANDIDATES,
     ProvisionHandle,
     ProvisionProvider,
     ProvisionSpec,
@@ -22,11 +25,44 @@ from core.provisioning_contracts import (
 
 
 RUNPOD_API_BASE_URL = "https://rest.runpod.io/v1"
+RUNPOD_GRAPHQL_URL = "https://api.runpod.io/graphql"
 MANAGED_NAME_PREFIX = "vf-auto-"
 OWNER_MARKER_KEY = "VF_MANAGED_BY"
 OWNER_MARKER_VALUE = "verifierforge-p2"
 RUNPOD_IMAGE = "runpod/pytorch:1.0.2-cu1281-torch280-ubuntu2404"
 _ERROR_BODY_LIMIT = 4000
+_CAPACITY_QUERY = """
+query Capacity($ids: [String!], $community: GpuLowestPriceInput!, $secure: GpuLowestPriceInput!) {
+  gpuTypes(input: {ids: $ids}) {
+    id
+    displayName
+    memoryInGb
+    secureCloud
+    communityCloud
+    securePrice
+    communityPrice
+    maxGpuCount
+    maxGpuCountCommunityCloud
+    maxGpuCountSecureCloud
+    community: lowestPrice(input: $community) {
+      gpuTypeId
+      uninterruptablePrice
+      stockStatus
+      availableGpuCounts
+      maxUnreservedGpuCount
+      countryCode
+    }
+    secure: lowestPrice(input: $secure) {
+      gpuTypeId
+      uninterruptablePrice
+      stockStatus
+      availableGpuCounts
+      maxUnreservedGpuCount
+      countryCode
+    }
+  }
+}
+"""
 
 
 @dataclass(frozen=True)
@@ -34,6 +70,15 @@ class RunPodBilling:
     amount_usd: float
     time_billed_ms: int
     records: tuple[dict[str, Any], ...]
+
+
+@dataclass(frozen=True)
+class RunPodGPUOffer:
+    gpu_type_id: str
+    display_name: str
+    cloud_type: str
+    hourly_price_usd: float
+    stock_status: str
 
 
 class RunPodAdapter:
@@ -46,7 +91,9 @@ class RunPodAdapter:
         api_key_provider: Callable[[], str] | None = None,
         client: httpx.AsyncClient | None = None,
         base_url: str = RUNPOD_API_BASE_URL,
+        graphql_url: str = RUNPOD_GRAPHQL_URL,
         timeout_s: float = 30.0,
+        create_timeout_s: float | None = None,
     ) -> None:
         if api_key_provider is not None and api_key is not None:
             raise ValueError("provide api_key or api_key_provider, not both")
@@ -58,6 +105,10 @@ class RunPodAdapter:
         else:
             self._api_key_provider = api_key_provider
         self.base_url = base_url.rstrip("/")
+        self.graphql_url = graphql_url
+        self.create_timeout_s = create_timeout_s or timeout_s
+        if self.create_timeout_s <= 0:
+            raise ValueError("create_timeout_s must be positive")
         self._owns_client = client is None
         self.client = client or httpx.AsyncClient(timeout=timeout_s)
 
@@ -74,13 +125,86 @@ class RunPodAdapter:
     async def provision(self, spec: ProvisionSpec) -> ProvisionHandle:
         if spec.provider is not ProvisionProvider.RUNPOD:
             raise ValueError("RunPodAdapter only accepts provider=runpod")
-        gpu_ids = list(DEFAULT_GPU_MAPPINGS[ProvisionProvider.RUNPOD][spec.gpu_class])
+        offers = await self.available_gpu_offers(spec)
+        if not offers:
+            raise ProvisionNoCapacity(
+                "no_capacity: no approved GPU candidate is currently available"
+            )
+        for offer in offers:
+            try:
+                pod = await self._create_candidate(spec, offer)
+            except (ProvisionProviderError, TimeoutError):
+                recovered = await self._recover_created_pod(spec)
+                if recovered is None:
+                    continue
+                pod = recovered
+            return await self._accept_created_pod(pod, spec=spec, offer=offer)
+        raise ProvisionNoCapacity(
+            f"no_capacity: all {len(offers)} available GPU candidates failed to create"
+        )
+
+    async def available_gpu_offers(self, spec: ProvisionSpec) -> list[RunPodGPUOffer]:
+        """Query live stock and return one cheapest cloud offer per approved GPU."""
+        candidates = DEFAULT_GPU_CANDIDATES[ProvisionProvider.RUNPOD][spec.gpu_class]
+        lowest_price_input: dict[str, Any] = {
+            "gpuCount": 1,
+            "supportPublicIp": True,
+        }
+        if spec.region_pref:
+            lowest_price_input["dataCenterId"] = ",".join(spec.region_pref)
+        body = await self._graphql_json(
+            query=_CAPACITY_QUERY,
+            variables={
+                "ids": list(candidates),
+                "community": {**lowest_price_input, "secureCloud": False},
+                "secure": {**lowest_price_input, "secureCloud": True},
+            },
+        )
+        data = body.get("data")
+        values = data.get("gpuTypes") if isinstance(data, dict) else None
+        if not isinstance(values, list) or not all(isinstance(value, dict) for value in values):
+            raise ProvisionProviderError("RunPod capacity response has invalid gpuTypes")
+        by_id = {str(value.get("id")): value for value in values}
+        ranked: list[tuple[float, int, RunPodGPUOffer]] = []
+        for index, gpu_type_id in enumerate(candidates):
+            if _blocked_gpu_model(gpu_type_id):
+                continue
+            gpu = by_id.get(gpu_type_id)
+            if gpu is None:
+                continue
+            offers = [
+                offer
+                for cloud, field in (("COMMUNITY", "community"), ("SECURE", "secure"))
+                if (offer := _gpu_offer(gpu, gpu_type_id, cloud, field)) is not None
+            ]
+            if not offers:
+                continue
+            selected = min(offers, key=lambda offer: (offer.hourly_price_usd, offer.cloud_type))
+            ranked.append((selected.hourly_price_usd, index, selected))
+        return [offer for _price, _index, offer in sorted(ranked)]
+
+    async def _create_candidate(
+        self, spec: ProvisionSpec, offer: RunPodGPUOffer
+    ) -> dict[str, Any]:
+        payload = self._create_payload(spec, offer)
+        try:
+            body = await asyncio.wait_for(
+                self._request_json("POST", "/pods", json=payload, expected={201}),
+                timeout=self.create_timeout_s,
+            )
+        except asyncio.TimeoutError as error:
+            raise TimeoutError("RunPod candidate create timed out") from error
+        return _object(body, "RunPod create response")
+
+    def _create_payload(
+        self, spec: ProvisionSpec, offer: RunPodGPUOffer
+    ) -> dict[str, Any]:
         payload: dict[str, Any] = {
             "name": self._managed_name(spec.job_id),
-            "cloudType": "COMMUNITY",
+            "cloudType": offer.cloud_type,
             "computeType": "GPU",
             "gpuCount": 1,
-            "gpuTypeIds": gpu_ids,
+            "gpuTypeIds": [offer.gpu_type_id],
             "gpuTypePriority": "custom",
             "imageName": spec.image,
             "containerDiskInGb": spec.container_disk_gb,
@@ -98,26 +222,43 @@ class RunPodAdapter:
         }
         if spec.region_pref:
             payload["dataCenterIds"] = spec.region_pref
-        try:
-            body = await self._request_json("POST", "/pods", json=payload, expected={201})
-        except ProvisionProviderError as error:
-            if not _community_capacity_exhausted(error):
-                raise
-            payload["cloudType"] = "SECURE"
-            body = await self._request_json("POST", "/pods", json=payload, expected={201})
-        pod = _object(body, "RunPod create response")
+        return payload
+
+    async def _recover_created_pod(self, spec: ProvisionSpec) -> dict[str, Any] | None:
+        expected_name = self._managed_name(spec.job_id)
+        matches = [
+            pod for pod in await self.list_account_pods() if pod.get("name") == expected_name
+        ]
+        if not matches:
+            return None
+        if len(matches) != 1 or not self._is_managed(
+            matches[0], expected_name=expected_name, expected_job_id=spec.job_id
+        ):
+            raise ProvisionProviderError(
+                "RunPod create reconciliation failed ownership verification"
+            )
+        return matches[0]
+
+    async def _accept_created_pod(
+        self,
+        pod: dict[str, Any],
+        *,
+        spec: ProvisionSpec,
+        offer: RunPodGPUOffer,
+    ) -> ProvisionHandle:
         external_id = _required_text(pod, "id")
-        if not self._is_managed(pod, expected_name=payload["name"]):
+        expected_name = self._managed_name(spec.job_id)
+        if not self._is_managed(pod, expected_name=expected_name):
             refreshed = await self.get_pod(external_id)
             if refreshed is not None:
                 pod = refreshed
-        if not self._is_managed(pod, expected_name=payload["name"]):
+        if not self._is_managed(pod, expected_name=expected_name):
             # The provider response must echo enough identity to prove ownership.
             try:
                 await self._request("DELETE", f"/pods/{external_id}", expected={204, 404})
             finally:
                 raise ProvisionProviderError("RunPod create response failed ownership verification")
-        return self._handle_from_pod(pod, spec=spec)
+        return self._handle_from_pod(pod, spec=spec, offer=offer)
 
     async def status(self, handle: ProvisionHandle) -> ProvisionStatus:
         pod = await self.get_pod(handle.external_id)
@@ -234,7 +375,15 @@ class RunPodAdapter:
         billed_ms = int(sum(_number(record, "timeBilledMs", "time_billed_ms") for record in records))
         return RunPodBilling(amount_usd=round(amount, 6), time_billed_ms=billed_ms, records=tuple(records))
 
-    def _handle_from_pod(self, pod: Mapping[str, Any], *, spec: ProvisionSpec) -> ProvisionHandle:
+    def _handle_from_pod(
+        self,
+        pod: Mapping[str, Any],
+        *,
+        spec: ProvisionSpec,
+        offer: RunPodGPUOffer,
+    ) -> ProvisionHandle:
+        provider_price = _hourly_price(pod)
+        hourly_price = provider_price if provider_price > 0 else offer.hourly_price_usd
         return ProvisionHandle(
             provider=ProvisionProvider.RUNPOD,
             external_id=_required_text(pod, "id"),
@@ -242,7 +391,14 @@ class RunPodAdapter:
             approval_id=spec.approval_id,
             region=_region(pod),
             ssh=_ssh_endpoint(pod),
-            labels={"name": str(pod.get("name", "")), OWNER_MARKER_KEY: OWNER_MARKER_VALUE},
+            labels={
+                "name": str(pod.get("name", "")),
+                OWNER_MARKER_KEY: OWNER_MARKER_VALUE,
+                "gpu_model": offer.gpu_type_id,
+                "gpu_display_name": offer.display_name,
+                "cloud_type": offer.cloud_type,
+                "hourly_price_usd": f"{hourly_price:.6f}",
+            },
             created_at=_created_at(pod),
         )
 
@@ -278,6 +434,48 @@ class RunPodAdapter:
         **kwargs: Any,
     ) -> Any:
         return _decode_json(await self._request(method, path, expected=expected, **kwargs))
+
+    async def _graphql_json(
+        self,
+        *,
+        query: str,
+        variables: dict[str, Any],
+    ) -> dict[str, Any]:
+        api_key = self._api_key_provider().strip()
+        if not api_key:
+            raise ProvisionProviderError("RunPod credential is unavailable")
+        try:
+            response = await self.client.request(
+                "POST",
+                self.graphql_url,
+                headers={
+                    "Authorization": f"Bearer {api_key}",
+                    "Content-Type": "application/json",
+                },
+                json={"query": query, "variables": variables},
+            )
+        except httpx.HTTPError as error:
+            raise ProvisionProviderError(
+                f"RunPod capacity query transport failed: {type(error).__name__}"
+            ) from error
+        if response.status_code != 200:
+            body = response.text[:_ERROR_BODY_LIMIT].replace(api_key, "[REDACTED]")
+            raise ProvisionProviderError(
+                f"RunPod capacity query returned HTTP {response.status_code}: {body}",
+                status_code=response.status_code,
+                provider_body=body,
+            )
+        decoded = _decode_json(response)
+        if not isinstance(decoded, dict):
+            raise ProvisionProviderError("RunPod capacity response is not an object")
+        if decoded.get("errors"):
+            body = json.dumps(decoded["errors"], ensure_ascii=True)[:_ERROR_BODY_LIMIT]
+            body = body.replace(api_key, "[REDACTED]")
+            raise ProvisionProviderError(
+                f"RunPod capacity query returned GraphQL errors: {body}",
+                provider_body=body,
+            )
+        return decoded
 
     async def _request(
         self,
@@ -318,12 +516,37 @@ def _decode_json(response: httpx.Response) -> Any:
         raise ProvisionProviderError("RunPod response was not valid JSON") from error
 
 
-def _community_capacity_exhausted(error: ProvisionProviderError) -> bool:
-    return (
-        error.status_code == 500
-        and error.provider_body is not None
-        and "There are no instances currently available" in error.provider_body
+def _gpu_offer(
+    gpu: Mapping[str, Any],
+    gpu_type_id: str,
+    cloud_type: str,
+    field: str,
+) -> RunPodGPUOffer | None:
+    value = gpu.get(field)
+    if not isinstance(value, Mapping):
+        return None
+    returned_id = value.get("gpuTypeId")
+    price = value.get("uninterruptablePrice")
+    stock_status = value.get("stockStatus")
+    if returned_id != gpu_type_id or isinstance(price, bool) or not isinstance(
+        price, (int, float)
+    ):
+        return None
+    numeric_price = float(price)
+    if not math.isfinite(numeric_price) or numeric_price <= 0 or not stock_status:
+        return None
+    return RunPodGPUOffer(
+        gpu_type_id=gpu_type_id,
+        display_name=str(gpu.get("displayName") or gpu_type_id),
+        cloud_type=cloud_type,
+        hourly_price_usd=numeric_price,
+        stock_status=str(stock_status),
     )
+
+
+def _blocked_gpu_model(gpu_type_id: str) -> bool:
+    lowered = gpu_type_id.lower().replace("-", "_")
+    return any(fragment in lowered for fragment in BLOCKED_GPU_MODEL_FRAGMENTS)
 
 
 def _object(value: Any, label: str) -> dict[str, Any]:

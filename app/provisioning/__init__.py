@@ -6,6 +6,7 @@ from app.provisioning.errors import (
     ProvisionCreateTimeout,
     ProvisioningError,
     ProvisionLifecycleError,
+    ProvisionNoCapacity,
     ProvisionProviderError,
     ProvisionRejected,
 )
@@ -32,6 +33,7 @@ __all__ = [
     "ProvisioningError",
     "ProvisioningPolicy",
     "ProvisionLifecycleError",
+    "ProvisionNoCapacity",
     "ProvisionProviderError",
     "ProvisionRejected",
     "RunPodAdapter",

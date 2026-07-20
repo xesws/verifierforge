@@ -7,7 +7,7 @@ import json
 import httpx
 import pytest
 
-from app.provisioning.errors import ProvisionProviderError
+from app.provisioning.errors import ProvisionNoCapacity, ProvisionProviderError
 from app.provisioning.runpod import (
     OWNER_MARKER_KEY,
     OWNER_MARKER_VALUE,
@@ -64,20 +64,67 @@ def _pod(**overrides):
     return value
 
 
+def _capacity(
+    offers: dict[str, tuple[str, float, str]],
+) -> dict[str, object]:
+    values: list[dict[str, object]] = []
+    for gpu_type_id in (
+        "NVIDIA RTX 2000 Ada Generation",
+        "NVIDIA RTX 4000 Ada Generation",
+        "NVIDIA L4",
+        "NVIDIA A40",
+    ):
+        selected = offers.get(gpu_type_id)
+        community = None
+        secure = None
+        if selected is not None:
+            cloud, price, stock = selected
+            item = {
+                "gpuTypeId": gpu_type_id,
+                "uninterruptablePrice": price,
+                "stockStatus": stock,
+                "availableGpuCounts": None,
+                "maxUnreservedGpuCount": None,
+                "countryCode": None,
+            }
+            if cloud == "COMMUNITY":
+                community = item
+            else:
+                secure = item
+        values.append(
+            {
+                "id": gpu_type_id,
+                "displayName": gpu_type_id.removeprefix("NVIDIA "),
+                "community": community,
+                "secure": secure,
+            }
+        )
+    return {"data": {"gpuTypes": values}}
+
+
+def _is_capacity_query(request: httpx.Request) -> bool:
+    return request.url.host == "api.runpod.io" and request.url.path == "/graphql"
+
+
 def test_create_status_delete_and_billing_contract() -> None:
     calls: list[httpx.Request] = []
 
     def handler(request: httpx.Request) -> httpx.Response:
         calls.append(request)
+        if _is_capacity_query(request):
+            return httpx.Response(
+                200,
+                json=_capacity(
+                    {"NVIDIA RTX 2000 Ada Generation": ("COMMUNITY", 0.1, "High")}
+                ),
+            )
         if request.method == "POST":
             payload = json.loads(request.content)
             assert payload["gpuCount"] == 1
             assert payload["gpuTypeIds"] == [
                 "NVIDIA RTX 2000 Ada Generation",
-                "NVIDIA RTX 4000 SFF Ada Generation",
-                "NVIDIA RTX 4000 Ada Generation",
-                "NVIDIA L4",
             ]
+            assert payload["cloudType"] == "COMMUNITY"
             assert payload["volumeInGb"] == 0
             assert "networkVolumeId" not in payload
             assert payload["env"][OWNER_MARKER_KEY] == OWNER_MARKER_VALUE
@@ -111,13 +158,25 @@ def test_create_status_delete_and_billing_contract() -> None:
     assert all(request.headers["Authorization"] == "Bearer secret-test-key" for request in calls)
 
 
-def test_create_retries_secure_only_for_explicit_community_capacity_error() -> None:
-    clouds: list[str] = []
+def test_create_failure_reconciles_then_tries_next_ranked_model() -> None:
+    attempts: list[tuple[str, str]] = []
 
     def handler(request: httpx.Request) -> httpx.Response:
+        if _is_capacity_query(request):
+            return httpx.Response(
+                200,
+                json=_capacity(
+                    {
+                        "NVIDIA RTX 2000 Ada Generation": ("COMMUNITY", 0.1, "High"),
+                        "NVIDIA RTX 4000 Ada Generation": ("SECURE", 0.2, "Low"),
+                    }
+                ),
+            )
+        if request.method == "GET" and request.url.path == "/v1/pods":
+            return httpx.Response(200, json=[])
         payload = json.loads(request.content)
-        clouds.append(payload["cloudType"])
-        if payload["cloudType"] == "COMMUNITY":
+        attempts.append((payload["gpuTypeIds"][0], payload["cloudType"]))
+        if len(attempts) == 1:
             return httpx.Response(
                 500,
                 json={"error": "create pod: There are no instances currently available"},
@@ -132,26 +191,139 @@ def test_create_retries_secure_only_for_explicit_community_capacity_error() -> N
         await client.aclose()
 
     _run(scenario())
-    assert clouds == ["COMMUNITY", "SECURE"]
+    assert attempts == [
+        ("NVIDIA RTX 2000 Ada Generation", "COMMUNITY"),
+        ("NVIDIA RTX 4000 Ada Generation", "SECURE"),
+    ]
 
 
-def test_create_does_not_retry_secure_for_non_capacity_error() -> None:
+def test_all_advertised_create_failures_converge_to_no_capacity() -> None:
     calls = 0
 
-    def handler(_request: httpx.Request) -> httpx.Response:
+    def handler(request: httpx.Request) -> httpx.Response:
         nonlocal calls
+        if _is_capacity_query(request):
+            return httpx.Response(
+                200,
+                json=_capacity(
+                    {"NVIDIA RTX 2000 Ada Generation": ("SECURE", 0.24, "Low")}
+                ),
+            )
         calls += 1
+        if request.method == "GET":
+            return httpx.Response(200, json=[])
         return httpx.Response(403, text="provider denied")
 
     async def scenario() -> None:
         client = httpx.AsyncClient(transport=httpx.MockTransport(handler))
         adapter = RunPodAdapter("key", client=client)
-        with pytest.raises(ProvisionProviderError, match="HTTP 403"):
+        with pytest.raises(ProvisionNoCapacity, match="no_capacity"):
             await adapter.provision(_spec())
         await client.aclose()
 
     _run(scenario())
-    assert calls == 1
+    assert calls == 2
+
+
+def test_first_candidate_out_of_stock_selects_next_live_offer() -> None:
+    async def scenario() -> None:
+        client = httpx.AsyncClient(
+            transport=httpx.MockTransport(
+                lambda request: httpx.Response(
+                    200,
+                    json=_capacity(
+                        {
+                            "NVIDIA RTX 4000 Ada Generation": (
+                                "COMMUNITY",
+                                0.2,
+                                "Low",
+                            )
+                        }
+                    ),
+                )
+            )
+        )
+        adapter = RunPodAdapter("key", client=client)
+        offers = await adapter.available_gpu_offers(_spec())
+        assert [offer.gpu_type_id for offer in offers] == [
+            "NVIDIA RTX 4000 Ada Generation"
+        ]
+        await client.aclose()
+
+    _run(scenario())
+
+
+def test_all_candidates_out_of_stock_sends_no_create_request() -> None:
+    requests: list[httpx.Request] = []
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        requests.append(request)
+        return httpx.Response(200, json=_capacity({}))
+
+    async def scenario() -> None:
+        client = httpx.AsyncClient(transport=httpx.MockTransport(handler))
+        adapter = RunPodAdapter("key", client=client)
+        with pytest.raises(ProvisionNoCapacity, match="no_capacity"):
+            await adapter.provision(_spec())
+        await client.aclose()
+
+    _run(scenario())
+    assert len(requests) == 1
+    assert _is_capacity_query(requests[0])
+
+
+def test_only_third_candidate_available_creates_exactly_that_model() -> None:
+    created: list[str] = []
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        if _is_capacity_query(request):
+            return httpx.Response(
+                200,
+                json=_capacity({"NVIDIA L4": ("SECURE", 0.39, "Low")}),
+            )
+        payload = json.loads(request.content)
+        created.extend(payload["gpuTypeIds"])
+        return httpx.Response(201, json=_pod(costPerHr=0.39))
+
+    async def scenario() -> None:
+        client = httpx.AsyncClient(transport=httpx.MockTransport(handler))
+        adapter = RunPodAdapter("key", client=client)
+        handle = await adapter.provision(_spec())
+        assert handle.labels["gpu_model"] == "NVIDIA L4"
+        assert handle.labels["cloud_type"] == "SECURE"
+        assert handle.labels["hourly_price_usd"] == "0.390000"
+        await client.aclose()
+
+    _run(scenario())
+    assert created == ["NVIDIA L4"]
+
+
+def test_live_price_not_declared_order_controls_first_attempt() -> None:
+    selected: list[str] = []
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        if _is_capacity_query(request):
+            return httpx.Response(
+                200,
+                json=_capacity(
+                    {
+                        "NVIDIA RTX 2000 Ada Generation": ("SECURE", 0.24, "Low"),
+                        "NVIDIA RTX 4000 Ada Generation": ("COMMUNITY", 0.2, "Low"),
+                    }
+                ),
+            )
+        payload = json.loads(request.content)
+        selected.extend(payload["gpuTypeIds"])
+        return httpx.Response(201, json=_pod(costPerHr=0.2))
+
+    async def scenario() -> None:
+        client = httpx.AsyncClient(transport=httpx.MockTransport(handler))
+        adapter = RunPodAdapter("key", client=client)
+        await adapter.provision(_spec())
+        await client.aclose()
+
+    _run(scenario())
+    assert selected == ["NVIDIA RTX 4000 Ada Generation"]
 
 
 def test_list_active_requires_prefix_and_owner_marker() -> None:

@@ -34,5 +34,9 @@ class ProvisionProviderError(ProvisionLifecycleError):
         self.provider_body = provider_body
 
 
+class ProvisionNoCapacity(ProvisionProviderError):
+    """All currently advertised, approved GPU candidates were exhausted."""
+
+
 class ProvisionAuditError(ProvisioningError):
     """Raised when durable audit cannot be written."""

@@ -16,6 +16,7 @@ from core.provisioning_contracts import (
 from app.provisioning.errors import (
     ProvisionAuditError,
     ProvisioningError,
+    ProvisionNoCapacity,
     ProvisionLifecycleError,
     ProvisionRejected,
 )
@@ -123,7 +124,7 @@ class LifecycleOrchestrator:
 
         try:
             handle = await self.adapter.provision(spec)
-        except ProvisioningError:
+        except ProvisioningError as error:
             await self._append_audit(
                 spec=spec,
                 handle=None,
@@ -131,7 +132,11 @@ class LifecycleOrchestrator:
                 before_state=ProvisionState.REQUESTED,
                 after_state=ProvisionState.FAILED,
                 actor="system",
-                reason="provider did not allocate a handle",
+                reason=(
+                    "no_capacity"
+                    if isinstance(error, ProvisionNoCapacity)
+                    else "provider did not allocate a handle"
+                ),
             )
             raise
         except Exception as exc:  # pragma: no cover - defensive adapter boundary
@@ -481,6 +486,7 @@ class LifecycleOrchestrator:
             before_state=before_state,
             after_state=after_state,
             reason=reason,
+            detail=_selection_audit_detail(handle),
         )
         try:
             await self.audit_log.append(event)
@@ -509,6 +515,7 @@ class LifecycleOrchestrator:
             before_state=before_state,
             after_state=after_state,
             reason=reason,
+            detail=_selection_audit_detail(handle),
         )
         try:
             await self.audit_log.append(event)
@@ -524,3 +531,20 @@ class LifecycleOrchestrator:
     @staticmethod
     def _key(handle: ProvisionHandle) -> str:
         return f"{handle.provider.value}:{handle.external_id}"
+
+
+def _selection_audit_detail(handle: ProvisionHandle | None) -> dict[str, object]:
+    if handle is None:
+        return {}
+    detail: dict[str, object] = {}
+    for key in ("gpu_model", "gpu_display_name", "cloud_type"):
+        value = handle.labels.get(key)
+        if value:
+            detail[key] = value
+    price = handle.labels.get("hourly_price_usd")
+    if price:
+        try:
+            detail["hourly_price_usd"] = float(price)
+        except ValueError:
+            pass
+    return detail
