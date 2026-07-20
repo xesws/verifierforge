@@ -84,3 +84,11 @@ def test_idempotent_wake_is_200_and_status_is_contract_shaped(monkeypatch) -> No
     assert status.status_code == 200
     assert status.json()["state"] == "cold"
     assert status.json()["url"] is None
+
+
+def test_reviewer_parent_owns_serving_reaper_startup(monkeypatch) -> None:
+    monkeypatch.setenv("VF_REVIEW_INVITE_CODE", "invite")
+    from app.reviewer import main as reviewer_main
+
+    reviewer = reviewer_main.create_app()
+    assert reviewer_main.start_serving_reaper in reviewer.router.on_startup

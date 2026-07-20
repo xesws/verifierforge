@@ -11,6 +11,7 @@ from fastapi.responses import JSONResponse
 
 from app.api.cors import configure_cors
 from app.api.main import app as api_app
+from app.api.serving import start_serving_reaper
 from app.proxy.main import app as proxy_app
 
 
@@ -44,6 +45,9 @@ def create_app() -> FastAPI:
         return await call_next(request)
 
     configure_cors(reviewer)
+    # Mounted child applications do not own the parent ASGI lifespan. Register
+    # the durable serving reconciler on the process-level reviewer app too.
+    reviewer.router.add_event_handler("startup", start_serving_reaper)
     reviewer.mount("/proxy", proxy_app)
     reviewer.mount("/", api_app)
     return reviewer
