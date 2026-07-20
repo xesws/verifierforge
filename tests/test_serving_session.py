@@ -148,6 +148,10 @@ def test_bootstrap_redacts_secrets_and_waits_for_local_vllm_readiness() -> None:
     assert '"phase": "failed"' in BOOTSTRAP_SOURCE
     assert "redacted_tail(vllm_log)" in BOOTSTRAP_SOURCE
     assert "http://127.0.0.1:8000/v1/models" in BOOTSTRAP_SOURCE
+    assert '"vllm==0.10.2"' in BOOTSTRAP_SOURCE
+    assert '"transformers==4.57.6"' in BOOTSTRAP_SOURCE
+    assert '"tokenizers==0.22.2"' in BOOTSTRAP_SOURCE
+    assert '"huggingface-hub==0.36.2"' in BOOTSTRAP_SOURCE
 
 
 def test_serving_settings_keep_paid_wake_off_and_budget_bounded() -> None:
