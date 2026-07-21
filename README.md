@@ -365,8 +365,8 @@ GPT-5.6 had two distinct jobs in VerifierForge. It helped build the product,
 and it became part of the product's governed intelligence layer; it did **not**
 train or replace the final Qwen specialist model.
 
-1. **Collaborative development with Soul Ultra.** GPT-5.6 worked alongside
-   Soul Ultra during implementation, review, debugging, and technical
+1. **Collaborative development with Sol Ultra.** GPT-5.6 worked alongside
+   Sol Ultra during implementation, review, debugging, and technical
    documentation. The two-model workflow gave the project a second reasoning
    path for checking designs and implementation decisions while the evidence
    and repository remained the source of truth.
