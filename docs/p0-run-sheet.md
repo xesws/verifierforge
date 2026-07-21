@@ -2,15 +2,22 @@
 
 ## 2026-07-20 v0.36.1 — align report logo with product VF
 
-**Status:** planned; documentation gate created before implementation.
+**Status:** complete; documentation gate created before implementation.
 
-- [ ] Replace the one-off graphite/checkmark mark with an SVG rendering of the
+- [x] Replace the one-off graphite/checkmark mark with an SVG rendering of the
   existing frontend `.brand-mark` visual language.
-- [ ] Regenerate README, `/tech`, and favicon assets from that single source.
-- [ ] Add identity regression coverage, validate, deploy, and verify the stable
+- [x] Regenerate README, `/tech`, and favicon assets from that single source.
+- [x] Add identity regression coverage, validate, deploy, and verify the stable
   `/tech` route.
 
 **Stop:** no layout or product-flow changes; the product mark is the authority.
+
+**Result:** product navigation and invitation gate now load the same generated
+VF asset used by the report wordmark and favicon. `486 passed, 1 skipped`, 30
+frontend tests, ESLint, build, secret scan, generator check, and static SVG
+inspection passed. Vercel deployment `dpl_7aAZY9BVm9Dv1CjB6oPReaggg8hF` is
+READY; `/tech` and `/favicon.svg` return HTTP 200, and the public favicon
+contains `vf-product-gradient` plus separate `V` and `F` glyphs.
 
 ## 2026-07-20 v0.36.0 — technical deep dive and brand placement
 
