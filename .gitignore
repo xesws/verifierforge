@@ -4,7 +4,6 @@ models/
 __pycache__/
 .env
 .env.*
-!.env.example
 node_modules/
 assets/*
 !assets/forge-agent/
