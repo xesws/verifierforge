@@ -4,6 +4,44 @@ import { App } from '../app/App'
 import { AuthProvider } from '../state/AuthContext'
 import { JourneyProvider } from '../state/JourneyContext'
 
+const sandboxFixture = vi.hoisted(() => ({
+  status: 'succeeded' as 'succeeded' | 'sqlite_error',
+  rows: [['Atlas', 160], ['Beacon', 150]] as Array<Array<string | number | null>>,
+  error: null as { code: string; message: string } | null,
+}))
+
+vi.mock('../sql/client', () => ({
+  BrowserSqlSandbox: class {
+    constructor(onState: (state: string, detail: string) => void) {
+      onState('ready', 'Local SQLite 3.49.1 sandbox is ready.')
+    }
+
+    async execute(completionId: string, rawSql: string, onStage: (stage: Record<string, string>) => void) {
+      const executionId = 'sqlrun-live-1'
+      onStage({ executionId, phase: 'validating', detail: 'Validating exact generated SQL.', at: '2026-07-20T00:06:00Z' })
+      onStage({ executionId, phase: 'database_ready', detail: 'Fresh database loaded.', at: '2026-07-20T00:06:00Z' })
+      onStage({ executionId, phase: 'executing', detail: 'SQLite is executing this SQL now.', at: '2026-07-20T00:06:00Z' })
+      return {
+        executionId,
+        completionId,
+        status: sandboxFixture.status,
+        executedSql: rawSql,
+        sqlSha256: 'c'.repeat(64),
+        dataset: { datasetId: 'nl2sql-v0.10.0-review-sandbox', sourceSha256: 'a'.repeat(64), schemaSha256: 'b'.repeat(64), engine: 'sqlite', mode: 'browser_ephemeral_wasm', sqlJsVersion: '1.14.1', sqliteVersion: '3.49.1' },
+        columns: sandboxFixture.status === 'succeeded' ? ['project', 'hours'] : [],
+        rows: sandboxFixture.status === 'succeeded' ? sandboxFixture.rows : [],
+        rowCount: sandboxFixture.status === 'succeeded' ? sandboxFixture.rows.length : 0,
+        truncated: false,
+        durationMs: 1.25,
+        executedAt: '2026-07-20T00:06:00Z',
+        error: sandboxFixture.error,
+      }
+    }
+
+    dispose() {}
+  },
+}))
+
 const decision = { decision: 'forge', rationale: 'High SQL volume, deterministic verification, and positive payback support a forge.', confidence: .96, config: { base_model: 'Qwen/Qwen2.5-1.5B-Instruct', steps: 400, k: 8, checkpoint_interval: 50, budget_usd_cap: 5, provider_pref: 'auto' } }
 const analysis = { decision_id: 'decision-1', cluster_id: 'data-pull-sql', decision, cached: false, created_at: '2026-07-20T00:00:00Z' }
 const approval = { approval_id: 'approval-1', decision_id: 'decision-1', approved_by: 'judge', approved_at: '2026-07-20T00:01:00Z' }
@@ -38,7 +76,7 @@ function apiFixture(serving: Record<string, unknown> = cold) {
     if (path.endsWith('/sample-source')) return response(null)
     if (path.includes('/settings/provider-credentials/')) return response({ user_id: 'judge', provider: 'runpod', configured: false, source: 'missing', credential_id: null, updated_at: null })
     if (path === '/serving/status') return response(serving)
-    if (path === '/serving/tuned-completion' && method === 'POST') return response({ id: 'chatcmpl-tuned-1', model: 'verifierforge-step-350', choices: [{ index: 0, message: { role: 'assistant', content: 'SELECT customer_id, SUM(total) FROM orders GROUP BY customer_id ORDER BY SUM(total) DESC LIMIT 5;' }, finish_reason: 'stop' }], usage: { prompt_tokens: 18, completion_tokens: 24, total_tokens: 42 } }, 200, { 'X-VerifierForge-Route': 'tuned' })
+    if (path === '/serving/tuned-completion' && method === 'POST') return response({ id: 'chatcmpl-tuned-1', model: 'verifierforge-step-350', choices: [{ index: 0, message: { role: 'assistant', content: 'SELECT p.name AS project, SUM(ep.hours) AS hours FROM projects p JOIN employee_projects ep ON ep.project_id = p.id GROUP BY p.id ORDER BY p.name;' }, finish_reason: 'stop' }], usage: { prompt_tokens: 18, completion_tokens: 24, total_tokens: 42 } }, 200, { 'X-VerifierForge-Route': 'tuned' })
     return response({ detail: `missing fixture ${method} ${path}` }, 404)
   }
 }
@@ -62,7 +100,12 @@ function seedJourney(stage: 'forge' | 'runs' | 'proof' | 'ship') {
   }))
 }
 
-beforeEach(() => vi.stubEnv('VITE_VF_API_BASE_URL', 'https://api.example.test'))
+beforeEach(() => {
+  vi.stubEnv('VITE_VF_API_BASE_URL', 'https://api.example.test')
+  sandboxFixture.status = 'succeeded'
+  sandboxFixture.rows = [['Atlas', 160], ['Beacon', 150]]
+  sandboxFixture.error = null
+})
 afterEach(() => { cleanup(); window.sessionStorage.clear(); vi.unstubAllEnvs(); vi.unstubAllGlobals() })
 
 describe('reviewer product path', () => {
@@ -98,24 +141,32 @@ describe('reviewer product path', () => {
     expect(screen.getByText('Held-out prompt 1')).toBeInTheDocument()
     fireEvent.click(screen.getByRole('button', { name: /Accept evidence & continue to Ship/i }))
     expect(await screen.findByText('Wake the tuned model')).toBeInTheDocument()
-    expect(screen.getByText('Try one tuned SQL compilation')).toBeInTheDocument()
+    expect(screen.getByText('Generate one tuned SQL query')).toBeInTheDocument()
   })
 
   it('shows the complete tuned result and request activity instead of only an ID', async () => {
     seedJourney('ship')
     renderAt('/ship/data-pull-sql', apiFixture(ready))
-    const run = await screen.findByRole('button', { name: /Run tuned completion/i })
+    const run = await screen.findByRole('button', { name: /Generate SQL/i })
     const sample = screen.getByRole('button', { name: 'Aggregate hours' })
     fireEvent.click(sample)
     expect(sample).toHaveAttribute('aria-pressed', 'true')
     expect(screen.getByLabelText('Natural-language query')).toHaveValue('For every project whose combined employee hours are no less than 100, output the project name and total hours, sorted by project name ascending.')
     fireEvent.click(run)
-    expect(await screen.findByText('Result is ready')).toBeInTheDocument()
-    expect(screen.getByText(/SELECT customer_id, SUM\(total\)/)).toBeInTheDocument()
+    expect(await screen.findByText('SQL generated')).toBeInTheDocument()
+    expect(screen.getByText(/SELECT p.name AS project/)).toBeInTheDocument()
     expect(screen.getByText('chatcmpl-tuned-1')).toBeInTheDocument()
     expect(screen.getByText('42')).toBeInTheDocument()
     expect(screen.getAllByText('tuned').length).toBeGreaterThan(0)
     expect(screen.getByText(/Canary is not consulted/i)).toBeInTheDocument()
+    expect(screen.queryByText('Live execution result')).not.toBeInTheDocument()
+    fireEvent.click(screen.getByRole('button', { name: /Run SQL on frozen demo data/i }))
+    expect(await screen.findByText('Live execution result')).toBeInTheDocument()
+    expect(screen.getByRole('table', { name: /Rows returned by the live SQLite execution/i })).toBeInTheDocument()
+    expect(screen.getByText('Atlas')).toBeInTheDocument()
+    expect(screen.getByText('160')).toBeInTheDocument()
+    expect(screen.getByText('sqlrun-live-1')).toBeInTheDocument()
+    expect(screen.getByText(/queries run against the frozen demo dataset/i)).toBeInTheDocument()
     const completionCall = vi.mocked(fetch).mock.calls.find(([input, init]) => new URL(String(input)).pathname === '/serving/tuned-completion' && init?.method === 'POST')
     const completionBody = JSON.parse(String(completionCall?.[1]?.body)) as { messages: Array<{ role: string; content: string }> }
     expect(completionBody.messages[1].content).toBe('For every project whose combined employee hours are no less than 100, output the project name and total hours, sorted by project name ascending.')
@@ -134,6 +185,21 @@ describe('reviewer product path', () => {
     fireEvent.click(run)
     expect(await screen.findByRole('alert')).toHaveTextContent(`Run blocked: serving state is ${state}`)
     expect(vi.mocked(fetch).mock.calls.some(([input]) => new URL(String(input)).pathname === '/serving/tuned-completion')).toBe(false)
+  })
+
+  it('shows a real SQLite failure as an execution outcome rather than a fake success', async () => {
+    sandboxFixture.status = 'sqlite_error'
+    sandboxFixture.rows = []
+    sandboxFixture.error = { code: 'sqlite_execution_error', message: 'no such column: DepartmentName' }
+    seedJourney('ship')
+    renderAt('/ship/data-pull-sql', apiFixture(ready))
+    fireEvent.click(await screen.findByRole('button', { name: /Generate SQL/i }))
+    expect(await screen.findByText('SQL generated')).toBeInTheDocument()
+
+    fireEvent.click(screen.getByRole('button', { name: /Run SQL on frozen demo data/i }))
+    expect(await screen.findByText('Execution failed in isolated SQLite')).toBeInTheDocument()
+    expect(screen.getByText('no such column: DepartmentName')).toBeInTheDocument()
+    expect(screen.getByText('SQL generated')).toBeInTheDocument()
   })
 
   it('restores a valid session journey and resets it when leaving', async () => {
