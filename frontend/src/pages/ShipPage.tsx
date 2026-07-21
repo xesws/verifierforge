@@ -1,11 +1,12 @@
 import { AlertTriangle, ArrowUp, CheckCircle2, Clock3, Copy, Info, PackageCheck, Play, ShieldCheck, TerminalSquare } from 'lucide-react'
 import { useEffect, useRef, useState } from 'react'
 import { ApiError } from '../api/client'
-import type { ChatCompletion, DemoTrafficStatus, RoutingState, RoutePath, ServingStatus } from '../api/contracts'
+import type { ChatCompletion, DemoTrafficStatus, LivePassRate, RoutingState, RoutePath, ServingStatus } from '../api/contracts'
 import { DemoTrafficControl } from '../components/DemoTrafficControl'
 import { EmptyGuardian } from '../components/EmptyGuardian'
 import { ErrorState, LoadingState } from '../components/ResourceState'
 import { GuardianChart } from '../components/GuardianChart'
+import { advanceGuardianRun, beginGuardianRun, type GuardianRunView } from '../components/guardianRun'
 import { PageHeader } from '../components/PageHeader'
 import { RoutingControl } from '../components/RoutingControl'
 import { SqlExecutionPanel } from '../components/SqlExecutionPanel'
@@ -58,9 +59,10 @@ export function ShipPage() {
   const [trafficStarting, setTrafficStarting] = useState(false)
   const [trafficError, setTrafficError] = useState<string | null>(null)
   const [trafficPollRevision, setTrafficPollRevision] = useState(0)
+  const [guardianRun, setGuardianRun] = useState<GuardianRunView | null>(null)
   const trafficWasRunning = useRef(false)
   const route = useResource(async () => { if (!client) throw new Error('API client is unavailable'); return (await client.getRouting('data-pull-sql')).data }, [client], { enabled: Boolean(client) })
-  const guardian = useResource(async () => { if (!client) throw new Error('API client is unavailable'); return (await client.getLivePassRate('data-pull-sql')).data }, [client, Boolean(trafficStatus?.running)], { enabled: Boolean(client), pollMs: trafficStatus?.running ? 5_000 : 30_000 })
+  const guardian = useResource(async () => { if (!client) throw new Error('API client is unavailable'); return (await client.getLivePassRate('data-pull-sql')).data }, [client, Boolean(trafficStatus?.running)], { enabled: Boolean(client), pollMs: trafficStatus?.running ? 1_000 : 30_000 })
   const reloadGuardian = guardian.reload
   const value = routingDraft ?? route.data
   const readiness = readinessMessage(serving)
@@ -87,7 +89,7 @@ export function ShipPage() {
         setTrafficAvailable(true)
         setTrafficStatus(status)
         setTrafficError(null)
-        if (status.running) timer = window.setTimeout(() => void poll(), 1_000)
+        if (status.running) timer = window.setTimeout(() => void poll(), 500)
       } catch (error) {
         if (cancelled) return
         if (error instanceof ApiError && error.status === 404) {
@@ -112,21 +114,50 @@ export function ShipPage() {
     trafficWasRunning.current = running
   }, [reloadGuardian, trafficStatus?.running])
 
-  async function save() { if (!client || !value) return; setSaving(true); setMessage(null); try { const saved = await client.putRouting('data-pull-sql', value); setRoutingDraft(saved.data); route.reload(); setMessage('Production canary policy saved to Supabase. The reviewer probe remains tuned-only.') } catch (error) { setMessage(error instanceof Error ? error.message : 'Routing save failed') } finally { setSaving(false) } }
+  useEffect(() => {
+    if (!trafficStatus) return
+    setGuardianRun((current) => {
+      if (current === null) {
+        return trafficStatus.running ? beginGuardianRun(trafficStatus, guardian.data) : null
+      }
+      return advanceGuardianRun(current, trafficStatus, guardian.data)
+    })
+  }, [guardian.data, trafficStatus])
 
-  async function startTraffic() {
-    if (!client || trafficStarting || trafficStatus?.running) return
+  async function save() {
+    if (!client || !value) return
+    setSaving(true)
+    setMessage(null)
+    try {
+      const saved = await client.putRouting('data-pull-sql', value)
+      setRoutingDraft(saved.data)
+      route.reload()
+      const traffic = await startTraffic()
+      setMessage(traffic ? 'Production canary policy saved to Supabase. Live 200-request traffic started automatically.' : 'Production canary policy saved, but demo traffic could not be started.')
+    } catch (error) {
+      setMessage(error instanceof Error ? error.message : 'Routing save failed')
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  async function startTraffic(): Promise<DemoTrafficStatus | null> {
+    if (!client || trafficStarting) return null
+    if (trafficStatus?.running) return trafficStatus
     setTrafficStarting(true)
     setTrafficError(null)
     try {
       const status = (await client.startDemoTraffic({ total: 200, rate: 5 })).data
+      setGuardianRun(beginGuardianRun(status, guardian.data))
       setTrafficAvailable(true)
       setTrafficStatus(status)
       setTrafficPollRevision((value) => value + 1)
       if (!status.running) reloadGuardian()
+      return status
     } catch (error) {
       if (error instanceof ApiError && error.status === 404) setTrafficAvailable(false)
       else setTrafficError(error instanceof Error ? error.message : 'Traffic simulation failed')
+      return null
     } finally {
       setTrafficStarting(false)
     }
@@ -189,11 +220,12 @@ export function ShipPage() {
   }
 
   const trafficControl = trafficAvailable ? <DemoTrafficControl status={trafficStatus} cold={serving?.state === 'cold'} starting={trafficStarting} error={trafficError} onStart={() => void startTraffic()} /> : null
+  const guardianValue: LivePassRate = guardian.data ?? { cluster_id: 'data-pull-sql', points: [] }
 
   return <div className="page ship-page">
     <PageHeader eyebrow="Ship / Data Pull SQL" title="Serve the selected checkpoint, generate SQL, then run it live." description="Ship owns scale-to-zero serving, production canary policy, Guardian signals, and a tuned-only reviewer playground. Training and proof are already complete." action={<StatusPill status={serving?.state ?? 'cold'} />} />
     <section className="ship-banner reveal reveal-1"><div><PackageCheck size={20} /><span><strong>Selected artifact</strong><small>{FLAGSHIP_JOB_ID} · step 350</small></span></div><div><ShieldCheck size={20} /><span><strong>Held-out proof</strong><small>58.3% → 78.3% pass@1</small></span></div><span className="local-chip">Live API</span></section>
-    {route.status === 'loading' || route.status === 'idle' ? <LoadingState label="Loading routing policy…" /> : route.status === 'error' || !value ? <ErrorState message={route.error ?? 'Routing unavailable'} onRetry={route.reload} /> : <div className="ship-grid"><RoutingControl value={value} onChange={setRoutingDraft} onSave={() => void save()} saving={saving} />{guardian.status === 'loading' ? <LoadingState label="Loading guardian points…" /> : guardian.data?.points.length ? <GuardianChart value={guardian.data} action={trafficControl} /> : <EmptyGuardian action={trafficControl} />}</div>}
+    {route.status === 'loading' || route.status === 'idle' ? <LoadingState label="Loading routing policy…" /> : route.status === 'error' || !value ? <ErrorState message={route.error ?? 'Routing unavailable'} onRetry={route.reload} /> : <div className="ship-grid"><RoutingControl value={value} onChange={setRoutingDraft} onSave={() => void save()} saving={saving} />{guardian.status === 'loading' && !guardianRun ? <LoadingState label="Loading guardian points…" /> : guardianValue.points.length || guardianRun ? <GuardianChart value={guardianValue} action={trafficControl} run={guardianRun} /> : <EmptyGuardian action={trafficControl} />}</div>}
     <WakeModelControl onStatus={setServing} />
     <section className="completion-panel glass-panel reveal reveal-4">
       <div className="completion-intro"><span className="eyebrow"><Play size={13} /> Tuned-only reviewer probe</span><h2>Generate one tuned SQL query</h2><p>{serving?.state === 'ready' ? 'The registry reports ready. Generate SQL first, then run that exact response in the local frozen-data sandbox below.' : 'The endpoint is cold. Wake it above; reports remain available while you wait.'}</p></div>

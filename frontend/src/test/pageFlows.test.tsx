@@ -261,7 +261,37 @@ describe('reviewer product path', () => {
     })
 
     expect(await screen.findByRole('button', { name: 'Simulate traffic (200 requests)' })).toBeEnabled()
-    expect(await screen.findByRole('img', { name: 'Live pass rate with 1 points' })).toBeInTheDocument()
+    expect(await screen.findByText('Run complete · 200/200 succeeded')).toBeInTheDocument()
+    expect(await screen.findByRole('img', { name: /Live Guardian run with 200 of 200 traffic moments/i })).toBeInTheDocument()
+  })
+
+  it('starts live 200-request traffic automatically after routing is saved', async () => {
+    seedJourney('ship')
+    const fixture = apiFixture(ready)
+    const idleTraffic = { total: 200, rate: 5, sent: 0, success: 0, failed: 0, running: false, error: null }
+    const runningTraffic = { ...idleTraffic, sent: 4, success: 4, running: true }
+    let started = false
+
+    renderAt('/ship/data-pull-sql', (path, method) => {
+      if (path === '/demo/traffic/status') return response(started ? runningTraffic : idleTraffic)
+      if (path === '/demo/traffic' && method === 'POST') {
+        started = true
+        return response(runningTraffic, 202)
+      }
+      return fixture(path, method)
+    })
+
+    const save = await screen.findByRole('button', { name: 'Save routing policy' })
+    fireEvent.click(save)
+
+    expect(await screen.findByText('Live traffic · 4/200 requests')).toBeInTheDocument()
+    expect(screen.getByRole('img', { name: 'Live Guardian run with 4 of 200 traffic moments and 0 new verifier samples' })).toBeInTheDocument()
+    const calls = vi.mocked(fetch).mock.calls.map(([input, init]) => ({ path: new URL(String(input)).pathname, method: init?.method ?? 'GET' }))
+    const saveIndex = calls.findIndex((call) => call.path.endsWith('/routing') && call.method === 'PUT')
+    const trafficIndex = calls.findIndex((call) => call.path === '/demo/traffic' && call.method === 'POST')
+    expect(saveIndex).toBeGreaterThanOrEqual(0)
+    expect(trafficIndex).toBeGreaterThan(saveIndex)
+    expect(calls.filter((call) => call.path === '/demo/traffic' && call.method === 'POST')).toHaveLength(1)
   })
 
   it.each([
