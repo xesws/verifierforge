@@ -3198,3 +3198,39 @@ secret scan passed, shell syntax passed.
 or cold-reviewer dependency and may be safely closed by the owner. Closing it
 does not remove any reviewer report/arena/Discover experience; live inference
 remains available through the Wake model scale-to-zero path.
+
+## 2026-07-20 v0.35.0 — frontend API integration and Vercel delivery
+
+**Status:** in progress. This section is the execution record for F0–F6.
+
+- [ ] **F0 — branch and documentation gate.** Push the v0.34.2 review,
+  branch from current main, reserve v0.35.0 docs, cherry-pick Nora commit
+  `642e335`, and prove the untouched visual baseline still builds.
+- [ ] **F1 — typed API boundary.** Cover exactly 21 frozen operations,
+  `VITE_VF_API_BASE_URL`, runtime Basic invitation, safe errors, and cold/
+  fallback semantics without a backend change.
+- [ ] **F2 — five-page product wiring.** Discover/Forge/Job/Report/Ship consume
+  real contracts and expose Input, Analyze, Approve, Start, routing, Guardian,
+  credentials, and serving controls in Nora's visual language.
+- [ ] **F3 — resilience.** Loading, empty, error, readonly, disabled, cold,
+  provisioning, loading, ready, draining, and failed behavior never red-screens
+  immutable evidence.
+- [ ] **F4 — local/public acceptance.** Exercise all 21 operations from the UI,
+  capture page evidence, run one authorized Wake and tuned completion, restore
+  product state, drain immediately, and prove provider inventory zero.
+- [ ] **F5 — Vercel preview.** Device-authorize the CLI, deploy the `frontend`
+  root, report its URL for owner Railway CORS configuration, verify direct
+  routes, and update JUDGES on the feature branch.
+- [ ] **F6 — owner gate and production.** After explicit visual approval,
+  update from main, revalidate, merge/push, deploy production, verify, and tag
+  `frontend-v1-live`.
+
+### Fixed safety decisions
+
+- Existing dirty runtime logs are never staged by this feature.
+- `VF_AUTOPROVISION=false` remains the expected public state; no training is
+  started. The only paid action is one budget-fused serving wake.
+- The invite is session-only and excluded from screenshots/video. Mutations
+  are never retried automatically.
+- Any single item blocked over 30 minutes is recorded and skipped, but no
+  missing acceptance can be relabeled complete or receive the live tag.
