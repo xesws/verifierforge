@@ -190,6 +190,10 @@ def _stores() -> AgentStores:
     )
 
 
+def _trace_store() -> AgentTraceStore:
+    return S3AgentTraceStore.from_env()
+
+
 def _services(cluster_id: str) -> AgentServices:
     binding = os.environ.get("VF_AGENT_BINDING", "real").strip().lower()
     if binding not in {"real", "mock"}:
@@ -245,7 +249,7 @@ def analyze_cluster(
             and cached is not None
             and cached.decision is not None
         ):
-            return _analysis_response(cached, cached=True)
+            return _analysis_response(cached, cached=True, traces=services.traces)
         summary = ForgeAgentRunner(
             client=services.client,
             registry=services.registry,
@@ -272,7 +276,7 @@ def analyze_cluster(
         raise HTTPException(status_code=502, detail=str(error)) from error
     if summary.decision is None:
         raise HTTPException(status_code=502, detail="Agent returned no decision")
-    return _analysis_response(summary, cached=False)
+    return _analysis_response(summary, cached=False, traces=services.traces)
 
 
 @router.get(
@@ -290,7 +294,7 @@ def latest_cluster_decision(cluster_id: str) -> AgentAnalysisResponse:
         raise HTTPException(status_code=503, detail=str(error)) from error
     if summary is None or summary.decision is None:
         raise HTTPException(status_code=404, detail="Agent decision not found")
-    return _analysis_response(summary, cached=True)
+    return _analysis_response(summary, cached=True, traces=_trace_store())
 
 
 @router.post(
@@ -383,11 +387,25 @@ def _require_product_cluster(cluster_id: str):
         raise HTTPException(status_code=404, detail="Cluster not found") from error
 
 
-def _analysis_response(summary, *, cached: bool) -> AgentAnalysisResponse:
+def _analysis_response(
+    summary, *, cached: bool, traces: AgentTraceStore
+) -> AgentAnalysisResponse:
+    trace = None
+    if summary.trace_s3_key is not None:
+        try:
+            trace = traces.get(summary.trace_s3_key)
+        except (OSError, RuntimeError, ValueError):
+            trace = None
     return AgentAnalysisResponse(
         decision_id=summary.decision_id,
         cluster_id=summary.cluster_id,
         decision=summary.decision,
         cached=cached,
         created_at=summary.created_at,
+        trace_id=summary.trace_id,
+        provider=summary.provider,
+        model=summary.model,
+        total_input_tokens=summary.total_input_tokens,
+        total_output_tokens=summary.total_output_tokens,
+        trace=trace,
     )

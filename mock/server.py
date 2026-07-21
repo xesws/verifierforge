@@ -30,6 +30,9 @@ from core.contracts import (
 from core.agent_contracts import (
     AgentAnalysisResponse,
     AgentDecision,
+    AgentRunStatus,
+    AgentToolCallTrace,
+    AgentTrace,
     ApprovalRecord,
     ApprovalRequest,
     TrainingConfig,
@@ -363,15 +366,22 @@ def analyze_cluster(
     profile = request.execution_profile if request is not None else "standard"
     cache_key = cluster_id if profile == "standard" else f"{cluster_id}|{profile}"
     existing = _AGENT_DECISIONS.get(cache_key)
-    if existing is not None:
+    if existing is not None and not (request is not None and request.force_refresh):
         return existing.model_copy(update={"cached": True})
     decision = _mock_agent_decision(cluster_id, p2=profile == "p2_gate_b")
+    trace = _mock_agent_trace(cluster_id, decision)
     response = AgentAnalysisResponse(
-        decision_id=f"mock-agent-{cluster_id}",
+        decision_id=f"mock-agent-{uuid4().hex}",
         cluster_id=cluster_id,
         decision=decision,
         cached=False,
-        created_at="2026-07-17T12:00:00Z",
+        created_at=trace.finished_at,
+        trace_id=trace.trace_id,
+        provider=trace.provider,
+        model=trace.model,
+        total_input_tokens=trace.total_input_tokens,
+        total_output_tokens=trace.total_output_tokens,
+        trace=trace,
     )
     _AGENT_DECISIONS[cache_key] = response
     return response
@@ -649,6 +659,96 @@ def _mock_agent_decision(cluster_id: str, *, p2: bool = False) -> AgentDecision:
         decision="need_more_data",
         rationale="More approved samples are required.",
         confidence=0.82,
+    )
+
+
+def _mock_agent_trace(cluster_id: str, decision: AgentDecision) -> AgentTrace:
+    started_at = datetime.now(timezone.utc)
+    analysis_id = "a" * 64
+    sample_set_id = "b" * 64
+    calls = [
+        AgentToolCallTrace(
+            tool_name="analyze_traffic",
+            arguments={"cluster_id": cluster_id},
+            output={
+                "cluster_id": cluster_id,
+                "analysis_id": analysis_id,
+                "request_count": 200,
+                "monthly_calls": 95_000,
+                "monthly_cost_usd": 5_500.0,
+                "data_sufficient": True,
+            },
+            started_at=started_at,
+            finished_at=started_at,
+            input_tokens=12,
+            output_tokens=6,
+        ),
+        AgentToolCallTrace(
+            tool_name="inspect_samples",
+            arguments={"cluster_id": cluster_id, "analysis_id": analysis_id, "n": 3},
+            output={
+                "cluster_id": cluster_id,
+                "analysis_id": analysis_id,
+                "sample_set_id": sample_set_id,
+                "data_sufficient": True,
+                "sample_count": 3,
+            },
+            started_at=started_at,
+            finished_at=started_at,
+            input_tokens=12,
+            output_tokens=6,
+        ),
+        AgentToolCallTrace(
+            tool_name="estimate_economics",
+            arguments={
+                "cluster_id": cluster_id,
+                "analysis_id": analysis_id,
+                "base_model": "Qwen/Qwen2.5-1.5B-Instruct",
+            },
+            output={
+                "training_cost_usd": 2.5,
+                "current_monthly_cost_usd": 5_500.0,
+                "projected_monthly_savings_usd": 3_850.0,
+                "payback_days": 1,
+            },
+            started_at=started_at,
+            finished_at=started_at,
+            input_tokens=12,
+            output_tokens=6,
+        ),
+        AgentToolCallTrace(
+            tool_name="check_verifiability",
+            arguments={
+                "cluster_id": cluster_id,
+                "analysis_id": analysis_id,
+                "sample_set_id": sample_set_id,
+            },
+            output={
+                "cluster_id": cluster_id,
+                "analysis_id": analysis_id,
+                "sample_set_id": sample_set_id,
+                "data_sufficient": True,
+                "confidence": 1.0,
+                "reasons": ["Deterministic verifier is available."],
+            },
+            started_at=started_at,
+            finished_at=started_at,
+            input_tokens=12,
+            output_tokens=6,
+        ),
+    ]
+    return AgentTrace(
+        trace_id=f"mock-trace-{uuid4().hex}",
+        cluster_id=cluster_id,
+        provider="mock",
+        model="vf-agent-deterministic-mock",
+        started_at=started_at,
+        finished_at=datetime.now(timezone.utc),
+        tool_calls=calls,
+        total_input_tokens=60,
+        total_output_tokens=30,
+        status=AgentRunStatus.COMPLETED,
+        terminal_decision=decision,
     )
 
 

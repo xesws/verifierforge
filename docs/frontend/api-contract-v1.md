@@ -1,7 +1,7 @@
 # Frontend API Contract v1
 
 **Target coverage:** **22 documented = 22 frozen = 22 real/mock parity**
-**Revision:** v0.35.0 · 2026-07-20 · tag `frontend-api-v1.3` after acceptance
+**Revision:** v0.35.7 · 2026-07-20 · additive Agent receipt
 
 This is the additive integration boundary for the Monday frontend. JSON field
 names and meanings below are frozen. The real API and `mock/server.py` use the
@@ -184,7 +184,7 @@ Content-Type: application/json
 {
   "data_source": "app/proxy/traffic.db",
   "execution_profile": "standard",
-  "force_refresh": false
+  "force_refresh": true
 }
 ```
 
@@ -208,12 +208,58 @@ The body is optional. Response:
     }
   },
   "cached": false,
-  "created_at": "2026-07-19T12:00:00Z"
+  "created_at": "2026-07-20T12:00:01Z",
+  "trace_id": "trace-01",
+  "provider": "openai",
+  "model": "gpt-5.6-luna",
+  "total_input_tokens": 4200,
+  "total_output_tokens": 320,
+  "trace": {
+    "trace_id": "trace-01",
+    "cluster_id": "data-pull-sql",
+    "provider": "openai",
+    "model": "gpt-5.6-luna",
+    "started_at": "2026-07-20T12:00:00Z",
+    "finished_at": "2026-07-20T12:00:01Z",
+    "tool_calls": [
+      {
+        "tool_name": "analyze_traffic",
+        "arguments": {"cluster_id": "data-pull-sql"},
+        "output": {"request_count": 200, "monthly_calls": 95000},
+        "started_at": "2026-07-20T12:00:00Z",
+        "finished_at": "2026-07-20T12:00:00Z",
+        "input_tokens": 800,
+        "output_tokens": 40,
+        "error": null
+      }
+    ],
+    "total_input_tokens": 4200,
+    "total_output_tokens": 320,
+    "status": "completed",
+    "guard_events": [],
+    "terminal_decision": {
+      "decision": "forge",
+      "rationale": "Deterministic verification and positive payback support a forge.",
+      "confidence": 0.98,
+      "config": {
+        "base_model": "Qwen/Qwen2.5-1.5B-Instruct",
+        "steps": 400,
+        "k": 8,
+        "checkpoint_interval": 50,
+        "budget_usd_cap": 5.0,
+        "provider_pref": "runpod"
+      }
+    }
+  }
 }
 ```
 
 Decision values are `forge | skip | need_more_data`; only `forge` includes a
-config. Reload the latest result with
+config. `force_refresh=true` requires a new Agent run; otherwise identical
+evidence may reuse a persisted result and return `cached=true`. The trace is a
+validated record of read-only tool calls and the terminal structured output,
+not hidden chain-of-thought. `provider=mock` must be displayed as a deterministic
+fixture, never as a live model. Reload the latest result with
 `GET /clusters/{cluster_id}/agent/decision`.
 
 ### 2. Approve & Forge (no spend)

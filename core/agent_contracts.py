@@ -197,6 +197,12 @@ class AgentAnalysisResponse(AgentModel):
     decision: AgentDecision
     cached: bool
     created_at: datetime
+    trace_id: str
+    provider: str
+    model: str
+    total_input_tokens: int = Field(ge=0)
+    total_output_tokens: int = Field(ge=0)
+    trace: AgentTrace | None = None
 
 
 class ApprovalRequest(AgentModel):

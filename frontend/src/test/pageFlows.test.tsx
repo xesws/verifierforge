@@ -43,7 +43,8 @@ vi.mock('../sql/client', () => ({
 }))
 
 const decision = { decision: 'forge', rationale: 'High SQL volume, deterministic verification, and positive payback support a forge.', confidence: .96, config: { base_model: 'Qwen/Qwen2.5-1.5B-Instruct', steps: 400, k: 8, checkpoint_interval: 50, budget_usd_cap: 5, provider_pref: 'auto' } }
-const analysis = { decision_id: 'decision-1', cluster_id: 'data-pull-sql', decision, cached: false, created_at: '2026-07-20T00:00:00Z' }
+const trace = { trace_id: 'trace-live-1', cluster_id: 'data-pull-sql', provider: 'openrouter', model: 'z-ai/glm-5.2', started_at: '2026-07-20T00:00:00Z', finished_at: '2026-07-20T00:00:01Z', tool_calls: [{ tool_name: 'analyze_traffic', arguments: { cluster_id: 'data-pull-sql' }, output: { request_count: 200, monthly_calls: 95000 }, started_at: '2026-07-20T00:00:00Z', finished_at: '2026-07-20T00:00:00Z', input_tokens: 12, output_tokens: 6, error: null }], total_input_tokens: 60, total_output_tokens: 30, status: 'completed', guard_events: [], terminal_decision: decision }
+const analysis = { decision_id: 'decision-1', cluster_id: 'data-pull-sql', decision, cached: false, created_at: '2026-07-20T00:00:01Z', trace_id: trace.trace_id, provider: trace.provider, model: trace.model, total_input_tokens: trace.total_input_tokens, total_output_tokens: trace.total_output_tokens, trace }
 const approval = { approval_id: 'approval-1', decision_id: 'decision-1', approved_by: 'judge', approved_at: '2026-07-20T00:01:00Z' }
 const clusters = [
   { cluster_id: 'support-ticket-extraction', name: 'Support ticket extraction', monthly_calls: 240000, monthly_cost_usd: 4800, trainable: true, status: 'live', job_id: 'nl2sql-gain', routing: null, live_pass_rate: null, approved_sample_source: null, analyzer_decision: null },
@@ -58,12 +59,12 @@ const loading = { ...ready, state: 'loading', url: null, detail: 'capacity alloc
 
 function response(payload: unknown, status = 200, headers: Record<string, string> = {}) { return new Response(JSON.stringify(payload), { status, headers: { 'Content-Type': 'application/json', ...headers } }) }
 
-function apiFixture(serving: Record<string, unknown> = cold) {
+function apiFixture(serving: Record<string, unknown> = cold, agentAnalysis: Record<string, unknown> = analysis) {
   return (path: string, method: string) => {
     if (path === '/clusters') return response(clusters)
     if (path === '/clusters/data-pull-sql') return response(clusters[2])
-    if (path.endsWith('/agent/analyze') && method === 'POST') return response(analysis)
-    if (path.endsWith('/agent/decision')) return response(analysis)
+    if (path.endsWith('/agent/analyze') && method === 'POST') return response(agentAnalysis)
+    if (path.endsWith('/agent/decision')) return response(agentAnalysis)
     if (path.endsWith('/approvals') && method === 'POST') return response(approval)
     if (path.endsWith('/approval')) return response(approval)
     if (path.endsWith('/forge-execution')) return response({ approval_id: 'approval-1', decision_id: 'decision-1', job_id: job.job_id, provider: 'runpod', state: 'approved', budget_usd_cap: 5, cost_accrued_usd: 0, provision_handle: null, credential_source: null, detail: 'Approved; Start disabled', created_at: approval.approved_at, updated_at: approval.approved_at })
@@ -128,7 +129,13 @@ describe('reviewer product path', () => {
     const forgeLink = await screen.findByRole('link', { name: /Continue to Forge/i })
     const analyzeCall = vi.mocked(fetch).mock.calls.find(([input, init]) => new URL(String(input)).pathname.endsWith('/agent/analyze') && init?.method === 'POST')
     expect(analyzeCall).toBeDefined()
-    expect(JSON.parse(String(analyzeCall?.[1]?.body))).toEqual({})
+    expect(JSON.parse(String(analyzeCall?.[1]?.body))).toEqual({ force_refresh: true })
+    const receipt = await screen.findByLabelText('Agent run receipt')
+    expect(receipt).toHaveTextContent('Fresh live model run')
+    expect(receipt).toHaveTextContent('trace-live-1')
+    expect(receipt).toHaveTextContent('z-ai/glm-5.2')
+    expect(receipt).toHaveTextContent('Exact validated submit_decision output')
+    expect(receipt).toHaveTextContent('01 · analyze_traffic')
     fireEvent.click(forgeLink)
     expect(await screen.findByText('Approve first. Start separately.')).toBeInTheDocument()
     fireEvent.click(screen.getByRole('button', { name: 'Approve & Forge' }))
@@ -144,6 +151,17 @@ describe('reviewer product path', () => {
     fireEvent.click(screen.getByRole('button', { name: /Accept evidence & continue to Ship/i }))
     expect(await screen.findByText('Wake the tuned model')).toBeInTheDocument()
     expect(screen.getByText('Generate one tuned SQL query')).toBeInTheDocument()
+  })
+
+  it('labels a deterministic mock receipt instead of presenting it as live', async () => {
+    const mockTrace = { ...trace, trace_id: 'trace-mock-1', provider: 'mock', model: 'vf-agent-deterministic-mock' }
+    const mockAnalysis = { ...analysis, trace_id: mockTrace.trace_id, provider: mockTrace.provider, model: mockTrace.model, trace: mockTrace }
+    renderAt('/discover', apiFixture(cold, mockAnalysis))
+    fireEvent.click(await screen.findByRole('button', { name: 'Analyze' }))
+
+    const receipt = await screen.findByLabelText('Agent run receipt')
+    expect(receipt).toHaveTextContent('Deterministic mock · not a live model')
+    expect(receipt).toHaveTextContent('trace-mock-1')
   })
 
   it('shows the complete tuned result and request activity instead of only an ID', async () => {

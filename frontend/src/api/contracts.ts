@@ -126,12 +126,44 @@ export interface AgentDecision {
   config: TrainingConfig | null
 }
 
+export interface AgentToolCallTrace {
+  tool_name: string
+  arguments: Record<string, unknown>
+  output: Record<string, unknown> | null
+  started_at: string
+  finished_at: string
+  input_tokens: number
+  output_tokens: number
+  error: string | null
+}
+
+export interface AgentTrace {
+  trace_id: string
+  cluster_id: string
+  provider: string
+  model: string
+  started_at: string
+  finished_at: string
+  tool_calls: AgentToolCallTrace[]
+  total_input_tokens: number
+  total_output_tokens: number
+  status: 'completed' | 'rejected' | 'failed' | 'trace_persist_failed'
+  guard_events: string[]
+  terminal_decision: AgentDecision | null
+}
+
 export interface AgentAnalysisResponse {
   decision_id: string
   cluster_id: string
   decision: AgentDecision
   cached: boolean
   created_at: string
+  trace_id: string
+  provider: string
+  model: string
+  total_input_tokens: number
+  total_output_tokens: number
+  trace: AgentTrace | null
 }
 
 export interface ApprovalRecord {

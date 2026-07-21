@@ -92,7 +92,7 @@ function SqlAnalysis({ cluster, onClusterReload }: { cluster: Cluster | null; on
         <code>{cluster.approved_sample_source ? `${cluster.approved_sample_source.row_count} rows · ${cluster.approved_sample_source.sha256.slice(0, 12)}…` : 'Not yet approved'}</code>
       </div>
       <div className="analysis-actions">
-        <button className="primary-button" type="button" disabled={busy !== null} onClick={() => void run('analyze', async () => { if (!client) return; const result = await client.analyze(cluster.cluster_id); setAnalysis(result.data); journey.recordAnalysis(result.data); setMessage(result.data.decision.decision === 'forge' ? 'Opportunity confirmed. Forge is now unlocked.' : 'This workload does not pass the Forge decision gate yet.') })}><Sparkles size={16} />{busy === 'analyze' ? 'Analyzing…' : 'Analyze'}</button>
+        <button className="primary-button" type="button" disabled={busy !== null} onClick={() => void run('analyze', async () => { if (!client) return; const result = await client.analyze(cluster.cluster_id, { force_refresh: true }); setAnalysis(result.data); journey.recordAnalysis(result.data); setMessage(result.data.decision.decision === 'forge' ? 'Opportunity confirmed. Forge is now unlocked.' : 'This workload does not pass the Forge decision gate yet.') })}><Sparkles size={16} />{busy === 'analyze' ? 'Analyzing…' : 'Analyze'}</button>
         <span>Analysis reads server-side traffic evidence, remains advisory, and cannot provision a GPU.</span>
       </div>
       {decision && <AgentDecisionCard analysis={analysis} />}
