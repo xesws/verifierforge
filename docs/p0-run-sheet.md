@@ -1,5 +1,22 @@
 # P0 Run Sheet — v0.6.1 data freeze
 
+## 2026-07-21 v0.38.1 — user-story causal context
+
+**Status:** in progress; documentation gate reserved before script revision.
+
+- [x] **Cost semantics.** Confirm the proxy supports a configurable external
+  OpenAI-compatible upstream and token-priced accounting.
+- [x] **Truth boundary.** Record that $5,500 is a Discover baseline, not a
+  computed current-price estimate or a provider-specific invoice.
+- [ ] **Narrative revision.** Add the internal-assistant need, paid API cause,
+  and specialist-model transition to both three-sentence scripts.
+- [ ] **Validation and delivery.** Recheck duration, facts, timeline and tests;
+  commit and push without staging runtime logs.
+
+**Decision:** name the legacy path as a token-priced external large-model API.
+OpenRouter is a possible configured upstream, but the script will not falsely
+attribute the product baseline to one provider.
+
 ## 2026-07-21 v0.38.0 — evidence-grounded demo user story
 
 **Status:** complete; evidence-grounded copy validated and synchronized.
