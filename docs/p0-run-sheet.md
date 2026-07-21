@@ -3325,3 +3325,27 @@ ESLint had zero warnings, and the production TypeScript/Vite build passed.
   - Vercel: `dpl_9xpQvKHu3oq97Pd2gQNJ93NtXRt8`, stable alias unchanged; served
     bundle contains cold/loading/blocked-click messaging.
   - Spend: zero Wake and zero tuned completion requests.
+
+## 2026-07-20 v0.35.4 — Browser-local live SQL execution
+
+**Status:** implemented; public visual acceptance pending.
+
+- [x] **Documentation gate.** Reserve v0.35.4 and document the frontend plus
+  verifier boundary before code (`fba65f6`).
+- [x] **30-minute feasibility gate.** `sql.js==1.14.1`, the real frozen-fixture
+  smoke, Worker/WASM bundle, and production build passed in under ten minutes;
+  the server endpoint fallback was not activated and the API remains 22 ops.
+- [x] **Fresh execution.** Each click creates a new in-memory database, loads
+  the 50-row pool's unique 2.3KB schema/INSERT fixture, executes the exact model
+  output, returns at most 100 rows, and terminates a two-second query.
+- [x] **No canned result proof.** Two executions of an employee query with
+  `randomblob()` returned different nonce values and execution IDs. Reference
+  SQL and expected results are absent from the browser asset.
+- [x] **UX and failures.** Generation and execution are separate; actual worker
+  stages, result rows, metadata, truncation, native SQLite errors, and timeouts
+  are visible. Generated SQL remains executable after serving goes cold.
+- [x] **Automated acceptance.** Vitest `25 passed`; ESLint and Vite build clean;
+  pytest `479 passed, 1 skipped`; frozen source/schema SHA check passed.
+- [ ] **Visual acceptance.** Browser discovery returned no available browser
+  instance. Do not claim a screenshot; verify the public Vercel deployment in
+  an owner browser.

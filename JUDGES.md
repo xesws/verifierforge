@@ -71,8 +71,13 @@ through `provisioning` and `loading`, inspect the flagship Job report: the two
 curves, held-out arena, and `0.5833 → 0.7833` result do not need a live GPU.
 The Ship activity window shows only real registry state/detail changes, elapsed
 time, and the measured 267–282 second estimate; it does not fabricate pod logs.
-`ready` is shown before the tuned-only SQL probe is offered, while a failed wake
-shows a readable reason and leaves reports available.
+`ready` is shown before the tuned-only SQL generation probe is offered, while a
+failed wake shows a readable reason and leaves reports available. After SQL is
+generated, click **Run SQL on frozen demo data**. A local Web Worker creates a
+fresh SQLite/WASM database, loads the same synthetic frozen schema used by the
+verifier, and displays the actual columns and rows (or the real SQLite error),
+execution ID, hashes, and timing. This second action makes no API, GPU, or LLM
+request and remains available if the serving session returns to cold.
 After 30 idle minutes the production reaper deletes the pod. Do not confuse
 this with Start Forge: training autoprovision remains disabled.
 
@@ -147,6 +152,8 @@ gate closed.
 Frontend implementers can use the frozen request/response examples in
 [`docs/frontend/api-contract-v1.md`](docs/frontend/api-contract-v1.md); the
 real and mock OpenAPI schemas are parity-tested for all listed operations.
+The live SQL runner is deliberately not operation 23: it is browser-local and
+keeps the frozen HTTP contract at 22 operations.
 
 ## 5. Inspect delivery and persistence evidence (about 2 minutes)
 

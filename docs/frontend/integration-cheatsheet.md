@@ -131,6 +131,12 @@ was read directly where that claim applies.
 | 21 | `GET /serving/status` | 200 | lifecycle shape; endpoint key absent | Supabase registry | yes |
 | 22 | `POST /serving/tuned-completion` | 409 while cold; 200 only when ready | OpenAI completion + `X-VerifierForge-Route: tuned` | Supabase registry + tuned endpoint | yes; cold branch verified, live branch requires separately authorized Wake |
 
+Ship's **Run SQL on frozen demo data** action is intentionally absent from this
+HTTP table. It executes the exact generated response inside a browser Web
+Worker using the bundled frozen SQLite fixture, so it adds no API operation,
+auth header, CORS requirement, provider request, or Supabase write. The frozen
+contract remains 22 operations.
+
 All scoped self-check Job, credential, and approval rows were removed. Routing
 and sample-source product values were restored, and
 `runs/frontend-unused.sqlite3` was never created.
