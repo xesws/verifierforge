@@ -1,8 +1,10 @@
 # VerifierForge judge path (under ten minutes)
 
-This path inspects committed evidence and the real product surface with
-deterministic local bindings. It needs Python 3.11+ but no GPU, model weights,
-cloud account, API key, or paid request.
+This guide offers two paths. The hosted Vercel product needs no local setup and
+may make an explicitly confirmed live Agent or serving request. The clone-only
+fallback inspects committed evidence with deterministic local bindings and
+needs Python 3.11+ but no GPU, model weights, cloud account, API key, or paid
+request.
 
 ## 1. Install and verify (about 3 minutes)
 
@@ -11,7 +13,7 @@ python -m pip install -r requirements-app.txt
 pytest -q
 ```
 
-Expected at this revision: `478 passed, 1 skipped`. The skip is the explicitly
+Expected at this revision: `497 passed, 1 skipped`. The skip is the explicitly
 credential-gated live S3 test.
 
 ## 2. Start the reviewer sandbox (about 1 minute)
@@ -24,7 +26,7 @@ https://verifierforge-web.vercel.app
 
 Enter the invitation code shared separately. The browser keeps it only in
 session storage; it is never part of the URL or frontend build. The page calls
-the Railway control plane below and follows the same frozen 22-operation API.
+the Railway control plane below and follows the same frozen 23-operation API.
 
 The UI enforces this visual path: **Discover** → inspect three real cluster
 cards, Input, Analyze, and the Agent decision → **Forge** → review the proposed
@@ -162,8 +164,9 @@ gate closed.
 Frontend implementers can use the frozen request/response examples in
 [`docs/frontend/api-contract-v1.md`](docs/frontend/api-contract-v1.md); the
 real and mock OpenAPI schemas are parity-tested for all listed operations.
-The live SQL runner is deliberately not operation 23: it is browser-local and
-keeps the frozen HTTP contract at 22 operations.
+The live SQL runner is deliberately outside the frozen HTTP operations: it is
+browser-local, while the HTTP contract remains at 23 operations including the
+explicit serving sleep boundary.
 
 ## 5. Inspect delivery and persistence evidence (about 2 minutes)
 

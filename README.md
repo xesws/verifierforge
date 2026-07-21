@@ -2,24 +2,55 @@
   <img src="assets/brand/verifierforge-wordmark.svg" alt="VerifierForge" width="520" />
 </p>
 
-<p align="center"><strong>Turn repetitive, verifiable LLM work into an evidence-backed small-model forge.</strong></p>
+<p align="center"><strong>Cut the cost of repetitive AI work with small models that are trained, checked, and deployed automatically.</strong></p>
 
 <p align="center">
   <img alt="tests passing" src="https://img.shields.io/badge/tests-passing-00a67e" />
-  <img alt="version v0.36.1" src="https://img.shields.io/badge/version-v0.36.1-087cf0" />
+  <img alt="version v0.39.2" src="https://img.shields.io/badge/version-v0.39.2-087cf0" />
   <img alt="Python 3.11" src="https://img.shields.io/badge/python-3.11-17212b" />
 </p>
 
 # VerifierForge
 
-VerifierForge turns production traffic with a programmatic success criterion
-into an evidence-backed small-model forge: Discover identifies a candidate,
-an audited Agent recommends whether to train, a human approves, and a
-disposable GPU path publishes results through durable storage.
+Businesses often pay a large-model API to solve the same simple task thousands
+of times, then pay people to inspect the output. VerifierForge targets the
+workflows where that review can be written as a program. It finds the expensive
+repetition and—after human approval—automatically trains, validates, and
+deploys a smaller model to take over the work. The result is a repeatable path
+from an expensive AI workflow to a cheaper specialist model, with evidence at
+every handoff and a switch back to the original model.
 
-The v1 prototype is deliberately narrow and inspectable. NL→SQL is the proved
-vertical; the verifier is the source of truth; held-out data selects the model;
-and routing remains reversible.
+The current end-to-end proof is deliberately focused: an enterprise data team
+uses an AI assistant for 95,000 recurring NL→SQL requests per month at a
+modeled cost of $5,500. VerifierForge discovers that workload, recommends a
+forge, trains on 50 examples, selects the best checkpoint on 60 unseen
+questions, and serves the result behind a reversible canary. It is one proven
+business workflow, not a claim that every task should use a small model.
+
+## Reviewer guide — no local setup required
+
+Reviewers do **not** need to clone this repository, install Python, or run a
+GPU. Use the invitation code supplied with the DevPost submission:
+
+1. Open **[verifierforge-web.vercel.app](https://verifierforge-web.vercel.app)**.
+2. Enter the separately shared reviewer invitation code. It is kept only in
+   browser session storage and is never embedded in this repository or URL.
+3. Follow the enforced product journey: **Discover → Forge → Runs → Proof →
+   Ship**. Each stage unlocks only after its required evidence or approval.
+4. In Ship, the report, curves, held-out arena, and browser SQL runner work
+   while tuned inference is cold. To try the real tuned model, confirm **Wake
+   model**, watch `provisioning → loading → ready`, then run a tuned SQL query.
+5. Click **Leave session** when finished. VerifierForge confirms provider
+   deletion and a durable `cold` state before clearing the session.
+
+Vercel is the product website. It calls the Railway API/control plane at
+`https://verifierforge-production.up.railway.app`; reviewers do not need to
+open Railway separately. `Approve & Forge` records human intent, while the
+public reviewer's training-side `Start Forge` remains disabled to prevent an
+accidental paid training job. Serving Wake is separately protected by the
+invitation, an explicit confirmation, one-session concurrency, and a budget
+cap. The public [Technical Deep Dive](https://verifierforge-web.vercel.app/tech)
+requires no invitation.
 
 ## Technical Deep Dive
 
@@ -57,43 +88,37 @@ Other completed gates are equally explicit:
 | Forge Agent | Live 12-scenario Gate C on `gpt-5.6-luna`: decision `1.0`, chain `1.0`, illegal actions `0`, config legality `1.0`; feature flag remains off by default. |
 | Product decision | A source-less production Analyze returned `need_more_data`; after a human-approved 50-row source, a fresh run returned `forge` at confidence `0.98` and created an approval in Supabase. |
 | Database | SQLite remains local default; the same async SQLAlchemy repositories and Alembic schema passed a real Supabase Postgres migration, reconciliation, and product smoke. |
-| Delivery | The reviewer API/proxy is a fixed Railway control plane; tuned GPU inference is now scale-to-zero. The frozen frontend boundary covers 22 operations, including a tuned-only reviewer probe that cannot mutate canary routing or fall back. Generated SQL can then run live in an ephemeral browser SQLite/WASM database against the frozen fixture—no canned rows, backend execution, GPU, or second model call. Two RunPod wake cycles reached ready in 282.14s and 266.68s, served real traffic, then idled to provider-inventory zero. The live 200-request proof split 111 default / 89 tuned with no fallback and Guardian `0.95`. |
+| Delivery | The reviewer API/proxy is a fixed Railway control plane; tuned GPU inference is now scale-to-zero. The frozen frontend boundary covers 23 operations, including tuned-only completion and explicit Leave-to-cold boundaries that cannot mutate canary routing or silently report deletion. Generated SQL can then run live in an ephemeral browser SQLite/WASM database against the frozen fixture—no canned rows, backend execution, GPU, or second model call. Two RunPod wake cycles reached ready in 282.14s and 266.68s, served real traffic, then idled to provider-inventory zero. The live 200-request proof split 111 default / 89 tuned with no fallback and Guardian `0.95`. |
 | Provisioning | P-1 mock lifecycle/fuses pass. P-2 executed an approved 0.5B/100-step S3 run and deleted the pod. P-4 then proved the separate web approval → explicit Start Forge → real RunPod readiness → delete wiring. Before every allocation, RunPod live capacity is queried, approved offers are price-ranked with bounded fallback, and the chosen GPU/rate is audited; the live proof selected RTX 4000 Ada at `$0.20/hr` and deleted it immediately. |
 
 ## Architecture
 
-```text
-Vercel frontend ──▶ Railway reviewer API + proxy ──▶ on-demand GPU vLLM
-       │
-       └── browser SQLite/WASM ──▶ frozen synthetic demo rows
-                           │          │                  ▲
-                           │          └── guardian       │ wake/idle reap
-                           │                             │
-                           ├── serving registry ─────────┘
-                           ▼
-                Supabase facts + S3 evidence
-                           │
-                           ▼
- Forge Agent (read-only) ──▶ human approval ──▶ explicit Start Forge
-                                                    │
-                                                    ▼
-                                      disposable training executor
-```
+<p align="center">
+  <img src="docs/blog/figures/06-system-loop.svg" alt="VerifierForge six-step loop: Discover, Analyze, Approve, Forge, Prove, and Ship, connected to the Forge Agent, Supabase and S3, and the Provisioner" width="100%" />
+</p>
 
-Pydantic contracts sit at each boundary. Product metadata, decisions,
-approvals, routing, and audit events use one repository layer. Full Agent
-traces and training objects remain in S3. A GPU worker is an executor, never a
-source of truth.
+*The Agent decides, Supabase remembers, and the Provisioner rents and returns
+compute. No GPU node is a source of truth.*
 
-The deployable reviewer image is intentionally separate from GPU execution. It
-is a single non-root Uvicorn service with no torch, vLLM, verl, Ray, or
-Transformers dependency. An invite-protected wake allocates one capacity-aware
-serving GPU, verifies the frozen S3 model, starts vLLM, and publishes its
-ephemeral endpoint into Supabase. Leave session explicitly proves deletion and
-returns the registry to cold; an idle reaper remains the abandoned-tab fallback.
-The browser sets `VITE_VF_API_BASE_URL` to the reviewer origin, so a backend
-rollback or tuned-endpoint rotation does not require a frontend rebuild unless
-the reviewer origin itself changes.
+The product is one six-step business loop supported by three systems:
+
+1. **Forge Agent** reads traffic, approved samples, economics, and
+   verifiability. It can recommend `forge`, `skip`, or `need_more_data`, but it
+   has no provider credential or provisioning handle.
+2. **Supabase + S3** preserve the truth across disposable machines. Supabase
+   stores relational facts and state; S3 stores immutable traces, checkpoints,
+   curves, and evidence manifests.
+3. **Provisioner** crosses the spending boundary only after explicit human
+   approval and Start Forge. It checks live capacity and price, creates a
+   bounded worker, collects the result, and tears the worker down.
+
+The runtime topology is deliberately split: the React UI runs on Vercel; the
+lightweight FastAPI/proxy control plane runs on Railway; Supabase and S3 hold
+durable state; and RunPod GPUs exist only while training or serving work is
+active. Ship has its own scale-to-zero serving lifecycle—`cold → provisioning
+→ loading → ready → draining → cold`—separate from the training approval path.
+The browser-local SQLite/WASM runner executes generated SQL against a fresh
+copy of the frozen synthetic fixture without another API, model, or GPU call.
 
 ### Data ownership and API read modes
 
@@ -131,12 +156,13 @@ only as a temporary local fake-trainer compatibility mode.
    error. This execution is separate from model generation and can continue
    after the GPU returns to cold.
 
-## Quickstart
+## Developer Quick Start
 
-Install the lightweight local dependencies and run the test suite:
+This section is for contributors. Reviewers should use the hosted path above.
+Install the lightweight application dependencies and run the test suite:
 
 ```bash
-python -m pip install -r requirements-app.txt -r requirements-trainer.txt
+python -m pip install -r requirements-app.txt
 pytest -q
 ```
 
@@ -150,30 +176,13 @@ curl http://127.0.0.1:8012/jobs/d4-m3-1p5b-r1-v0125/metrics
 ```
 
 Open `http://127.0.0.1:8012/docs` for the API. The optional mock Agent demo is
-documented in [JUDGES.md](JUDGES.md); it uses the real Discover UI and stores a
-decision/approval locally without a paid call.
+documented in [JUDGES.md](JUDGES.md). The clone-only command above starts the
+artifact API and deterministic fake proxy; it is a no-secret fallback, not the
+hosted React product and not a live training run.
 
-The fixed product frontend is
-`https://verifierforge-web.vercel.app`; it calls the Railway API at
-`https://verifierforge-production.up.railway.app`. Product paths require the
-separately shared Basic Auth invitation. Training autoprovision remains off.
-Serving wake has its own explicit confirmation, one-session concurrency limit,
-`$5` cap, explicit Leave-to-cold shutdown, and idle reaper; report and arena
-evidence do not require a live GPU.
-
-Owners can expose the full product composition—Supabase repositories, the
-configured real tuned endpoint, mock Agent, mock provisioner and Guardian—via
-an authenticated Cloudflare quick tunnel:
-
-```bash
-bash scripts/start_reviewer_sandbox.sh --mode full
-```
-
-The launcher prints the ephemeral URL and the path to a `0600`, ignored invite
-code file. Reviewers authenticate as Basic Auth user `judge`; the code must be
-shared separately. Quick tunnels are temporary evidence, not production
-hosting. `VF_AUTOPROVISION` is enabled only inside this launcher together with
-`VF_PROVISION_BINDING=mock`, so Start Forge cannot create a paid resource.
+GPU/trainer work is optional and separately isolated. Only contributors who
+are working on that path should install `requirements-trainer.txt`; the hosted
+reviewer API does not include torch, vLLM, verl, Ray, or Transformers.
 
 For permanent reviewer hosting, build the root `Dockerfile` and run
 `scripts/start_hosted_backend.sh`. The hosted service uses Supabase, S3,
@@ -274,6 +283,167 @@ BYO credentials through Settings and keep that fallback unset.
 
 
 ## How we worked with Codex
+
+### 2026-07-21 — v0.38.0 through v0.39.1 reviewer-truth log
+
+1. **The demo story no longer matched the product.** Planning copy still used
+   an old quantitative-finance persona, but the shipped dataset contains
+   employees, departments, projects, and assignment hours. Codex traced every
+   noun back through the frozen schema, arena, Ship prompts, and Discover card;
+   it also found that 95,000 requests and $5,500 are the committed workload
+   assumptions, not an OpenRouter invoice. The human required a concrete
+   25-second story that explained why the bill exists. Codex rewrote the
+   bilingual script around an enterprise data assistant and an
+   operator-configured external large-model API in `633820d` and `197100a`
+   (`v0.38.0`–`v0.38.1`) without inventing a customer or provider.
+
+2. **Guardian evidence was real but visually buried.** Saving a routing policy
+   still required a second traffic action, and 143 historical points made new
+   samples almost invisible. The human decided that Save should immediately
+   demonstrate the chosen policy but forbade fabricated verifier values.
+   Codex reused the existing in-process traffic task and built a run-local
+   0–200 request curve that carries the latest measured score forward and
+   changes only when a real Guardian point arrives. Commits `a33525e` and
+   `01ebce4` record `v0.39.0`; no sampling threshold or backend route changed.
+
+3. **Leaving the demo could leave a serving GPU running.** The UI originally
+   cleared browser state without proving provider deletion. During diagnosis,
+   Codex also caught a dangerous false proof: a process configured with the
+   mock serving binding could mark a real provider handle cold without deleting
+   it. The human required Leave to perform a complete reset. Codex added an
+   invitation-protected, idempotent sleep boundary, serialized drain, and a
+   provider-binding mismatch guard in `ab47298`; deployment evidence in
+   `8b79521` shows authenticated HTTP 200 to `cold`, unauthenticated HTTP 401,
+   target absence, and zero managed inventory. Closing a tab still relies on
+   the 30-minute idle reaper; the UI does not claim otherwise.
+
+### 2026-07-20 — v0.32.3 through v0.37.1 hosted-product log
+
+1. **The frozen report contract existed but returned incomplete evidence.**
+   Supabase-backed Job reports had `arena=null` and
+   `projected_monthly_savings_usd=null`; the documentation also claimed 19
+   operations while tests froze 16. The first real self-check had hidden that
+   gap behind `Future attached to a different loop`, so Codex repaired the
+   harness before judging the data. The human required a held-out-only arena,
+   deterministic inclusion of successes and failures, and identical
+   artifact/hybrid/Supabase shapes. Codex published ten comparisons
+   (six improved, two both-pass, two both-fail), the documented $3,850 savings
+   projection, and 19/19/19 parity in `9a24337`; `c3d7f64` tagged
+   `frontend-api-v1.1` (`v0.32.3`).
+
+2. **A laptop and quick tunnel were not a dependable reviewer backend.** The
+   human chose a lightweight, always-on container platform and required the
+   GPU service to remain separate. Codex removed training dependencies from the
+   API image and deployed a roughly 98.7 MB service to Railway. The first
+   public attempt returned `502 Application failed to respond`: Railway had
+   assigned `PORT=8080` while its domain still targeted 8000. Codex corrected
+   the target port without rebuilding, then passed the public contract,
+   invitation, CORS, report, tuned request, and Guardian checks. Commit
+   `8bc23a1` and tag `hosted-backend-v1` record `v0.33.0`.
+
+3. **A permanent L4 contradicted the disposable-worker architecture.** The
+   human specified a registry-driven, scale-to-zero serving lifecycle and
+   required two successful wake/reap cycles before retiring the old service.
+   Codex found that step 350 was initially absent from S3 and that the stock
+   serving image failed with `AttributeError: Qwen2Tokenizer has no attribute
+   all_special_tokens_extended`. It uploaded and verified all 13 model files,
+   pinned the proven vLLM/Transformers/tokenizers stack, and implemented the
+   dynamic serving registry. Two RTX 4000 Ada wakes reached ready in 282.14s
+   and 266.68s; 200 requests split 111 default / 89 tuned / 0 fallback,
+   Guardian ended at 0.95, and both reaps reached provider inventory zero.
+   `f81e273` carries tags `serving-scale-to-zero` and `frontend-api-v1.2`.
+   The human then ordered a cold-state retirement audit; Codex removed the last
+   physical endpoint references and reduced cold Discover hydration from 9.39s
+   to 2.5–2.8s before certifying the L4 safe to stop in `9ded490`
+   (`v0.34.0`–`v0.34.1`).
+
+4. **The visual frontend was attractive but still a static branch.** Codex
+   first reviewed Nora's branch without modifying it (`a9df58f`), and the human
+   decided to preserve its visual language while adding only the data layer and
+   missing product states. During integration, WebKit raised `Failed to execute
+   'fetch' on 'Window': Illegal invocation`; Codex traced it to passing native
+   `fetch` without its `window` receiver and fixed the binding. The human then
+   made Discover → Forge → Runs → Proof → Ship a hard dependency chain. The
+   v0.35.0 series added the typed 23-operation client, invitation handling,
+   real five-page data, staged Journey, and Vercel delivery; `7621e7a` records
+   the acceptance state. No `frontend-v1-live` tag was invented because the
+   version record still reserved final visual approval to the owner.
+
+5. **Reviewer interactions repeatedly exposed “demo-looking” evidence.** The
+   human reported each visible defect; Codex diagnosed and shipped one bounded
+   patch at a time: Analyze source semantics (`v0.35.1`), six frozen-schema
+   prompt examples (`v0.35.2`), explicit cold/loading/ready messaging
+   (`v0.35.3`), fresh browser SQLite/WASM execution (`v0.35.4`), wording that
+   separates all 60 held-out pass@1 trials from ten displayed arena rows
+   (`v0.35.5`), schema-grounded generation after the model invented
+   `department` and `status` columns (`v0.35.6`), an auditable GPT-5.6 Luna
+   tool/decision receipt instead of hidden chain-of-thought (`v0.35.7`), and
+   honest elapsed-time Analyze progress without a fake percentage
+   (`v0.35.8`). The closing commits are `0f4552f`, `79bde6b`, `468eb12`,
+   `66769de`, `e6bef1c`, `d54493c`, `a490096`, and `212cda7`.
+
+6. **The engineering evidence was scattered and the first report logo was
+   off-brand.** The human required a technical article whose figures use real
+   data and later required the existing frontend VF mark everywhere. Codex
+   built one canonical Markdown source and six deterministic SVGs with embedded
+   source hashes. Vercel initially failed with `Could not resolve
+   "../../../docs/blog/technical-deep-dive.md?raw"` because its project root
+   contains only `frontend/`; Codex chose a byte-equal generated mirror guarded
+   by tests instead of duplicating authored prose. Merge `17d8d69` publishes
+   `v0.36.0`; `3ed5f8f` records the `v0.36.1` brand correction.
+
+7. **The routing demo required an operator, and CI relied on a developer's
+   laptop.** The human asked for one-click, observable 200-request traffic
+   without adding a second routing implementation. Codex reused the proxy's
+   real dispatch path and added bounded progress plus Guardian refresh in
+   `20b2e2f` (`v0.37.0`). A clean GitHub runner then failed the zero-cost P4
+   mock because its fixture silently depended on `~/.ssh/id_ed25519.pub`.
+   Codex injected a synthetic public key only in the test fixture—leaving live
+   RunPod validation fail-closed—and restored CI in `dd2695f` (`v0.37.1`).
+
+### 2026-07-19 — v0.29.0 through v0.32.2 product-delivery log
+
+1. **Approval stopped one step before execution.** P2 could run a bounded
+   worker, but the product recorded only an approval and had no safe way to use
+   a customer's provider credential. The human drew the spending boundary:
+   `Approve & Forge` writes intent; a separate confirmed `Start Forge` may
+   allocate; `VF_AUTOPROVISION` stays off; and the lower user/system budget cap
+   wins. Codex implemented write-only Fernet credentials, decrypt-at-call,
+   durable lifecycle state, mock coverage, and a real create/readiness/delete
+   smoke with an estimated $0.000623 cost. Commit `5b80041` and tag
+   `provisioner-p4-complete` close `v0.29.0`.
+
+2. **The full reviewer path had no authenticated public composition.** The
+   human specified Supabase facts, a real tuned endpoint, deterministic Agent
+   and Provisioner bindings, and zero unapproved model/GPU spend. Initial tuned
+   requests returned vLLM 404 because the UI label
+   `verifierforge-step-350` was forwarded as the serving model ID. Codex added
+   an explicit model-identity mapping and composed API, proxy, invitation auth,
+   and quick-tunnel fallback. `fced1b5` and tag `reviewer-sandbox-full` record
+   `v0.30.0`. For the teammate boundary, the human required additive mock/real
+   parity and three distinct Analyze/Approve/Start actions; Codex froze the
+   first frontend contract and queued metadata-only Job creation in `39ea01b`,
+   tagged `frontend-api-v1` (`v0.31.0`).
+
+3. **A single hard-coded GPU choice could fail even when cheaper capacity was
+   available.** Codex checked the provider's current interfaces and found no
+   standalone REST inventory endpoint; authenticated GraphQL
+   `gpuTypes/lowestPrice` exposed stock and price before REST Pod creation. The
+   human fixed the allowed `small_ada` candidates—RTX 2000 Ada, RTX 4000 Ada,
+   L4, then A40—and kept all Blackwell models blocked. Codex implemented live
+   price ranking, bounded fallback, `no_capacity` convergence, and GPU/rate
+   audit. The live proof selected RTX 4000 Ada at $0.20/hour and immediately
+   deleted it; `335d78c` carries tag `provisioner-capacity-aware`
+   (`v0.32.0`).
+
+4. **Frontend integration still lacked a real Postgres-backed audit and a
+   portable evidence snapshot.** Codex exercised the then-frozen operations
+   against Supabase, fixed only the CORS and disabled-Start semantics, and
+   published the integration cheatsheet in `558be4f` (`v0.32.1`). At the
+   owner's explicit request, `77505c7` then committed a reviewed snapshot of
+   286 run-evidence files and two lightweight model markers for teammate use
+   (`v0.32.2`); multi-gigabyte weights, `.safetensors`, invitation codes, and
+   secrets remained excluded.
 
 ### 2026-07-18–19 — v0.18.0 through v0.28.5 product/infrastructure log
 
