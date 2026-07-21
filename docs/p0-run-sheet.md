@@ -1,5 +1,30 @@
 # P0 Run Sheet — v0.6.1 data freeze
 
+## 2026-07-20 v0.36.0 — technical deep dive and brand placement
+
+**Status:** planned; documentation gate committed before implementation.
+
+- [ ] TB-1: publish one English technical narrative with claim-level evidence
+  paths and explicit limitations.
+- [ ] TB-2: publish six mandatory deterministic SVG figures; real curves read
+  only tracked M3/M4 and held-out artifacts.
+- [ ] TB-3: add a public, no-API `/tech` route with ToC, collapsible sections,
+  responsive layout, and Vercel acceptance.
+- [ ] TB-4: add the README lockup, badges, and concise deep-dive entry without
+  deleting existing content.
+- [ ] TB-5: publish a small SVG mark/wordmark and favicon.
+
+Truth boundaries fixed before code: M3/M4 is a falsification reference rather
+than a controlled causal estimate; the verifier selects the highest achieved
+tier rather than summing weights; `$0.177846` is a provider estimate; `474
+passed, 1 skipped` is the v0.34 closeout snapshot; the timed S3 node-death drill
+remained incomplete; and the augmentation log does not independently prove the
+resolved OpenRouter model slug.
+
+**Acceptance:** deterministic figure check, frontend test/lint/build, full
+pytest, secret scan, browser QA, and public `/tech` return green. **Stop:** omit
+an unsupported claim rather than invent evidence; do not deploy a failed build.
+
 **Status:** resumed — v0.10.0 U1–U3 training/held-out gate update
 **Owner:** Codex on `main`
 **Starting commit:** `78912f1` (`v0.6.0 Data: discard malformed expansion responses`)
