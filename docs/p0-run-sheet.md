@@ -3231,7 +3231,7 @@ ESLint had zero warnings, and the production TypeScript/Vite build passed.
   - [ ] Screenshot pass is blocked in this session because browser discovery
     returned no available browser instance. Local reviewer/API and Vite were
     started successfully; do not substitute an unrelated automation surface.
-- [ ] **F5 — Vercel preview.** Device-authorize the CLI, deploy the `frontend`
+- [x] **F5 — Vercel production entry.** Device-authorize the CLI, deploy the `frontend`
   root, report its URL for owner Railway CORS configuration, verify direct
   routes, and update JUDGES on the feature branch.
   - [x] Device authorization completed as Vercel user `xesws`; project
