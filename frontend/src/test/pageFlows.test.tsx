@@ -138,6 +138,8 @@ describe('reviewer product path', () => {
     fireEvent.click(screen.getByRole('button', { name: /Continue to Proof/i }))
     expect(await screen.findByText('78.3%')).toBeInTheDocument()
     expect(screen.getByText('$3,850')).toBeInTheDocument()
+    expect(screen.getByText('Arena · pass@1 measured across all 60 held-out samples')).toBeInTheDocument()
+    expect(screen.getByText('Model trained on a 50-example pool · evaluated on 60 unseen examples · 10 side-by-side comparisons shown here.')).toBeInTheDocument()
     expect(screen.getByText('Held-out prompt 1')).toBeInTheDocument()
     fireEvent.click(screen.getByRole('button', { name: /Accept evidence & continue to Ship/i }))
     expect(await screen.findByText('Wake the tuned model')).toBeInTheDocument()

@@ -9,7 +9,7 @@ export function ArenaComparison({ arena }: { arena: Arena }) {
   return (
     <GlassPanel className="arena-panel reveal reveal-4">
       <div className="panel-heading">
-        <div><span className="eyebrow"><Sparkles size={13} aria-hidden="true" /> Held-out arena · {Math.round(arena.win_rate * 100)}% tuned-only wins</span><h2>See the behavior change</h2><p>Ten deterministic samples from the frozen 60-row held-out evaluation, including wins, shared passes, and shared failures.</p></div>
+        <div><span className="eyebrow"><Sparkles size={13} aria-hidden="true" /> Arena · pass@1 measured across all 60 held-out samples</span><h2>See the behavior change</h2><p>Model trained on a 50-example pool · evaluated on 60 unseen examples · 10 side-by-side comparisons shown here.</p></div>
         <button className="secondary-button" type="button" onClick={() => setExpanded((value) => !value)} aria-expanded={expanded}>{expanded ? <ChevronUp size={16} /> : <ChevronDown size={16} />}{expanded ? 'Show less' : `Expand all ${arena.samples.length}`}</button>
       </div>
       <div className="arena-list">
