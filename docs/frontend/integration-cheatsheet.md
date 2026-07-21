@@ -1,6 +1,6 @@
 # Frontend integration cheatsheet
 
-Last verified: **2026-07-20 · v0.35.1 candidate** from the fixed Railway public
+Last verified: **2026-07-20 · v0.35.2 candidate** from the fixed Railway public
 origin and Vercel production alias. The 22-operation boundary passed its
 secret-safe, no-Wake smoke against Supabase Postgres and the dynamic serving
 registry. The Forge Agent is
