@@ -1,0 +1,56 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 730" role="img" aria-labelledby="title desc">
+<title id="title">VerifierForge six-step closed loop</title>
+<desc id="desc">Traffic discovery, Agent advice, human approval, disposable training, held-out proof, and guarded scale-to-zero serving share Supabase and S3 evidence.</desc>
+<metadata>{&quot;facts&quot;:{&quot;cold_starts&quot;:[282.1415295172483,266.68479481339455],&quot;selected_gpu&quot;:{&quot;cloud_type&quot;:&quot;COMMUNITY&quot;,&quot;display_name&quot;:&quot;RTX 4000 Ada&quot;,&quot;external_id&quot;:&quot;ol2xt6tn71b8oc&quot;,&quot;gpu_model&quot;:&quot;NVIDIA RTX 4000 Ada Generation&quot;,&quot;hourly_price_usd&quot;:0.2}},&quot;sources&quot;:[{&quot;path&quot;:&quot;docs/evidence/serving/v0.34.0-sv5-live.json&quot;,&quot;sha256&quot;:&quot;ce959a731335da2d7381a6b12aec48129f6a0ebf1ce04915a30e5e41596b1ff0&quot;},{&quot;path&quot;:&quot;docs/evidence/provisioner/v0.32.0-capacity-live-pass.json&quot;,&quot;sha256&quot;:&quot;f631e8b463a8202a78d7efaa73a7ec266fa0edf76c5004eee84d119878c94bb1&quot;}]}</metadata>
+<defs>
+<filter id="shadow" x="-15%" y="-15%" width="130%" height="140%"><feDropShadow dx="0" dy="10" stdDeviation="14" flood-color="#304d5b" flood-opacity=".10"/></filter>
+<linearGradient id="accent" x1="0" x2="1"><stop stop-color="#087cf0"/><stop offset="1" stop-color="#00a67e"/></linearGradient>
+<style>text{font-family:Manrope,Inter,Arial,sans-serif;fill:#17212b}.mono{font-family:"IBM Plex Mono",Menlo,monospace}.label{font-size:13px;letter-spacing:.09em;text-transform:uppercase;font-weight:700}.small{font-size:13px}.tiny{font-size:11px}.body{font-size:16px}.heading{font-size:26px;font-weight:750;letter-spacing:-.03em}.hero{font-size:34px;font-weight:780;letter-spacing:-.04em}.muted{fill:#62717d}.soft{fill:#82909a}.blue{fill:#087cf0}.green{fill:#00a67e}.amber{fill:#a96900}.coral{fill:#dd6b5b}.white{fill:#fff}.stroke{stroke:#d6e2e6;stroke-width:1.5}.arrow{stroke:#82909a;stroke-width:2;fill:none;marker-end:url(#arrow)}</style>
+<marker id="arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse"><path d="M 0 0 L 10 5 L 0 10 z" fill="#82909a"/></marker>
+</defs>
+<rect width="1200" height="730" rx="28" fill="#edf5f7"/>
+<text x="48" y="48" class="label blue" text-anchor="start">FIGURE 6 · SYSTEM ARCHITECTURE</text>
+<text x="48" y="84" class="heading" text-anchor="start">One loop, three systems, disposable compute</text>
+<text x="48" y="111" class="small muted" text-anchor="start">Agent decides, Supabase remembers, Provisioner spends and tears down.</text>
+<rect x="44" y="140" width="1112" height="525" rx="18" fill="#ffffff" stroke="#d6e2e6" filter="url(#shadow)"/>
+<circle cx="90" cy="280" r="70" fill="#f8fbfc" stroke="#087cf0" stroke-width="3"/>
+<text x="90" y="257" class="label" text-anchor="middle" fill="#087cf0">01</text>
+<text x="90" y="286" class="label" text-anchor="middle">DISCOVER</text>
+<text x="90" y="315" class="tiny muted" text-anchor="middle"><tspan x="90" dy="0">cluster traffic</tspan><tspan x="90" dy="17">+ cost + volume</tspan></text>
+<path d="M162 280 L208 280" stroke="#087cf0" stroke-width="2" fill="none" marker-end="url(#arrow)"/>
+<circle cx="280" cy="280" r="70" fill="#f8fbfc" stroke="#087cf0" stroke-width="3"/>
+<text x="280" y="257" class="label" text-anchor="middle" fill="#087cf0">02</text>
+<text x="280" y="286" class="label" text-anchor="middle">ANALYZE</text>
+<text x="280" y="315" class="tiny muted" text-anchor="middle"><tspan x="280" dy="0">GPT-5.6 +</tspan><tspan x="280" dy="17"> read-only tools</tspan></text>
+<path d="M352 280 L398 280" stroke="#087cf0" stroke-width="2" fill="none" marker-end="url(#arrow)"/>
+<circle cx="470" cy="280" r="70" fill="#f8fbfc" stroke="#a96900" stroke-width="3"/>
+<text x="470" y="257" class="label" text-anchor="middle" fill="#a96900">03</text>
+<text x="470" y="286" class="label" text-anchor="middle">APPROVE</text>
+<text x="470" y="315" class="tiny muted" text-anchor="middle"><tspan x="470" dy="0">human intent +</tspan><tspan x="470" dy="17"> explicit Start</tspan></text>
+<path d="M542 280 L588 280" stroke="#a96900" stroke-width="2" fill="none" marker-end="url(#arrow)"/>
+<circle cx="660" cy="280" r="70" fill="#f8fbfc" stroke="#00a67e" stroke-width="3"/>
+<text x="660" y="257" class="label" text-anchor="middle" fill="#00a67e">04</text>
+<text x="660" y="286" class="label" text-anchor="middle">FORGE</text>
+<text x="660" y="315" class="tiny muted" text-anchor="middle"><tspan x="660" dy="0">capacity-aware</tspan><tspan x="660" dy="17"> disposable GPU</tspan></text>
+<path d="M732 280 L778 280" stroke="#00a67e" stroke-width="2" fill="none" marker-end="url(#arrow)"/>
+<circle cx="850" cy="280" r="70" fill="#f8fbfc" stroke="#00a67e" stroke-width="3"/>
+<text x="850" y="257" class="label" text-anchor="middle" fill="#00a67e">05</text>
+<text x="850" y="286" class="label" text-anchor="middle">PROVE</text>
+<text x="850" y="315" class="tiny muted" text-anchor="middle"><tspan x="850" dy="0">held-out select +</tspan><tspan x="850" dy="17"> spurious control</tspan></text>
+<path d="M922 280 L968 280" stroke="#00a67e" stroke-width="2" fill="none" marker-end="url(#arrow)"/>
+<circle cx="1040" cy="280" r="70" fill="#f8fbfc" stroke="#17212b" stroke-width="3"/>
+<text x="1040" y="257" class="label" text-anchor="middle" fill="#17212b">06</text>
+<text x="1040" y="286" class="label" text-anchor="middle">SHIP</text>
+<text x="1040" y="315" class="tiny muted" text-anchor="middle"><tspan x="1040" dy="0">canary + guardian</tspan><tspan x="1040" dy="17"> + idle reap</tspan></text>
+<rect x="95" y="405" width="285" height="150" rx="18" fill="#eef6ff" stroke="#c8e1f8"/>
+<text x="122" y="440" class="label blue" text-anchor="start">FORGE AGENT</text>
+<text x="122" y="477" class="small" text-anchor="start"><tspan x="122" dy="0">decision + strict config</tspan><tspan x="122" dy="24">Gate C: 1 / 1 / 0 / 1</tspan><tspan x="122" dy="24">no execution handle</tspan></text>
+<rect x="457" y="405" width="285" height="150" rx="18" fill="#f0faf7" stroke="#bfe6da"/>
+<text x="484" y="440" class="label green" text-anchor="start">SUPABASE + S3</text>
+<text x="484" y="477" class="small" text-anchor="start"><tspan x="484" dy="0">relational facts + state</tspan><tspan x="484" dy="24">immutable curves + traces</tspan><tspan x="484" dy="24">manifest-last identity</tspan></text>
+<rect x="819" y="405" width="285" height="150" rx="18" fill="#fff4e3" stroke="#f0d7aa"/>
+<text x="846" y="440" class="label amber" text-anchor="start">PROVISIONER</text>
+<text x="846" y="477" class="small" text-anchor="start"><tspan x="846" dy="0">live price / capacity</tspan><tspan x="846" dy="24">$0.20/hr selected</tspan><tspan x="846" dy="24">wake → ready → cold</tspan></text>
+<path d="M1040 352 C1040 620, 90 620, 90 352" stroke="#00a67e" stroke-width="3" fill="none" stroke-dasharray="10 8" marker-end="url(#arrow)"/>
+<text x="600" y="624" class="small mono green" text-anchor="middle">guardian evidence feeds the next discovery cycle · no GPU is a source of truth</text>
+</svg>
