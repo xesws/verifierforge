@@ -3203,7 +3203,7 @@ remains available through the Wake model scale-to-zero path.
 
 **Status:** in progress. This section is the execution record for F0–F6.
 
-- [ ] **F0 — branch and documentation gate.** Push the v0.34.2 review,
+- [x] **F0 — branch and documentation gate.** Push the v0.34.2 review,
   branch from current main, reserve v0.35.0 docs, cherry-pick Nora commit
   `642e335`, and prove the untouched visual baseline still builds.
 - [ ] **F1 — typed API boundary.** Cover exactly 21 frozen operations,
