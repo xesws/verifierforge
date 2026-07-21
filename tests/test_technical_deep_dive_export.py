@@ -30,5 +30,7 @@ def test_print_mode_keeps_one_source_and_forces_complete_rendering() -> None:
     assert ".tech-chapter { order: 3; overflow: visible; break-before: page;" in css
     assert "EXPECTED_CHAPTERS = 12" in exporter
     assert "EXPECTED_FIGURES = 6" in exporter
+    assert 'ROOT / "docs" / "submission" / "verifierforge-technical-deep-dive.pdf"' in exporter
+    assert 'ROOT / "output"' not in exporter
     assert '"Page.printToPDF"' in exporter
     assert "_wait_for_print_ready" in exporter

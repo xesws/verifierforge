@@ -128,7 +128,7 @@ the frozen held-out exam above.*
 
 The full engineering account is available as a public, invitation-free
 [visual article](https://verifierforge-web.vercel.app/tech), a single
-[submission-ready PDF](output/pdf/verifierforge-technical-deep-dive.pdf), and
+[submission-ready PDF](docs/submission/verifierforge-technical-deep-dive.pdf), and
 the [versioned Markdown source](docs/blog/technical-deep-dive.md). It covers:
 
 - the executable NL→SQL verifier, GRPO group-relative update, and gate A;
