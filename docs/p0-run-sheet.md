@@ -3268,15 +3268,22 @@ ESLint had zero warnings, and the production TypeScript/Vite build passed.
 
 ## 2026-07-20 v0.35.1 — Discover Analyze source fix
 
-**Status:** in progress.
+**Status:** complete on deployed feature candidate; owner visual confirmation pending.
 
 - [x] **Diagnosis.** The screenshot error is the API's intended path guard:
   the UI incorrectly passed the approved repository JSONL as the internal
   proxy traffic `data_source`; Analyze failed and the journey correctly stayed
   locked.
-- [ ] **Frontend fix.** Keep Input on the sample-source endpoint; send Analyze
+- [x] **Frontend fix.** Keep Input on the sample-source endpoint; send Analyze
   without a client filesystem path and clarify both meanings in the UI.
-- [ ] **Regression.** Assert request shape plus Forge unlock, then run Vitest,
+- [x] **Regression.** Assert request shape plus Forge unlock, then run Vitest,
   ESLint, build, and full pytest.
-- [ ] **Public acceptance.** Redeploy the zero-cost candidate and prove one
+- [x] **Public acceptance.** Redeploy the zero-cost candidate and prove one
   public mock-bound Analyze returns `forge` and unlocks Forge.
+  - Vitest: 14 passed; ESLint and production build passed.
+  - Pytest: `478 passed, 1 skipped, 1 warning`; the warning is the existing
+    aiosqlite shutdown race in `test_serving_session`.
+  - Vercel: `dpl_JCpL9W2qproT5MVqsWJAQHkL5LGQ`, stable alias unchanged.
+  - Public Analyze evidence: HTTP 200, `cluster_id=data-pull-sql`,
+    `decision=forge`, config present, request body `{}`, mock-bound/cached and
+    therefore zero paid provider action.

@@ -1,11 +1,16 @@
 # Frontend integration cheatsheet
 
-Last verified: **2026-07-20 · v0.35.0 candidate** from the fixed Railway public
+Last verified: **2026-07-20 · v0.35.1 candidate** from the fixed Railway public
 origin and Vercel production alias. The 22-operation boundary passed its
 secret-safe, no-Wake smoke against Supabase Postgres and the dynamic serving
 registry. The Forge Agent is
 deterministic mock and training autoprovision is off. Serving wake is an
 independent, invite-protected action with explicit spend confirmation.
+
+Discover's **Input** path is the approved training/evaluation JSONL. Analyze
+does not send that repository path as `data_source`; it reads proxy traffic
+from the server-configured store. The public no-path Analyze returned HTTP 200
+with a forgeable decision.
 
 Production frontend: `https://verifierforge-web.vercel.app`. Its Vercel build
 contains only the public Railway origin; the invitation remains runtime-only.
