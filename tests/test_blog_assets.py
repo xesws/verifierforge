@@ -56,6 +56,33 @@ def test_data_figures_bind_the_published_results() -> None:
     assert heldout["facts"]["selected_pass_at_1"] == 0.7833333333333333
 
 
+def test_agent_gate_c_encloses_the_strict_exit_and_score() -> None:
+    root = ET.fromstring(
+        (build_blog_assets.FIGURE_DIR / "02-agent-system.svg").read_text()
+    )
+    rects = root.findall(f"{SVG}rect")
+
+    evaluator = next(
+        node for node in rects if node.attrib.get("x") == "72" and node.attrib.get("y") == "154"
+    )
+    strict_exit = next(
+        node for node in rects if node.attrib.get("x") == "350" and node.attrib.get("y") == "530"
+    )
+    gate_score = next(
+        node for node in rects if node.attrib.get("x") == "100" and node.attrib.get("y") == "550"
+    )
+
+    evaluator_right = float(evaluator.attrib["x"]) + float(evaluator.attrib["width"])
+    evaluator_bottom = float(evaluator.attrib["y"]) + float(evaluator.attrib["height"])
+    for node in (strict_exit, gate_score):
+        assert float(node.attrib["x"]) + float(node.attrib["width"]) <= evaluator_right
+        assert float(node.attrib["y"]) + float(node.attrib["height"]) <= evaluator_bottom
+
+    text = " ".join("".join(node.itertext()) for node in root.findall(f"{SVG}text"))
+    assert "GATE C EVALUATOR" in text
+    assert "HUMAN APPROVAL WALL" in text
+
+
 def test_favicon_is_the_canonical_mark() -> None:
     mark = build_blog_assets.BRAND_DIR / "verifierforge-mark.svg"
     favicon = build_blog_assets.ROOT / "frontend" / "public" / "favicon.svg"

@@ -201,7 +201,7 @@ def build_agent_system() -> str:
     metrics = report["metrics"]
     svg = SVG(
         "Forge Agent decision system and Gate C",
-        "GPT-5.6 uses four read-only tools, exits through a strict schema, and cannot reach the Provisioner without human approval.",
+        "Gate C encloses GPT-5.6, four read-only tools, the data layer, and the strict decision exit; the Provisioner remains beyond a human approval wall.",
         metadata=_metadata([GATE_C_REPORT], scenario_count=report["scenario_count"], metrics=metrics),
     )
     _header(svg, "FIGURE 2 · AGENT SYSTEM", "A decision engine with no spending handle", "Responses tool-calling is audited; execution begins only beyond a human approval wall.")
@@ -214,7 +214,7 @@ def build_agent_system() -> str:
     svg.multiline(108, 462, ["No Provisioner import", "No provider credential", "No spending handle"], cls="tiny muted", gap=19)
     tools = ["analyze_traffic", "inspect_samples", "estimate_economics", "check_verifiability"]
     for index, tool in enumerate(tools):
-        y = 176 + index * 83
+        y = 190 + index * 83
         svg.rect(378, y, 230, 58, fill=CARD, stroke=LINE)
         svg.text(493, y + 35, tool, cls="small mono", anchor="middle")
         svg.arrow(315, y + 29, 378, y + 29, color=BLUE)
@@ -222,20 +222,22 @@ def build_agent_system() -> str:
     svg.rect(665, 190, 180, 310, fill="#f0faf7", stroke="#bfe6da")
     svg.text(755, 225, "DATA LAYER", cls="label green", anchor="middle")
     svg.multiline(755, 271, ["Supabase facts", "approved samples", "cost assumptions", "verifier evidence"], cls="small", gap=32, anchor="middle")
-    svg.rect(350, 535, 510, 62, fill="#17212b", stroke=None)
-    svg.text(605, 561, "submit_decision · strict AgentDecision schema", cls="small mono white", anchor="middle")
-    svg.text(605, 583, "forge | skip | need_more_data", cls="tiny mono", anchor="middle", fill="#9ddbc9")
-    svg.add(f'<line x1="890" y1="170" x2="890" y2="590" stroke="{CORAL}" stroke-width="5" stroke-dasharray="8 8"/>')
+    svg.rect(350, 530, 510, 62, fill="#17212b", stroke=None)
+    svg.text(605, 556, "submit_decision · strict AgentDecision schema", cls="small mono white", anchor="middle")
+    svg.text(605, 578, "forge | skip | need_more_data", cls="tiny mono", anchor="middle", fill="#9ddbc9")
+    svg.add(f'<line x1="890" y1="170" x2="890" y2="600" stroke="{CORAL}" stroke-width="5" stroke-dasharray="8 8"/>')
     svg.text(904, 204, "HUMAN APPROVAL WALL", cls="label coral")
-    svg.rect(930, 250, 180, 104, fill="#fff4e3", stroke="#f0d7aa")
-    svg.text(1020, 284, "Approve", cls="heading", anchor="middle")
-    svg.text(1020, 315, "writes intent only", cls="small muted", anchor="middle")
-    svg.rect(930, 382, 180, 104, fill="#eaf4ff", stroke="#c8e1f8")
-    svg.text(1020, 417, "Start Forge", cls="heading", anchor="middle")
-    svg.text(1020, 448, "Provisioner begins", cls="small muted", anchor="middle")
-    svg.rect(72, 154, 806, 394, fill="none", stroke="#98b9c8", radius=24)
-    svg.text(680, 166, "EVALUATOR · 12 scenarios · schema / chain / decision / config", cls="tiny mono muted", anchor="middle")
-    svg.pill(944, 535, "GATE C  1 / 1 / 0 / 1", fill=GREEN, width=176)
+    svg.rect(930, 240, 180, 104, fill="#fff4e3", stroke="#f0d7aa")
+    svg.text(1020, 274, "Approve", cls="heading", anchor="middle")
+    svg.text(1020, 305, "writes intent only", cls="small muted", anchor="middle")
+    svg.arrow(1020, 344, 1020, 385, color=AMBER)
+    svg.rect(930, 385, 180, 104, fill="#eaf4ff", stroke="#c8e1f8")
+    svg.text(1020, 420, "Start Forge", cls="heading", anchor="middle")
+    svg.text(1020, 451, "Provisioner begins", cls="small muted", anchor="middle")
+    svg.rect(72, 154, 806, 456, fill="none", stroke="#98b9c8", radius=24)
+    svg.text(475, 174, "GATE C EVALUATOR · 12 scenarios · schema / chain / decision / config", cls="tiny mono muted", anchor="middle")
+    svg.pill(100, 550, "GATE C  1 / 1 / 0 / 1", fill=GREEN, width=215)
+    svg.add(f'<path d="M860 561 C910 561 900 292 930 292" stroke="{AMBER}" stroke-width="2" fill="none" marker-end="url(#arrow)"/>')
     return svg.finish()
 
 
