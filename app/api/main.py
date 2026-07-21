@@ -15,6 +15,7 @@ from app.api.artifacts import ArtifactDataError, ArtifactStore
 from app.api.agent import router as agent_router
 from app.api.copilot import router as copilot_router
 from app.api.cors import configure_cors
+from app.api.demo_traffic import router as demo_traffic_router
 from app.api.provisioning import router as provisioning_router
 from app.api.serving import router as serving_router
 from app.api.serving import start_serving_reaper
@@ -47,6 +48,7 @@ app.include_router(copilot_router)
 app.include_router(agent_router)
 app.include_router(provisioning_router)
 app.include_router(serving_router)
+app.include_router(demo_traffic_router)
 app.router.add_event_handler("startup", start_serving_reaper)
 
 

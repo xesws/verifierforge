@@ -1,10 +1,12 @@
 import { Activity, RadioTower } from 'lucide-react'
+import type { ReactNode } from 'react'
 import { GlassPanel } from './GlassPanel'
 
-export function EmptyGuardian() {
+export function EmptyGuardian({ action }: { action?: ReactNode }) {
   return (
     <GlassPanel className="guardian-panel reveal reveal-3">
       <div className="panel-heading compact"><div><span className="eyebrow"><Activity size={13} /> Guard</span><h2>Live guardian</h2></div><span className="local-chip muted">No samples</span></div>
+      {action}
       <div className="guardian-empty">
         <div className="guardian-icon"><RadioTower size={28} aria-hidden="true" /></div>
         <h3>Awaiting sampled canary traffic</h3>

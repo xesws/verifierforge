@@ -1,4 +1,4 @@
-import { cleanup, fireEvent, render, screen } from '@testing-library/react'
+import { act, cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { App } from '../app/App'
 import { AuthProvider } from '../state/AuthContext'
@@ -213,6 +213,55 @@ describe('reviewer product path', () => {
     expect(completionBody.messages[0].content).toContain('active INTEGER NOT NULL')
     expect(completionBody.messages[0].content).not.toContain('INSERT INTO')
     expect(completionBody.messages[1].content).toBe('For every project whose combined employee hours are no less than 100, output the project name and total hours, sorted by project name ascending.')
+  })
+
+  it('shows cold traffic guidance, live progress, and Guardian points without a refresh', async () => {
+    seedJourney('ship')
+    const fixture = apiFixture(cold)
+    const idleTraffic = { total: 200, rate: 5, sent: 0, success: 0, failed: 0, running: false, error: null }
+    const runningTraffic = { ...idleTraffic, running: true }
+    const completedTraffic = { ...idleTraffic, sent: 200, success: 200 }
+    let trafficStatusReads = 0
+    let started = false
+    let completed = false
+    let resolveStatus: ((response: Response) => void) | undefined
+
+    renderAt('/ship/data-pull-sql', (path, method) => {
+      if (path === '/demo/traffic/status') {
+        trafficStatusReads += 1
+        if (!started) return response(idleTraffic)
+        if (completed) return response(completedTraffic)
+        return new Promise<Response>((resolve) => { resolveStatus = resolve })
+      }
+      if (path === '/demo/traffic' && method === 'POST') {
+        started = true
+        return response(runningTraffic, 202)
+      }
+      if (path.endsWith('/live-pass-rate')) {
+        return response({ cluster_id: 'data-pull-sql', points: completed ? [{ timestamp: '2026-07-20T00:10:00Z', pass_rate: 1 }] : [] })
+      }
+      return fixture(path, method)
+    })
+
+    await waitFor(() => expect(trafficStatusReads).toBe(1))
+    expect(await screen.findByText('Awaiting sampled canary traffic')).toBeInTheDocument()
+    const start = await screen.findByRole('button', { name: 'Simulate traffic (200 requests)' })
+    expect(screen.getByText('endpoint cold — traffic will route to default; wake the model to see tuned scoring')).toBeInTheDocument()
+    fireEvent.click(start)
+
+    const progress = await screen.findByRole('button', { name: /Simulating traffic · 0\/200/i })
+    expect(progress).toBeDisabled()
+    expect(progress).toHaveAttribute('aria-busy', 'true')
+    await waitFor(() => expect(resolveStatus).toBeDefined())
+
+    await act(async () => {
+      completed = true
+      resolveStatus?.(response(completedTraffic))
+      await Promise.resolve()
+    })
+
+    expect(await screen.findByRole('button', { name: 'Simulate traffic (200 requests)' })).toBeEnabled()
+    expect(await screen.findByRole('img', { name: 'Live pass rate with 1 points' })).toBeInTheDocument()
   })
 
   it.each([

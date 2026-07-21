@@ -2,8 +2,6 @@
 
 from __future__ import annotations
 
-import base64
-import hmac
 import os
 import threading
 import time
@@ -12,6 +10,7 @@ from typing import Any
 from fastapi import APIRouter, HTTPException, Request, Response
 from fastapi.responses import JSONResponse
 
+from app.api.auth import require_invitation
 from app.db import DatabaseOperationError, repository_gateway
 from app.proxy.main import (
     TunedCompletionUnavailable,
@@ -47,7 +46,7 @@ def wake_serving(
     raw_request: Request,
     response: Response,
 ) -> ServingStatus:
-    _require_invitation(raw_request)
+    require_invitation(raw_request)
     try:
         status, created = serving_coordinator().request_wake(request.model_id)
         response.status_code = 202 if created else 200
@@ -61,7 +60,7 @@ def wake_serving(
 
 @router.get("/serving/status", response_model=ServingStatus)
 def serving_status(raw_request: Request, model_id: str | None = None) -> ServingStatus:
-    _require_invitation(raw_request)
+    require_invitation(raw_request)
     try:
         return serving_coordinator().status(model_id)
     except (DatabaseOperationError, OSError, RuntimeError, ValueError):
@@ -78,7 +77,7 @@ def tuned_completion(
 ) -> JSONResponse:
     """Run an authenticated reviewer probe against only the tuned endpoint."""
 
-    _require_invitation(raw_request)
+    require_invitation(raw_request)
     try:
         forwarded = forward_tuned_completion(request)
     except TunedCompletionUnavailable as error:
@@ -129,28 +128,6 @@ def reset_serving_state_for_tests() -> None:
     global _COORDINATOR, _REAPER_STARTED
     _COORDINATOR = None
     _REAPER_STARTED = False
-
-
-def _require_invitation(request: Request) -> None:
-    expected = os.environ.get("VF_REVIEW_INVITE_CODE", "")
-    if not expected:
-        raise HTTPException(status_code=503, detail="Reviewer invitation is not configured")
-    value = request.headers.get("authorization", "")
-    supplied: str | None = None
-    if value.startswith("Basic "):
-        try:
-            decoded = base64.b64decode(value.removeprefix("Basic "), validate=True).decode()
-            username, separator, password = decoded.partition(":")
-            if separator and username == "judge":
-                supplied = password
-        except (ValueError, UnicodeDecodeError):
-            supplied = None
-    if supplied is None or not hmac.compare_digest(supplied, expected):
-        raise HTTPException(
-            status_code=401,
-            detail="Invitation required",
-            headers={"WWW-Authenticate": 'Basic realm="VerifierForge"'},
-        )
 
 
 __all__ = [

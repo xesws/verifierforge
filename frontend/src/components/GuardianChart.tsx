@@ -1,14 +1,16 @@
 import { Activity } from 'lucide-react'
+import type { ReactNode } from 'react'
 import { CartesianGrid, Line, LineChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts'
 import type { LivePassRate } from '../api/contracts'
 import { GlassPanel } from './GlassPanel'
 
-export function GuardianChart({ value }: { value: LivePassRate }) {
+export function GuardianChart({ value, action }: { value: LivePassRate; action?: ReactNode }) {
   const points = value.points.map((point, index) => ({ ...point, sample: index + 1 }))
   const latest = points.at(-1)?.pass_rate
   return (
     <GlassPanel className="guardian-panel reveal reveal-3">
       <div className="panel-heading compact"><div><span className="eyebrow"><Activity size={13} /> Guard</span><h2>Live guardian</h2></div><span className="local-chip">{points.length} points{latest === undefined ? '' : ` · ${(latest * 100).toFixed(0)}%`}</span></div>
+      {action}
       <div className="guardian-chart" role="img" aria-label={`Live pass rate with ${points.length} points`}>
         <ResponsiveContainer width="100%" height="100%">
           <LineChart data={points} margin={{ top: 22, right: 18, left: 0, bottom: 8 }} accessibilityLayer>

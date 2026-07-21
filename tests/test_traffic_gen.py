@@ -25,6 +25,7 @@ def test_generator_builds_twenty_requests_for_each_distinct_product_family() -> 
 def test_mix_parser_and_replay_are_weighted_cyclic_and_report_failures() -> None:
     requests = traffic_gen.build_requests()
     sent_systems: list[str] = []
+    progress: list[traffic_gen.TrafficStats] = []
 
     def sender(_base_url: str, request: dict[str, object]) -> bool:
         messages = request["messages"]
@@ -38,10 +39,19 @@ def test_mix_parser_and_replay_are_weighted_cyclic_and_report_failures() -> None
         total=6,
         mix=traffic_gen.parse_mix("support-ticket=1,invoice:1,data-pull-sql=1"),
         sender=sender,
+        on_progress=progress.append,
     )
 
     assert stats.sent == 6
     assert (stats.success, stats.failed, stats.interrupted) == (5, 1, False)
+    assert [(item.sent, item.success, item.failed) for item in progress] == [
+        (1, 1, 0),
+        (2, 2, 0),
+        (3, 3, 0),
+        (4, 3, 1),
+        (5, 4, 1),
+        (6, 5, 1),
+    ]
     assert sent_systems[:3] == [
         traffic_gen.SYSTEM_PROMPTS["support-ticket"],
         traffic_gen.SYSTEM_PROMPTS["invoice"],

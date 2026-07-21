@@ -253,6 +253,21 @@ export interface ServingWakeRequest {
   confirm_provider_spend: true
 }
 
+export interface DemoTrafficRequest {
+  total?: number
+  rate?: number
+}
+
+export interface DemoTrafficStatus {
+  total: number
+  rate: number
+  sent: number
+  success: number
+  failed: number
+  running: boolean
+  error: string | null
+}
+
 export interface ChatCompletion {
   id: string
   model: string

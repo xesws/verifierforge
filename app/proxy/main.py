@@ -299,7 +299,15 @@ def create_app(
             headers={"X-VerifierForge-Route": decision.route_path},
         )
 
+    proxy.state.dispatch_product_completion = chat_completions
     return proxy
+
+
+def dispatch_product_completion(request: Mapping[str, Any]) -> JSONResponse:
+    """Enter the production proxy pipeline without a subprocess or HTTP hop."""
+
+    dispatcher = app.state.dispatch_product_completion
+    return dispatcher(dict(request))
 
 
 def _fallback_from_tuned(

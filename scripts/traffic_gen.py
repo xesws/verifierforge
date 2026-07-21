@@ -79,6 +79,9 @@ class TrafficStats:
     interrupted: bool = False
 
 
+ProgressCallback = Callable[[TrafficStats], None]
+
+
 def build_requests(pool_path: Path = FROZEN_TRAINING_POOL) -> dict[str, list[dict[str, Any]]]:
     """Build the three D5 request families without modifying frozen source data."""
     sql_prompts = _frozen_sql_prompts(pool_path)
@@ -116,6 +119,7 @@ def replay_requests(
     total: int,
     mix: Mapping[str, int],
     sender: Callable[[str, Mapping[str, Any]], bool] | None = None,
+    on_progress: ProgressCallback | None = None,
     sleeper: Callable[[float], None] = time.sleep,
     clock: Callable[[], float] = time.monotonic,
 ) -> TrafficStats:
@@ -145,6 +149,8 @@ def replay_requests(
                 success += 1
             else:
                 failed += 1
+            if on_progress is not None:
+                on_progress(TrafficStats(sent=sent, success=success, failed=failed))
             if rate:
                 delay = started + sent / rate - clock()
                 if delay > 0:

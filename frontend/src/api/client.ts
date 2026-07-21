@@ -5,6 +5,8 @@ import type {
   ApprovedSampleSource,
   ChatCompletion,
   Cluster,
+  DemoTrafficRequest,
+  DemoTrafficStatus,
   ForgeExecutionStatus,
   Job,
   JobCreateRequest,
@@ -126,6 +128,10 @@ export class VerifierForgeClient {
     this.request<ChatCompletion>('/serving/tuned-completion', 'POST', body)
   chatCompletion = (body: Record<string, unknown>) =>
     this.request<ChatCompletion>('/proxy/v1/chat/completions', 'POST', body)
+  startDemoTraffic = (body: DemoTrafficRequest = {}) =>
+    this.request<DemoTrafficStatus>('/demo/traffic', 'POST', body)
+  getDemoTrafficStatus = () =>
+    this.request<DemoTrafficStatus>('/demo/traffic/status')
 
   private async request<T>(path: string, method = 'GET', body?: JsonBody): Promise<ApiResponse<T>> {
     const controller = new AbortController()

@@ -114,4 +114,26 @@ describe('VerifierForgeClient', () => {
     await expect(client.createJob({ template: 'nl2sql', model: 'model' })).rejects.toMatchObject({ status: 0 })
     expect(fetcher).toHaveBeenCalledOnce()
   })
+
+  it('exposes the additive demo traffic extension outside the frozen operation set', async () => {
+    const calls: Array<{ method: string; path: string; body: string | undefined }> = []
+    const fetcher = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
+      calls.push({
+        method: init?.method ?? 'GET',
+        path: new URL(String(input)).pathname,
+        body: typeof init?.body === 'string' ? init.body : undefined,
+      })
+      return jsonResponse({ total: 200, rate: 5, sent: 0, success: 0, failed: 0, running: false, error: null })
+    })
+    const client = new VerifierForgeClient({ baseUrl: 'https://api.example.test', fetcher: fetcher as typeof fetch })
+
+    await client.startDemoTraffic({ total: 200, rate: 5 })
+    await client.getDemoTrafficStatus()
+
+    expect(calls).toEqual([
+      { method: 'POST', path: '/demo/traffic', body: JSON.stringify({ total: 200, rate: 5 }) },
+      { method: 'GET', path: '/demo/traffic/status', body: undefined },
+    ])
+    expect(FROZEN_OPERATIONS).toHaveLength(22)
+  })
 })
