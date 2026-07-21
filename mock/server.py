@@ -184,6 +184,7 @@ CLUSTERS: list[Cluster] = [
     if cluster.cluster_id == "support-ticket-extraction"
     else cluster.model_copy(
         update={
+            "job_id": "nl2sql-gain",
             "approved_sample_source": ApprovedSampleSource(
                 kind="repository_jsonl",
                 uri="data/nl2sql/v0.10.0-training-pool.jsonl",
