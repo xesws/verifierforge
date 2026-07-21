@@ -1,6 +1,6 @@
 # VerifierForge user-story opening
 
-**Target:** 25 seconds maximum. **Version:** v0.38.0. **Evidence date:**
+**Target:** 25 seconds maximum. **Version:** v0.38.1. **Evidence date:**
 2026-07-21.
 
 ## What the demo data actually depicts
@@ -27,31 +27,41 @@ Repository evidence:
 - `app/proxy/clusters.py` fixes Data Pull SQL at 95,000 monthly calls and
   $5,500 monthly model cost. The UI describes it as natural language to
   production-safe analytical SQL.
+- The real proxy path in `app/proxy/upstream.py` forwards an OpenAI-compatible
+  request to an operator-configured external API. `app/proxy/traffic.py`
+  records token counts and estimates cost from an editable price table.
+
+The narrative therefore describes the legacy path as a token-priced external
+large-model API. OpenRouter is one possible configured upstream, but the
+$5,500 Discover baseline is not derived from the repository's current proxy
+price table and must not be presented as an OpenRouter invoice.
 
 ## 中文旁白
 
-> 企业数据团队每月让大模型把9.5万条员工、部门、项目和工时问题写成SQL，账单达$5,500/月。这些请求高频、简单、可程序化验真，正适合专属小模型。VerifierForge自动发现、训练、验证，再替换昂贵大模型。
+> 员工用数据助手查询部门、人员、项目和工时。后台每月把9.5万次请求发给按Token收费的外部大模型API，账单达$5,500。问题重复、简单且SQL可验真；VerifierForge训练专属小模型，验证后替换昂贵调用链。
 
-三句，共 108 个字符，符合中文不超过 110 字的限制。
+三句，共 110 个字符，符合中文不超过 110 字的限制。
 
 ## English voiceover
 
-> An enterprise data team asks a large model to turn 95,000 monthly questions about employees, departments, projects, and assignment hours into SQL—costing $5,500 a month. These requests are frequent, simple, and programmatically verifiable, making them ideal for a dedicated small model. VerifierForge automatically discovers, trains, and validates that specialist, then safely replaces the larger model.
+> Employees across the company use an internal data assistant to ask routine questions about departments, people, projects, and work hours. Behind the scenes, all 95,000 monthly requests go to a token-priced third-party large-model API, creating a $5,500 bill. Because these SQL tasks repeat and can be checked automatically, VerifierForge trains and validates a specialist small model to replace that expensive path.
 
-Three sentences, 55 whitespace-delimited words, within the 70-word limit.
+Three sentences, 61 whitespace-delimited words, within the 70-word limit.
 
 ## Demo consistency check
 
 | Script noun or claim | Demo source of truth | Check |
 | --- | --- | --- |
-| Industry background | No industry is named; the script says only “enterprise” | ✓ |
-| Team | Internal data/operations analytics implied by the Data Pull SQL workflow | ✓ |
+| Industry background | No industry is named; the script says only “company” | ✓ |
+| Internal data assistant | Concrete framing for the demonstrated Data Pull SQL workflow | ✓ |
 | Employees and departments | Frozen `employees` and `departments` tables | ✓ |
 | Projects and assignment hours | Frozen `projects` and `employee_projects.hours` | ✓ |
 | Natural language to SQL | Discover description, system prompt, and all frozen records | ✓ |
 | Read-only, programmatic verification | Single `SELECT`/`WITH` constraint and frozen SQLite execution | ✓ |
+| External paid model API | Proxy real mode forwards to a configurable OpenAI-compatible upstream | ✓ |
+| Token-priced usage | Proxy records input/output tokens and applies a configured price table | ✓ |
 | 95,000 monthly questions | Data Pull SQL `monthly_calls=95_000` | ✓ |
-| $5,500 monthly model cost | Data Pull SQL `monthly_cost_usd=5_500.0` | ✓ |
+| $5,500 monthly bill | Discover baseline `monthly_cost_usd=5_500.0`; not a provider invoice | ✓ |
 | Arena compatibility | All ten samples concern the same employee/department/project schema | ✓ |
 | Legacy persona exclusion | No fund, trading, portfolio, invoice, or customer-order claim appears | ✓ |
 
