@@ -1,0 +1,57 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 680" role="img" aria-labelledby="title desc">
+<title id="title">Forge Agent decision system and Gate C</title>
+<desc id="desc">GPT-5.6 uses four read-only tools, exits through a strict schema, and cannot reach the Provisioner without human approval.</desc>
+<metadata>{&quot;facts&quot;:{&quot;metrics&quot;:{&quot;chain_success_rate&quot;:1.0,&quot;config_legality_rate&quot;:1.0,&quot;decision_accuracy&quot;:1.0,&quot;illegal_action_count&quot;:0,&quot;tool_schema_valid_rate&quot;:1.0},&quot;scenario_count&quot;:12},&quot;sources&quot;:[{&quot;path&quot;:&quot;runs/forge-agent/gate-c-v0223-round2.json&quot;,&quot;sha256&quot;:&quot;df11ba682b353a644f85e1179afb32723967394f9425af8584d2552b23bdfbec&quot;}]}</metadata>
+<defs>
+<filter id="shadow" x="-15%" y="-15%" width="130%" height="140%"><feDropShadow dx="0" dy="10" stdDeviation="14" flood-color="#304d5b" flood-opacity=".10"/></filter>
+<linearGradient id="accent" x1="0" x2="1"><stop stop-color="#087cf0"/><stop offset="1" stop-color="#00a67e"/></linearGradient>
+<style>text{font-family:Manrope,Inter,Arial,sans-serif;fill:#17212b}.mono{font-family:"IBM Plex Mono",Menlo,monospace}.label{font-size:13px;letter-spacing:.09em;text-transform:uppercase;font-weight:700}.small{font-size:13px}.tiny{font-size:11px}.body{font-size:16px}.heading{font-size:26px;font-weight:750;letter-spacing:-.03em}.hero{font-size:34px;font-weight:780;letter-spacing:-.04em}.muted{fill:#62717d}.soft{fill:#82909a}.blue{fill:#087cf0}.green{fill:#00a67e}.amber{fill:#a96900}.coral{fill:#dd6b5b}.white{fill:#fff}.stroke{stroke:#d6e2e6;stroke-width:1.5}.arrow{stroke:#82909a;stroke-width:2;fill:none;marker-end:url(#arrow)}</style>
+<marker id="arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse"><path d="M 0 0 L 10 5 L 0 10 z" fill="#82909a"/></marker>
+</defs>
+<rect width="1200" height="680" rx="28" fill="#edf5f7"/>
+<text x="48" y="48" class="label blue" text-anchor="start">FIGURE 2 · AGENT SYSTEM</text>
+<text x="48" y="84" class="heading" text-anchor="start">A decision engine with no spending handle</text>
+<text x="48" y="111" class="small muted" text-anchor="start">Responses tool-calling is audited; execution begins only beyond a human approval wall.</text>
+<rect x="44" y="140" width="1112" height="490" rx="18" fill="#ffffff" stroke="#d6e2e6" filter="url(#shadow)"/>
+<rect x="80" y="190" width="235" height="330" rx="18" fill="#eef6ff" stroke="#c8e1f8"/>
+<text x="108" y="224" class="label blue" text-anchor="start">GPT-5.6 LUNA</text>
+<text x="108" y="258" class="heading" text-anchor="start">ReAct loop</text>
+<text x="108" y="300" class="small" text-anchor="start"><tspan x="108" dy="0">Responses API</tspan><tspan x="108" dy="24">bounded turns/tokens/time</tspan><tspan x="108" dy="24">structured tool calls</tspan><tspan x="108" dy="24">audited AgentTrace</tspan></text>
+<rect x="108" y="415" width="116" height="28" rx="14" fill="#00a67e"/>
+<text x="166.0" y="434" class="tiny mono" text-anchor="middle" fill="#ffffff">READ ONLY</text>
+<text x="108" y="462" class="tiny muted" text-anchor="start"><tspan x="108" dy="0">No Provisioner import</tspan><tspan x="108" dy="19">No provider credential</tspan><tspan x="108" dy="19">No spending handle</tspan></text>
+<rect x="378" y="176" width="230" height="58" rx="18" fill="#ffffff" stroke="#d6e2e6"/>
+<text x="493" y="211" class="small mono" text-anchor="middle">analyze_traffic</text>
+<path d="M315 205 L378 205" stroke="#087cf0" stroke-width="2" fill="none" marker-end="url(#arrow)"/>
+<path d="M608 205 L665 205" stroke="#00a67e" stroke-width="2" fill="none" marker-end="url(#arrow)"/>
+<rect x="378" y="259" width="230" height="58" rx="18" fill="#ffffff" stroke="#d6e2e6"/>
+<text x="493" y="294" class="small mono" text-anchor="middle">inspect_samples</text>
+<path d="M315 288 L378 288" stroke="#087cf0" stroke-width="2" fill="none" marker-end="url(#arrow)"/>
+<path d="M608 288 L665 288" stroke="#00a67e" stroke-width="2" fill="none" marker-end="url(#arrow)"/>
+<rect x="378" y="342" width="230" height="58" rx="18" fill="#ffffff" stroke="#d6e2e6"/>
+<text x="493" y="377" class="small mono" text-anchor="middle">estimate_economics</text>
+<path d="M315 371 L378 371" stroke="#087cf0" stroke-width="2" fill="none" marker-end="url(#arrow)"/>
+<path d="M608 371 L665 371" stroke="#00a67e" stroke-width="2" fill="none" marker-end="url(#arrow)"/>
+<rect x="378" y="425" width="230" height="58" rx="18" fill="#ffffff" stroke="#d6e2e6"/>
+<text x="493" y="460" class="small mono" text-anchor="middle">check_verifiability</text>
+<path d="M315 454 L378 454" stroke="#087cf0" stroke-width="2" fill="none" marker-end="url(#arrow)"/>
+<path d="M608 454 L665 454" stroke="#00a67e" stroke-width="2" fill="none" marker-end="url(#arrow)"/>
+<rect x="665" y="190" width="180" height="310" rx="18" fill="#f0faf7" stroke="#bfe6da"/>
+<text x="755" y="225" class="label green" text-anchor="middle">DATA LAYER</text>
+<text x="755" y="271" class="small" text-anchor="middle"><tspan x="755" dy="0">Supabase facts</tspan><tspan x="755" dy="32">approved samples</tspan><tspan x="755" dy="32">cost assumptions</tspan><tspan x="755" dy="32">verifier evidence</tspan></text>
+<rect x="350" y="535" width="510" height="62" rx="18" fill="#17212b"/>
+<text x="605" y="561" class="small mono white" text-anchor="middle">submit_decision · strict AgentDecision schema</text>
+<text x="605" y="583" class="tiny mono" text-anchor="middle" fill="#9ddbc9">forge | skip | need_more_data</text>
+<line x1="890" y1="170" x2="890" y2="590" stroke="#dd6b5b" stroke-width="5" stroke-dasharray="8 8"/>
+<text x="904" y="204" class="label coral" text-anchor="start">HUMAN APPROVAL WALL</text>
+<rect x="930" y="250" width="180" height="104" rx="18" fill="#fff4e3" stroke="#f0d7aa"/>
+<text x="1020" y="284" class="heading" text-anchor="middle">Approve</text>
+<text x="1020" y="315" class="small muted" text-anchor="middle">writes intent only</text>
+<rect x="930" y="382" width="180" height="104" rx="18" fill="#eaf4ff" stroke="#c8e1f8"/>
+<text x="1020" y="417" class="heading" text-anchor="middle">Start Forge</text>
+<text x="1020" y="448" class="small muted" text-anchor="middle">Provisioner begins</text>
+<rect x="72" y="154" width="806" height="394" rx="24" fill="none" stroke="#98b9c8"/>
+<text x="680" y="166" class="tiny mono muted" text-anchor="middle">EVALUATOR · 12 scenarios · schema / chain / decision / config</text>
+<rect x="944" y="535" width="176" height="28" rx="14" fill="#00a67e"/>
+<text x="1032.0" y="554" class="tiny mono" text-anchor="middle" fill="#ffffff">GATE C  1 / 1 / 0 / 1</text>
+</svg>

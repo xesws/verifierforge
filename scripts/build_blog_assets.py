@@ -14,6 +14,10 @@ from typing import Iterable, Sequence
 ROOT = Path(__file__).resolve().parents[1]
 FIGURE_DIR = ROOT / "docs" / "blog" / "figures"
 BRAND_DIR = ROOT / "assets" / "brand"
+WEB_CONTENT_DIR = (
+    ROOT / "frontend" / "src" / "generated" / "technical-deep-dive"
+)
+ARTICLE_PATH = ROOT / "docs" / "blog" / "technical-deep-dive.md"
 
 MAIN_METRICS = Path("data/demo-artifacts/jobs/d4-m3-1p5b-r1-v0125/metrics.jsonl")
 CONTROL_METRICS = Path("data/demo-artifacts/jobs/d4-m4-0p5b-random-v0126/metrics.jsonl")
@@ -414,17 +418,31 @@ def build_wordmark() -> str:
 
 def outputs() -> dict[Path, str]:
     mark = build_mark()
-    return {
-        FIGURE_DIR / "01-spurious-control.svg": build_spurious_control(),
-        FIGURE_DIR / "02-agent-system.svg": build_agent_system(),
-        FIGURE_DIR / "03-grpo-loop.svg": build_grpo_loop(),
-        FIGURE_DIR / "04-verifier-pipeline.svg": build_verifier_pipeline(),
-        FIGURE_DIR / "05-heldout-selection.svg": build_heldout_selection(),
-        FIGURE_DIR / "06-system-loop.svg": build_system_loop(),
+    figures = {
+        "01-spurious-control.svg": build_spurious_control(),
+        "02-agent-system.svg": build_agent_system(),
+        "03-grpo-loop.svg": build_grpo_loop(),
+        "04-verifier-pipeline.svg": build_verifier_pipeline(),
+        "05-heldout-selection.svg": build_heldout_selection(),
+        "06-system-loop.svg": build_system_loop(),
+    }
+    result = {
+        **{FIGURE_DIR / name: content for name, content in figures.items()},
         BRAND_DIR / "verifierforge-mark.svg": mark,
         BRAND_DIR / "verifierforge-wordmark.svg": build_wordmark(),
         ROOT / "frontend" / "public" / "favicon.svg": mark,
+        WEB_CONTENT_DIR / "technical-deep-dive.md": ARTICLE_PATH.read_text(
+            encoding="utf-8"
+        ),
+        WEB_CONTENT_DIR / "verifierforge-wordmark.svg": build_wordmark(),
     }
+    result.update(
+        {
+            WEB_CONTENT_DIR / "figures" / name: content
+            for name, content in figures.items()
+        }
+    )
+    return result
 
 
 def write_outputs() -> None:

@@ -60,3 +60,15 @@ def test_favicon_is_the_canonical_mark() -> None:
     mark = build_blog_assets.BRAND_DIR / "verifierforge-mark.svg"
     favicon = build_blog_assets.ROOT / "frontend" / "public" / "favicon.svg"
     assert mark.read_bytes() == favicon.read_bytes()
+
+
+def test_frontend_bundle_is_generated_from_the_canonical_sources() -> None:
+    web = build_blog_assets.WEB_CONTENT_DIR
+    assert (web / "technical-deep-dive.md").read_bytes() == (
+        build_blog_assets.ARTICLE_PATH.read_bytes()
+    )
+    assert (web / "verifierforge-wordmark.svg").read_bytes() == (
+        build_blog_assets.BRAND_DIR / "verifierforge-wordmark.svg"
+    ).read_bytes()
+    for figure in build_blog_assets.FIGURE_DIR.glob("*.svg"):
+        assert (web / "figures" / figure.name).read_bytes() == figure.read_bytes()
