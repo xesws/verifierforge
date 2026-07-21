@@ -3224,6 +3224,13 @@ ESLint had zero warnings, and the production TypeScript/Vite build passed.
 - [ ] **F4 — local/public acceptance.** Exercise all 21 operations from the UI,
   capture page evidence, run one authorized Wake and tuned completion, restore
   product state, drain immediately, and prove provider inventory zero.
+  - [x] Public secret-safe contract smoke: 20 non-paid operations were
+    exercised against Railway; expected disabled Start returned HTTP 404,
+    execution status remained readable as `approved`, and temporary Job/
+    credential rows were deleted. Paid Wake remains deliberately deferred.
+  - [ ] Screenshot pass is blocked in this session because browser discovery
+    returned no available browser instance. Local reviewer/API and Vite were
+    started successfully; do not substitute an unrelated automation surface.
 - [ ] **F5 — Vercel preview.** Device-authorize the CLI, deploy the `frontend`
   root, report its URL for owner Railway CORS configuration, verify direct
   routes, and update JUDGES on the feature branch.
