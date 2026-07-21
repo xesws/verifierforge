@@ -6,7 +6,7 @@
 
 <p align="center">
   <img alt="tests passing" src="https://img.shields.io/badge/tests-passing-00a67e" />
-  <img alt="version v0.39.2" src="https://img.shields.io/badge/version-v0.39.2-087cf0" />
+  <img alt="version v0.39.3" src="https://img.shields.io/badge/version-v0.39.3-087cf0" />
   <img alt="Python 3.11" src="https://img.shields.io/badge/python-3.11-17212b" />
 </p>
 
@@ -26,6 +26,51 @@ modeled cost of $5,500. VerifierForge discovers that workload, recommends a
 forge, trains on 50 examples, selects the best checkpoint on 60 unseen
 questions, and serves the result behind a reversible canary. It is one proven
 business workflow, not a claim that every task should use a small model.
+
+## The example: replace repetitive NL→SQL calls
+
+The demonstrated customer is an enterprise data team whose internal assistant
+answers recurring questions about employees, departments, projects, and work
+hours. Its legacy path sends all 95,000 monthly questions to a general-purpose
+model API, producing the Discover baseline of **$5,500 per month**. These
+requests are a good specialization candidate because they repeat and the
+resulting SQL can be executed and checked automatically.
+
+One actual example from the frozen 50-row training pool is:
+
+> **Business question:** Find every active employee in the Engineering
+> department and order the results by name.
+
+```sql
+SELECT e.name
+FROM employees AS e
+JOIN departments AS d ON e.department_id = d.id
+WHERE d.name = 'Engineering' AND e.active = 1
+ORDER BY e.name;
+```
+
+On the frozen fixture this returns `Ada`, `Frances`, and `Grace`. The example,
+schema, expected rows, and reference SQL are committed as training record
+[`v1-007`](data/nl2sql/v0.10.0-training-pool.jsonl); the product also lets a
+reviewer generate SQL with the tuned model and execute it live in a fresh
+browser SQLite database.
+
+### The result: held-out pass@1 improved from 58.3% to 78.3%
+
+<p align="center">
+  <img src="docs/blog/figures/05-heldout-selection.svg" alt="Held-out pass at one for the baseline and eight trained checkpoints, with step 350 selected at 78.3 percent versus the 58.3 percent baseline" width="100%" />
+</p>
+
+*Starting from Qwen2.5-1.5B-Instruct, all eight trained checkpoints sat the same
+60-question exam that was excluded from training. Step 350 scored **78.3%
+pass@1**, a **20 percentage-point** gain over the **58.3% baseline**. The final
+step 400 fell to 71.7%, so VerifierForge shipped the best verified
+checkpoint—not simply the last one.*
+
+| Frozen held-out exam | Baseline | Selected step 350 |
+| --- | ---: | ---: |
+| pass@1 across 60 unseen questions | **58.3%** | **78.3%** |
+| pass@8 across the same 60 questions | 76.7% | 90.0% |
 
 ## Reviewer guide — no local setup required
 
@@ -51,6 +96,33 @@ accidental paid training job. Serving Wake is separately protected by the
 invitation, an explicit confirmation, one-session concurrency, and a budget
 cap. The public [Technical Deep Dive](https://verifierforge-web.vercel.app/tech)
 requires no invitation.
+
+## Why the result is credible
+
+The training reward is not a human rating or an LLM judging another LLM. Every
+completion passes through an executable verifier: extract one read-only SQL
+statement, parse it, run it against the frozen schema, and compare its result
+set with the expected rows.
+
+<p align="center">
+  <img src="docs/blog/figures/04-verifier-pipeline.svg" alt="NL to SQL verifier pipeline from extraction through parsing, execution, and exact result comparison" width="100%" />
+</p>
+
+*The verifier gives partial credit for valid SQL and executable SQL, but only
+an exact result-set match receives full reward.*
+
+The run also includes a deliberately imperfect random-reward reference. It is
+not a strict causal experiment—the control uses a smaller model and fewer
+steps—but it is a useful falsification check: the verifier-rewarded training
+curve rose while the random-reward monitor ended at 0.40.
+
+<p align="center">
+  <img src="docs/blog/figures/01-spurious-control.svg" alt="Actual monitoring curves for the verifier-rewarded main run and random-reward reference" width="100%" />
+</p>
+
+*If the visible gain were merely a generic formatting effect, the random-reward
+path should also rise. It did not; the quality claim itself still comes from
+the frozen held-out exam above.*
 
 ## Technical Deep Dive
 
@@ -156,6 +228,9 @@ only as a temporary local fake-trainer compatibility mode.
    error. This execution is separate from model generation and can continue
    after the GPU returns to cold.
 
+<details>
+<summary><strong>Contributor setup and operations (optional)</strong></summary>
+
 ## Developer Quick Start
 
 This section is for contributors. Reviewers should use the hosted path above.
@@ -257,6 +332,8 @@ returns it. Decryption happens afresh at each provider HTTP call. For local and
 reviewer demos only, a user without a stored credential may fall back to the
 system process's `.env` `RUNPOD_API_KEY`; production deployments should supply
 BYO credentials through Settings and keep that fallback unset.
+
+</details>
 
 ## Limitations
 
