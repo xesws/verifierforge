@@ -1,7 +1,6 @@
 import { createContext, type ReactNode, useCallback, useContext, useMemo, useState } from 'react'
 import { ApiConfigurationError, VerifierForgeClient, configuredApiBaseUrl } from '../api/client'
-
-const STORAGE_KEY = 'verifierforge.invitation.session.v1'
+import { clearReviewerSessionStorage, INVITATION_STORAGE_KEY } from './storage'
 
 interface AuthState {
   invitation: string | null
@@ -14,7 +13,7 @@ interface AuthState {
 const AuthContext = createContext<AuthState | null>(null)
 
 function storedInvitation(): string | null {
-  try { return window.sessionStorage.getItem(STORAGE_KEY) } catch { return null }
+  try { return window.sessionStorage.getItem(INVITATION_STORAGE_KEY) } catch { return null }
 }
 
 export function AuthProvider({ children }: { children: ReactNode }) {
@@ -22,11 +21,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const setInvitation = useCallback((value: string) => {
     const clean = value.trim()
     if (!clean) return
-    window.sessionStorage.setItem(STORAGE_KEY, clean)
+    window.sessionStorage.setItem(INVITATION_STORAGE_KEY, clean)
     setInvitationState(clean)
   }, [])
   const clearInvitation = useCallback(() => {
-    window.sessionStorage.removeItem(STORAGE_KEY)
+    clearReviewerSessionStorage()
     setInvitationState(null)
   }, [])
   const state = useMemo<AuthState>(() => {

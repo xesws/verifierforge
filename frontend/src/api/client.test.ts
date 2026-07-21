@@ -13,9 +13,9 @@ function jsonResponse(payload: unknown, init: ResponseInit = {}): Response {
 }
 
 describe('frozen operation registry', () => {
-  it('contains exactly the 21 frontend-api-v1 operations', () => {
-    expect(FROZEN_OPERATIONS).toHaveLength(21)
-    expect(new Set(FROZEN_OPERATIONS.map(([method, path]) => `${method} ${path}`)).size).toBe(21)
+  it('contains exactly the 22 frontend-api-v1 operations', () => {
+    expect(FROZEN_OPERATIONS).toHaveLength(22)
+    expect(new Set(FROZEN_OPERATIONS.map(([method, path]) => `${method} ${path}`)).size).toBe(22)
   })
 })
 
@@ -69,6 +69,7 @@ describe('VerifierForgeClient', () => {
     await client.putProviderCredential('nebius', 'owner', 'fixture-only')
     await client.wakeServing({ model_id: 'vf-demo', confirm_provider_spend: true })
     await client.getServingStatus()
+    await client.tunedCompletion({ model: 'vf-demo', messages: [] })
 
     const expected = FROZEN_OPERATIONS.map(([method, path]) => ({
       method,

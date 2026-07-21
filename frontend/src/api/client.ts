@@ -122,6 +122,8 @@ export class VerifierForgeClient {
   wakeServing = (body: ServingWakeRequest) => this.request<ServingStatus>('/serving/wake', 'POST', body)
   getServingStatus = (modelId = 'vf-demo') =>
     this.request<ServingStatus>(`/serving/status?model_id=${encodeURIComponent(modelId)}`)
+  tunedCompletion = (body: Record<string, unknown>) =>
+    this.request<ChatCompletion>('/serving/tuned-completion', 'POST', body)
   chatCompletion = (body: Record<string, unknown>) =>
     this.request<ChatCompletion>('/proxy/v1/chat/completions', 'POST', body)
 

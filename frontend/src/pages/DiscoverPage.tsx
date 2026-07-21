@@ -2,18 +2,18 @@ import { ArrowRight, Coins, Cpu, DatabaseZap, Gauge, Layers3, Link2, ShieldCheck
 import { useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { ApiError } from '../api/client'
-import type { AgentAnalysisResponse, ApprovalRecord, Cluster, ForgeExecutionStatus } from '../api/contracts'
+import type { AgentAnalysisResponse, Cluster } from '../api/contracts'
 import { AgentDecisionCard } from '../components/AgentDecisionCard'
 import { EvidenceBadge } from '../components/EvidenceBadge'
 import { ErrorState, LoadingState } from '../components/ResourceState'
 import { GlassPanel } from '../components/GlassPanel'
 import { PageHeader } from '../components/PageHeader'
 import { StatusPill } from '../components/StatusPill'
-import { WakeModelControl } from '../components/WakeModelControl'
-import { clusterDescriptions, FLAGSHIP_JOB_ID, SQL_SAMPLE_SOURCE } from '../data/presentation'
+import { clusterDescriptions, SQL_SAMPLE_SOURCE } from '../data/presentation'
 import { useAuth } from '../state/AuthContext'
+import { useJourney } from '../state/JourneyContext'
 import { useResource } from '../state/useResource'
-import { formatCompact, formatCurrency, formatPercent } from '../utils/format'
+import { formatCompact, formatCurrency } from '../utils/format'
 
 const clusterIcons = [Layers3, Coins, DatabaseZap] as const
 
@@ -30,7 +30,7 @@ export function DiscoverPage() {
 
   return (
     <div className="page discover-page">
-      <PageHeader eyebrow="Opportunity map" title="Turn recurring model spend into owned performance." description="Inspect real workload volume, let the Forge Agent propose a bounded plan, then approve and start it as two separate decisions." action={<Link className="primary-button" to="/forge/new"><Sparkles size={17} />New job</Link>} />
+      <PageHeader eyebrow="Opportunity map" title="Discover which recurring workload is worth optimizing." description="Inspect business volume and cost, approve the governed input, then ask the Forge Agent whether a bounded specialist is defensible. Training and serving live in later stages." />
       <section className="summary-strip reveal reveal-1" aria-label="Portfolio summary">
         <div><Layers3 size={17} /><strong>{clusters.data.length}</strong><span>task clusters</span></div>
         <div><Gauge size={17} /><strong>{formatCurrency(monthlySpend)}</strong><span>monthly model cost</span></div>
@@ -46,7 +46,7 @@ export function DiscoverPage() {
               <div className="cluster-top"><div className="cluster-icon"><Icon size={22} /></div><StatusPill status={cluster.status} /></div>
               <div className="cluster-copy"><span className="mono">{formatCompact(cluster.monthly_calls)} SQL / MONTH</span><h2>{cluster.name}</h2><p>{clusterDescriptions[cluster.cluster_id] ?? 'A repeated model workload discovered from proxy traffic.'}</p></div>
               <div className="cluster-cost"><span>Monthly model cost</span><strong>{formatCurrency(cluster.monthly_cost_usd)}</strong><small> / month</small></div>
-              {isSql ? <a className="card-link" href="#sql-analysis">Review evidence & agent plan <ArrowRight size={15} /></a> : cluster.job_id ? <Link className="card-link" to={`/jobs/${cluster.job_id}`}>View run <ArrowRight size={15} /></Link> : <span className="cluster-muted">Awaiting an approved verifier source</span>}
+              {isSql ? <a className="card-link" href="#sql-analysis">Analyze this opportunity <ArrowRight size={15} /></a> : <span className="cluster-muted">Available for traffic analysis</span>}
             </GlassPanel>
           )
         })}
@@ -59,34 +59,22 @@ export function DiscoverPage() {
 
 function SqlAnalysis({ cluster, onClusterReload }: { cluster: Cluster | null; onClusterReload: () => void }) {
   const { client } = useAuth()
+  const journey = useJourney()
   const [analysis, setAnalysis] = useState<AgentAnalysisResponse | null>(null)
-  const [approval, setApproval] = useState<ApprovalRecord | null>(null)
-  const [execution, setExecution] = useState<ForgeExecutionStatus | null>(null)
   const [sourceUri, setSourceUri] = useState<string>(SQL_SAMPLE_SOURCE.uri)
   const [busy, setBusy] = useState<string | null>(null)
   const [message, setMessage] = useState<string | null>(null)
-  const [confirmStart, setConfirmStart] = useState(false)
-
-  const executionState = execution?.state
-  useEffect(() => {
-    if (!client || !cluster) return
-    void client.getDecision(cluster.cluster_id).then((value) => setAnalysis(value.data)).catch((error) => { if (!(error instanceof ApiError && error.status === 404)) setMessage(error.message) })
-  }, [client, cluster])
 
   useEffect(() => {
-    if (!client || !analysis) return
-    void client.getApproval(analysis.decision_id).then((value) => setApproval(value.data)).catch((error) => { if (!(error instanceof ApiError && error.status === 404)) setMessage(error.message) })
-  }, [analysis, client])
-
-  useEffect(() => {
-    if (!client || !approval) return
-    const load = () => client.getForgeExecution(approval.approval_id).then((value) => setExecution(value.data)).catch((error) => { if (!(error instanceof ApiError && error.status === 404)) setMessage(error.message) })
-    void load()
-    if (!executionState || ['approved', 'provisioning', 'running', 'collecting'].includes(executionState)) {
-      const timer = window.setInterval(() => void load(), 5_000)
-      return () => window.clearInterval(timer)
-    }
-  }, [approval, client, executionState])
+    if (!client || !cluster || journey.clusterId !== cluster.cluster_id || !journey.decisionId) return
+    void client.getDecision(cluster.cluster_id)
+      .then((value) => {
+        if (value.data.decision_id === journey.decisionId) setAnalysis(value.data)
+      })
+      .catch((error) => {
+        if (!(error instanceof ApiError && error.status === 404)) setMessage(error.message)
+      })
+  }, [client, cluster, journey.clusterId, journey.decisionId])
 
   async function run(label: string, action: () => Promise<void>) {
     setBusy(label); setMessage(null)
@@ -94,24 +82,22 @@ function SqlAnalysis({ cluster, onClusterReload }: { cluster: Cluster | null; on
   }
 
   if (!cluster) return null
-  const decision = analysis?.decision ?? cluster.analyzer_decision
+  const decision = analysis?.decision
   return (
     <section className="analysis-workflow reveal reveal-4" id="sql-analysis">
-      <div className="workflow-heading"><div><span className="eyebrow">Data Pull SQL · decision workflow</span><h2>Inspect the input before approving the solution.</h2><p>95k monthly calls and {formatCurrency(cluster.monthly_cost_usd)} in monthly model cost make the opportunity visible before any recommendation appears.</p></div><Link2 size={24} /></div>
+      <div className="workflow-heading"><div><span className="eyebrow">Data Pull SQL · discovery workflow</span><h2>Inspect the input, then ask whether this workload is optimizable.</h2><p>95k monthly calls and {formatCurrency(cluster.monthly_cost_usd)} in monthly model cost make the opportunity visible before any recommendation appears.</p></div><Link2 size={24} /></div>
       <div className="source-row">
         <label htmlFor="sample-source"><span>Input</span><small>The governed repository source the agent may inspect.</small></label>
         <div><input id="sample-source" value={sourceUri} onChange={(event) => setSourceUri(event.target.value)} /><button className="secondary-button" type="button" disabled={busy !== null} onClick={() => void run('input', async () => { if (!client) return; await client.putSampleSource(cluster.cluster_id, { uri: sourceUri, approved_by: 'judge', expected_sha256: SQL_SAMPLE_SOURCE.sha256, expected_row_count: SQL_SAMPLE_SOURCE.rowCount }); onClusterReload(); setMessage('Input source approved and identity-checked.') })}>Input</button></div>
         <code>{cluster.approved_sample_source ? `${cluster.approved_sample_source.row_count} rows · ${cluster.approved_sample_source.sha256.slice(0, 12)}…` : 'Not yet approved'}</code>
       </div>
       <div className="analysis-actions">
-        <button className="primary-button" type="button" disabled={busy !== null} onClick={() => void run('analyze', async () => { if (!client) return; const result = await client.analyze(cluster.cluster_id, { data_source: sourceUri }); setAnalysis(result.data) })}><Sparkles size={16} />{busy === 'analyze' ? 'Analyzing…' : 'Analyze'}</button>
+        <button className="primary-button" type="button" disabled={busy !== null} onClick={() => void run('analyze', async () => { if (!client) return; const result = await client.analyze(cluster.cluster_id, { data_source: sourceUri }); setAnalysis(result.data); journey.recordAnalysis(result.data); setMessage(result.data.decision.decision === 'forge' ? 'Opportunity confirmed. Forge is now unlocked.' : 'This workload does not pass the Forge decision gate yet.') })}><Sparkles size={16} />{busy === 'analyze' ? 'Analyzing…' : 'Analyze'}</button>
         <span>Agent analysis is advisory and cannot provision a GPU.</span>
       </div>
-      {decision && <AgentDecisionCard analysis={analysis} fallback={cluster.analyzer_decision} />}
-      {decision?.config && <GlassPanel className="approval-panel"><div><span className="eyebrow">Human control boundary</span><h3>Approve the proposed schema, then start separately.</h3><p><strong>Approve & Forge</strong> stores who accepted this exact config. It does not allocate a GPU. <strong>Start Forge</strong> is a second confirmation that may provision a budget-capped GPU and begin the training lifecycle.</p></div><div className="approval-actions">{!approval ? <button className="secondary-button" type="button" disabled={!analysis || busy !== null} onClick={() => void run('approve', async () => { if (!client || !analysis) return; setApproval((await client.approve(analysis.decision_id, 'judge')).data) })}>Approve & Forge</button> : <StatusPill status={execution?.state ?? 'approved'} />}{approval && !execution && <label className="confirmation-row"><input type="checkbox" checked={confirmStart} onChange={(event) => setConfirmStart(event.target.checked)} /><span>I confirm provider spend may begin.</span></label>}{approval && !execution && <button className="primary-button" type="button" disabled={!confirmStart || busy !== null} onClick={() => void run('start', async () => { if (!client) return; setExecution((await client.startForge(approval.approval_id, { requested_by: 'judge', confirm_provider_spend: true })).data) })}>{busy === 'start' ? 'Starting…' : 'Start Forge'}</button>}</div></GlassPanel>}
+      {decision && <AgentDecisionCard analysis={analysis} />}
+      {decision?.decision === 'forge' && decision.config && <div className="discovery-handoff"><div><strong>Discovery complete</strong><span>Review and authorize this exact proposal in Forge.</span></div><Link className="primary-button" to="/forge/new">Continue to Forge <ArrowRight size={16} /></Link></div>}
       {message && <div className="inline-notice" role="status">{message}</div>}
-      <WakeModelControl />
-      <div className="workflow-proof"><span>Existing proof</span><strong>{formatPercent(.583333)} <ArrowRight size={15} /> {formatPercent(.783333)}</strong><Link to={`/reports/${FLAGSHIP_JOB_ID}`}>Open held-out report</Link></div>
     </section>
   )
 }

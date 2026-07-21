@@ -1,6 +1,6 @@
 import { ArrowRight, BadgeDollarSign, Check, CircleDollarSign, Rows3, ShieldCheck, Target } from 'lucide-react'
 import { useEffect, useState } from 'react'
-import { Link, useParams } from 'react-router-dom'
+import { Navigate, useNavigate, useParams } from 'react-router-dom'
 import { selectedCheckpoint } from '../api/mappers'
 import { ArenaComparison } from '../components/ArenaComparison'
 import { EvidenceBadge } from '../components/EvidenceBadge'
@@ -9,6 +9,7 @@ import { HeldoutChart } from '../components/HeldoutChart'
 import { MetricCard } from '../components/MetricCard'
 import { ErrorState, LoadingState } from '../components/ResourceState'
 import { useAuth } from '../state/AuthContext'
+import { useJourney } from '../state/JourneyContext'
 import { useResource } from '../state/useResource'
 import { formatCurrency, formatPercent } from '../utils/format'
 
@@ -21,7 +22,10 @@ function CountUp({ value }: { value: number }) {
 export function ReportPage() {
   const { jobId = '' } = useParams()
   const { client } = useAuth()
+  const journey = useJourney()
+  const navigate = useNavigate()
   const resource = useResource(async () => { if (!client) throw new Error('API client is unavailable'); return (await client.getJob(jobId)).data }, [client, jobId], { enabled: Boolean(client && jobId) })
+  if (journey.selectedJobId && jobId !== journey.selectedJobId) return <Navigate to={`/reports/${journey.selectedJobId}`} replace state={{ journeyNotice: 'Proof is locked to the Run selected in Forge.' }} />
   if (resource.status === 'loading' || resource.status === 'idle') return <LoadingState label="Loading the frozen report…" />
   if (resource.status === 'error' || !resource.data) return <ErrorState message={resource.error ?? 'Report unavailable'} onRetry={resource.reload} />
   const job = resource.data
@@ -38,6 +42,6 @@ export function ReportPage() {
     <section className="report-metrics reveal reveal-1"><MetricCard label="ARENA" value={`${report.arena.samples.length} samples`} note={`${provenanceRows} frozen sources`} icon={<Rows3 size={17} />} /><MetricCard label="CONTROL AFTER" value={formatPercent(report.control_final_pass_at_1)} note="random-reward comparison" icon={<Target size={17} />} tone="blue" /><MetricCard label="SELECTED" value={selected ? `Step ${selected}` : 'Frozen'} note="maximum held-out pass@1" icon={<ShieldCheck size={17} />} tone="green" /></section>
     <div className="report-grid"><GlassPanel className="heldout-panel reveal reveal-2"><div className="panel-heading"><div><span className="eyebrow"><ShieldCheck size={13} /> Before / after branch</span><h2>The tuned path separates from control.</h2><p>All three values come from the report contract, not a presentation fixture.</p></div></div><HeldoutChart baseline={before} tuned={after} control={report.control_final_pass_at_1} /><div className="selection-explainer"><strong>Verdict: {report.verdict}</strong><p>{report.narrative}</p></div></GlassPanel><GlassPanel className="savings-card reveal reveal-3"><div className="savings-icon"><CircleDollarSign size={25} /></div><span>Projected monthly savings</span><strong>{formatCurrency(report.projected_monthly_savings_usd ?? 0)}</strong><p>{report.savings_projection.formula}</p><ul>{report.savings_projection.assumptions.map((assumption) => <li key={assumption}>{assumption}</li>)}</ul><div className="projection-label"><BadgeDollarSign size={14} />Explicit assumptions · API payload</div></GlassPanel></div>
     <ArenaComparison arena={report.arena} />
-    <div className="report-footer reveal reveal-5"><p><ShieldCheck size={17} /><span><strong>Evidence boundary locked.</strong> Arena samples are from the unseen held-out set and include failures.</span></p><Link className="primary-button" to="/ship/data-pull-sql">Configure routing <ArrowRight size={16} /></Link></div>
+    <div className="report-footer reveal reveal-5"><p><ShieldCheck size={17} /><span><strong>Evidence boundary locked.</strong> Arena samples are from the unseen held-out set and include failures.</span></p><button className="primary-button" type="button" onClick={() => { journey.acknowledgeProof(); navigate('/ship/data-pull-sql') }}>Accept evidence & continue to Ship <ArrowRight size={16} /></button></div>
   </div>
 }

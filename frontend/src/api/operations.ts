@@ -20,6 +20,7 @@ export const FROZEN_OPERATIONS = [
   ['PUT', '/settings/provider-credentials/{provider}'],
   ['POST', '/serving/wake'],
   ['GET', '/serving/status'],
+  ['POST', '/serving/tuned-completion'],
 ] as const
 
 export type FrozenOperation = (typeof FROZEN_OPERATIONS)[number]
