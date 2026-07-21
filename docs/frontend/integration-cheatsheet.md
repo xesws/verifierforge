@@ -1,8 +1,9 @@
 # Frontend integration cheatsheet
 
-Last verified: **2026-07-20 · v0.34.0** from the fixed Railway public origin;
-the v0.35.0 journey/tuned-probe revision is pending redeployment
-against Supabase Postgres and the dynamic serving registry. The Forge Agent is
+Last verified: **2026-07-20 · v0.35.0 candidate** from the fixed Railway public
+origin and Vercel production alias. The 22-operation boundary passed its
+secret-safe, no-Wake smoke against Supabase Postgres and the dynamic serving
+registry. The Forge Agent is
 deterministic mock and training autoprovision is off. Serving wake is an
 independent, invite-protected action with explicit spend confirmation.
 
@@ -123,7 +124,7 @@ was read directly where that claim applies.
 | 19 | `PUT /settings/provider-credentials/nebius` | 200 | yes; key never returned | Supabase | yes |
 | 20 | `POST /serving/wake` | 404 by code default; 202 on accepted hosted wake | lifecycle shape; literal spend confirmation | Supabase + RunPod | yes |
 | 21 | `GET /serving/status` | 200 | lifecycle shape; endpoint key absent | Supabase registry | yes |
-| 22 | `POST /serving/tuned-completion` | 409 while cold; 200 only when ready | OpenAI completion + `X-VerifierForge-Route: tuned` | Supabase registry + tuned endpoint | pending v0.35.0 acceptance |
+| 22 | `POST /serving/tuned-completion` | 409 while cold; 200 only when ready | OpenAI completion + `X-VerifierForge-Route: tuned` | Supabase registry + tuned endpoint | yes; cold branch verified, live branch requires separately authorized Wake |
 
 All scoped self-check Job, credential, and approval rows were removed. Routing
 and sample-source product values were restored, and

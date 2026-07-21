@@ -3206,7 +3206,7 @@ remains available through the Wake model scale-to-zero path.
 - [x] **F0 — branch and documentation gate.** Push the v0.34.2 review,
   branch from current main, reserve v0.35.0 docs, cherry-pick Nora commit
   `642e335`, and prove the untouched visual baseline still builds.
-- [x] **F1 — typed API boundary.** Cover exactly 21 frozen operations,
+- [x] **F1 — typed API boundary.** Cover exactly 22 frozen operations,
   `VITE_VF_API_BASE_URL`, runtime Basic invitation, safe errors, and cold/
   fallback semantics without a backend change.
 - [x] **F2 — five-page product wiring.** Discover/Forge/Job/Report/Ship consume
@@ -3219,18 +3219,23 @@ remains available through the Wake model scale-to-zero path.
 F2/F3 checkpoint: the static JSON generator and localStorage Job simulation
 were removed. The five pages now consume the frozen typed client; cold serving
 leaves all report evidence visible, mutations are explicit, and Start Forge is
-separate from approval. Validation at commit time: 9 frontend tests passed,
+separate from approval. Final validation: 14 frontend tests passed,
 ESLint had zero warnings, and the production TypeScript/Vite build passed.
-- [ ] **F4 — local/public acceptance.** Exercise all 21 operations from the UI,
+- [ ] **F4 — local/public acceptance.** Exercise all 22 operations from the UI,
   capture page evidence, run one authorized Wake and tuned completion, restore
   product state, drain immediately, and prove provider inventory zero.
-  - [x] Public secret-safe contract smoke: 20 non-paid operations were
-    exercised against Railway; expected disabled Start returned HTTP 404,
-    execution status remained readable as `approved`, and temporary Job/
-    credential rows were deleted. Paid Wake remains deliberately deferred.
+  - [x] Public secret-safe contract smoke: 21 no-Wake calls exercised every
+    safe branch of the 22-operation Railway boundary; the paid Wake was
+    deliberately skipped. Expected disabled Start returned HTTP 404, cold
+    tuned completion returned HTTP 409, execution status remained readable as
+    `approved`, and temporary Job/credential rows were deleted.
   - [ ] Screenshot pass is blocked in this session because browser discovery
     returned no available browser instance. Local reviewer/API and Vite were
     started successfully; do not substitute an unrelated automation surface.
+  - [x] Deterministic acceptance: `pytest -q` reported `478 passed, 1 skipped`;
+    frontend Vitest reported `14 passed`; ESLint and the production Vite build
+    passed. Direct deep-link rejection, staged unlocks, session reset, real
+    status activity, and full tuned result rendering have component coverage.
 - [x] **F5 — Vercel production entry.** Device-authorize the CLI, deploy the `frontend`
   root, report its URL for owner Railway CORS configuration, verify direct
   routes, and update JUDGES on the feature branch.
@@ -3242,6 +3247,11 @@ ESLint had zero warnings, and the production TypeScript/Vite build passed.
     `VITE_VF_API_BASE_URL` to the Railway public origin.
   - [x] Railway CORS preflight from the exact Vercel origin returned HTTP 200
     with matching `access-control-allow-origin`.
+  - [x] Reviewer-journey correction redeployed: Railway deployment
+    `c06cb26c-7a57-47aa-ad02-5d045ae1669c` is Online; Vercel deployment
+    `dpl_BWc4iuu3ocBkgHcCNsiESZ3F3ygz` is Ready on the stable alias. All five
+    SPA deep links returned HTTP 200 and the built bundle contained the staged
+    handoff, Ship Wake, and tuned-result controls.
 - [ ] **F6 — owner gate and production.** After explicit visual approval,
   update from main, revalidate, merge/push, deploy production, verify, and tag
   `frontend-v1-live`.

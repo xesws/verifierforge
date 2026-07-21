@@ -11,7 +11,7 @@ python -m pip install -r requirements-app.txt
 pytest -q
 ```
 
-Expected at this revision: `474 passed, 1 skipped`. The skip is the explicitly
+Expected at this revision: `478 passed, 1 skipped`. The skip is the explicitly
 credential-gated live S3 test.
 
 ## 2. Start the reviewer sandbox (about 1 minute)
