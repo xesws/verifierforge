@@ -20,6 +20,18 @@ describe('frozen operation registry', () => {
 })
 
 describe('VerifierForgeClient', () => {
+  it('binds the native fetch receiver to Window for WebKit', async () => {
+    const nativeLike = vi.fn(function (this: unknown) {
+      if (this !== window) throw new TypeError("Failed to execute 'fetch' on 'Window': Illegal invocation")
+      return Promise.resolve(jsonResponse([]))
+    })
+    vi.stubGlobal('fetch', nativeLike)
+    const client = new VerifierForgeClient({ baseUrl: 'https://api.example.test' })
+
+    await expect(client.listClusters()).resolves.toMatchObject({ status: 200, data: [] })
+    expect(nativeLike).toHaveBeenCalledOnce()
+  })
+
   it('normalizes only HTTPS and loopback HTTP origins', () => {
     expect(normalizeBaseUrl('https://api.example.test///')).toBe('https://api.example.test')
     expect(normalizeBaseUrl('http://127.0.0.1:8010/')).toBe('http://127.0.0.1:8010')

@@ -83,7 +83,7 @@ export class VerifierForgeClient {
     this.baseUrl = normalizeBaseUrl(options.baseUrl ?? configuredApiBaseUrl())
     this.invitation = options.invitation ?? (() => null)
     this.onUnauthorized = options.onUnauthorized ?? (() => undefined)
-    this.fetcher = options.fetcher ?? fetch
+    this.fetcher = (options.fetcher ?? window.fetch).bind(window)
     this.timeoutMs = options.timeoutMs ?? 20_000
   }
 
