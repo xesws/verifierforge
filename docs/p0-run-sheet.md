@@ -1,5 +1,24 @@
 # P0 Run Sheet — v0.6.1 data freeze
 
+## 2026-07-20 v0.37.0 — one-click demo traffic simulation
+
+**Status:** planned; implementation starts only after the v0.36.0/v0.36.1
+line is integrated and cleaned up.
+
+- [x] **Version gate.** Reserve the additive reviewer extension and matching
+  backend, evaluation-serving, frontend, and infrastructure records before
+  implementation.
+- [ ] **Backend.** Add the authenticated flag-off-by-default singleton task,
+  reuse `traffic_gen` with live progress, and enter the exact in-process proxy
+  dispatcher without subprocess or loopback HTTP.
+- [ ] **Frontend.** Add the Ship button, `sent/total` status, cold guidance,
+  active Guardian polling, and no-refresh point transition.
+- [ ] **Validation.** Pass focused and full backend/frontend gates without
+  staging the existing runtime logs.
+- [ ] **Public acceptance.** Deploy Railway then Vercel; prove cold 200/200
+  physical-default traffic and ready 50% canary Guardian growth, restore route
+  and idle policy, and return provider inventory to zero.
+
 ## 2026-07-20 v0.36.1 — align report logo with product VF
 
 **Status:** complete; documentation gate created before implementation.
