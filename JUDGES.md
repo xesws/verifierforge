@@ -24,14 +24,14 @@ https://verifierforge-web.vercel.app
 
 Enter the invitation code shared separately. The browser keeps it only in
 session storage; it is never part of the URL or frontend build. The page calls
-the Railway control plane below and follows the same frozen 21-operation API.
+the Railway control plane below and follows the same frozen 22-operation API.
 
-Recommended visual path: **Discover** → review three real cluster cards → on
-Data Pull SQL inspect the governed Input and Agent proposal → observe the
-separate Approve and Start Forge boundaries → open **Runs** for the 400/200
-curves → **Prove** for `58.3% → 78.3%`, arena, savings, and verdict → **Ship**
-for canary, Guardian, and scale-to-zero status. Reports remain available while
-serving is cold.
+The UI enforces this visual path: **Discover** → inspect three real cluster
+cards, Input, Analyze, and the Agent decision → **Forge** → review the proposed
+config, record approval, then explicitly continue with the completed flagship
+run → **Runs** → inspect the 400/200 curves → **Proof** → inspect
+`58.3% → 78.3%`, arena, savings, and verdict → **Ship** → inspect canary,
+Guardian, and scale-to-zero serving. Locked steps cannot be deep-linked around.
 
 For a clone-only fallback, start the local reviewer sandbox:
 
@@ -57,20 +57,22 @@ The accepted public reviewer is:
 https://verifierforge-production.up.railway.app
 ```
 
-It uses Supabase, deterministic mock Agent, and the same 21-operation contract.
+It uses Supabase, deterministic mock Agent, and the same 22-operation contract.
 Tuned inference is scale-to-zero rather than a permanently rented endpoint. It
 requires HTTP Basic Auth: username `judge`,
 invitation code shared separately. A request without auth returns 401;
 `/healthz` remains public. `VF_AUTOPROVISION=false`, so Start Forge returns an
 explicit disabled response and cannot create a paid resource.
 
-Start a live-inference walkthrough by clicking **Wake model** on Discover. The action
+Start a live-inference walkthrough only after reaching **Ship**, then click
+**Wake model**. The action
 permits only one session and has a `$5` cap. While its visible state advances
 through `provisioning` and `loading`, inspect the flagship Job report: the two
 curves, held-out arena, and `0.5833 → 0.7833` result do not need a live GPU.
-Return to Discover after about 4.5 minutes; the two measured cold starts were
-282 and 267 seconds. `ready` is shown before live inference is offered, while a
-failed wake shows `failed` plus a readable reason and leaves reports available.
+The Ship activity window shows only real registry state/detail changes, elapsed
+time, and the measured 267–282 second estimate; it does not fabricate pod logs.
+`ready` is shown before the tuned-only SQL probe is offered, while a failed wake
+shows a readable reason and leaves reports available.
 After 30 idle minutes the production reaper deletes the pod. Do not confuse
 this with Start Forge: training autoprovision remains disabled.
 
@@ -129,9 +131,10 @@ inspection, open `http://127.0.0.1:8014/discover`. On **Data Pull SQL**:
 1. inspect `95,000 SQL queries/month` and `$5,500/month`;
 2. click **Input**, keep the default repository source, and confirm;
 3. click **Analyze** to see the mock-bound decision, rationale and config;
-4. click **Approve & Forge** and observe the durable approval receipt;
-5. on the hosted reviewer, confirm the separate spend boundary and click
-   **Start Forge**; the default-off flag visibly rejects it without spending.
+4. continue to **Forge**, click **Approve & Forge**, and observe the durable
+   approval receipt;
+5. confirm the separate Start spend boundary remains disabled, then choose the
+   explicitly labelled completed flagship run to continue without spending.
 
 This UI path is structurally real but intentionally zero-cost. The separate
 live Gate C evidence is `1.0 / 1.0 / 0 / 1.0` under tag

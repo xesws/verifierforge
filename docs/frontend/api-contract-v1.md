@@ -1,7 +1,7 @@
 # Frontend API Contract v1
 
-**Coverage:** **21 documented = 21 frozen = 21 real/mock parity**
-**Frozen:** v0.34.0 · 2026-07-20 · tags `frontend-api-v1`, `frontend-api-v1.1`, `frontend-api-v1.2`
+**Target coverage:** **22 documented = 22 frozen = 22 real/mock parity**
+**Revision:** v0.35.0 · 2026-07-20 · tag `frontend-api-v1.3` after acceptance
 
 This is the additive integration boundary for the Monday frontend. JSON field
 names and meanings below are frozen. The real API and `mock/server.py` use the
@@ -58,6 +58,36 @@ States are `cold | provisioning | loading | ready | draining`; only `ready`
 contains `url`. Endpoint key material is never returned. With
 `VF_SERVING_WAKE_ENABLED=false`, POST is an explicit 404 with zero provider
 mutation while status/report/arena reads remain available.
+
+### Tuned-only reviewer completion
+
+The Ship playground does not use production canary selection. Once status is
+`ready`, it sends one OpenAI-compatible, non-streaming request directly through
+the registered tuned endpoint:
+
+```http
+POST /serving/tuned-completion
+Authorization: Basic <base64("judge:<invite-code>")>
+Content-Type: application/json
+
+{
+  "model": "vf-demo",
+  "messages": [
+    {"role": "system", "content": "Compile the request into SQLite SQL."},
+    {"role": "user", "content": "List the five highest-value customers."}
+  ],
+  "temperature": 0,
+  "max_tokens": 180
+}
+```
+
+Success is the upstream OpenAI chat-completion object unchanged, plus response
+header `X-VerifierForge-Route: tuned`. The server replaces the request model
+with the registry model ID, records the request as tuned traffic, and schedules
+Guardian scoring best-effort. It never changes the routing table and never
+falls back to the default upstream. A non-ready registry is HTTP 409; a tuned
+upstream failure is a secret-safe HTTP 502. Endpoint URL and key are never
+returned.
 
 Public acceptance reached ready twice in 282.14 and 266.68 seconds, proved a
 200-request 44.5% tuned canary with no fallback, and returned the registry and
@@ -426,7 +456,7 @@ available at `/docs` and `/openapi.json` for generated frontend clients.
 
 ## Internal and debug routes — frontend must not use
 
-These routes are intentionally outside the 21-operation frozen contract:
+These routes are intentionally outside the 22-operation frozen contract:
 
 - `GET /discover` — FastAPI-hosted demonstration page.
 - `POST /copilot/nl2sql/proposals` and `POST /copilot/nl2sql/validate` —
@@ -435,4 +465,4 @@ These routes are intentionally outside the 21-operation frozen contract:
   discovery and health surfaces.
 
 They may change without a frontend contract revision. Product code must use
-the 21 frozen operations above.
+the 22 frozen operations above.
