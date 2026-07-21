@@ -2,7 +2,7 @@
 
 ## 2026-07-20 v0.37.0 — one-click demo traffic simulation
 
-**Status:** implemented and locally validated; production rollout pending.
+**Status:** complete; deployed and publicly accepted.
 
 - [x] **Version gate.** Reserve the additive reviewer extension and matching
   backend, evaluation-serving, frontend, and infrastructure records before
@@ -14,12 +14,22 @@
   active Guardian polling, and no-refresh point transition.
 - [x] **Validation.** Pass focused and full backend/frontend gates without
   staging the existing runtime logs.
-- [ ] **Public acceptance.** Deploy Railway then Vercel; prove cold 200/200
+- [x] **Public acceptance.** Deploy Railway then Vercel; prove cold 200/200
   physical-default traffic and ready 50% canary Guardian growth, restore route
   and idle policy, and return provider inventory to zero.
 
 **Local result:** `492 passed, 1 skipped`; 32 frontend tests; ESLint; Vite
 production build; Python compilation; secret scan; and diff checks all pass.
+
+**Production result:** Railway SHA `4f747e5` and Vercel deployment
+`dpl_5PAUihiKB6uncDadX3dpRPKFdB94` are healthy. Cold traffic completed 200/200
+through the physical default path with zero Guardian delta. Ready traffic at
+50% SQL canary completed 200/200 with 159 default and 41 tuned rows while
+Guardian grew 143→145, first observed during progress at 46/200. Routing is
+restored to enabled 100%, idle is restored to 30 minutes, registry is cold,
+and raw provider inventory has zero `vf-auto-*` resources. Public UI assets and
+CORS are accepted; no browser instance was available for a screenshot/manual
+visual claim, while the automated page-flow covers the no-refresh transition.
 
 ## 2026-07-20 v0.36.1 — align report logo with product VF
 
