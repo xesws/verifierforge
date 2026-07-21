@@ -3328,7 +3328,7 @@ ESLint had zero warnings, and the production TypeScript/Vite build passed.
 
 ## 2026-07-20 v0.35.4 — Browser-local live SQL execution
 
-**Status:** implemented; public visual acceptance pending.
+**Status:** deployed; owner visual acceptance pending.
 
 - [x] **Documentation gate.** Reserve v0.35.4 and document the frontend plus
   verifier boundary before code (`fba65f6`).
@@ -3349,3 +3349,8 @@ ESLint had zero warnings, and the production TypeScript/Vite build passed.
 - [ ] **Visual acceptance.** Browser discovery returned no available browser
   instance. Do not claim a screenshot; verify the public Vercel deployment in
   an owner browser.
+- [x] **Deployment artifact gate.** Vercel deployment
+  `dpl_4RbQL5VWB99WJgRw7FH3fs5pQXdm` is READY on
+  `https://verifierforge-web.vercel.app`. Ship, the dedicated Worker, and WASM
+  returned HTTP 200; the WASM MIME is `application/wasm`, and the public Worker
+  contains the expected dataset ID plus schema SHA.
