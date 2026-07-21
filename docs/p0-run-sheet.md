@@ -1,5 +1,23 @@
 # P0 Run Sheet — v0.6.1 data freeze
 
+## 2026-07-21 v0.38.0 — evidence-grounded demo user story
+
+**Status:** in progress; documentation gate reserved before submission edits.
+
+- [x] **Evidence read.** Cross-check the frozen schema and fixtures, held-out
+  arena ten, Ship prompt examples, and Discover workload economics.
+- [ ] **Canonical script.** Publish three-sentence Chinese and English openings
+  within 110 characters and 70 words respectively, plus a noun-level audit.
+- [ ] **Video alignment.** Replace 0:00–0:25 and retime the existing Data Pull
+  SQL transition to 0:25–0:50 without changing the 3:00 total.
+- [ ] **Handoff and validation.** Record the avatar delivery terms, pass tests
+  and diff hygiene, commit, push, and leave runtime logs unstaged.
+
+**Evidence finding:** the dataset declares no industry. It represents an
+enterprise internal data/operations team querying departments, employees,
+projects, and assignment hours through read-only analytical SQL. The product
+catalog fixes this workload at 95,000 monthly calls and $5,500 monthly cost.
+
 ## 2026-07-20 v0.37.1 — isolate mock provisioning from host SSH state
 
 **Status:** complete; pushed CI and production invariants green.
