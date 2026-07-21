@@ -3306,3 +3306,17 @@ ESLint had zero warnings, and the production TypeScript/Vite build passed.
   - Vercel: `dpl_AbsnJbCAtqJ3iVTbpxUkWGB1LYg1`, stable alias unchanged; all
     six prompt labels were present in the served bundle.
   - Spend: zero Wake and zero tuned completion requests.
+
+## 2026-07-20 v0.35.3 — Ship readiness messaging
+
+**Status:** in progress.
+
+- [x] **Diagnosis.** Cold/loading Run used native disabled behavior with active
+  styling and no local dependency explanation; hidden-tab polling also never
+  resumed, so status could remain stale after the registry reached Ready.
+- [ ] **Messaging gate.** Show state-specific Wake → Ready → Run instructions,
+  explicit premature-click feedback, and honest disabled styling.
+- [ ] **Polling recovery.** Resume registry polling when a hidden tab becomes
+  visible and cover the behavior with a regression test.
+- [ ] **Acceptance.** Run all frontend/repository gates and deploy the zero-cost
+  candidate without Wake or tuned inference.
