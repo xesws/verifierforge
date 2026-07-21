@@ -44,7 +44,10 @@ variables used for a newly generated Agent trace stay in ignored `.env`.
 ```bash
 VF_DB_BACKEND=postgres \
 VF_AGENT_ENABLED=true \
-VF_AGENT_BINDING=mock \
+VF_AGENT_BINDING=real \
+VF_AGENT_GATE_C_PASSED=true \
+VF_LLM_PROVIDER=openai \
+VF_LLM_MODEL=gpt-5.6-luna \
 VF_AUTOPROVISION=false \
 VF_SERVING_WAKE_ENABLED=false \
 VF_PROVISION_BINDING=mock \
@@ -114,7 +117,7 @@ was read directly where that claim applies.
 | 4 | `GET /jobs/{job_id}/metrics` | 200 | yes | artifacts or Supabase projection | yes |
 | 5 | `GET /clusters` | 200 | yes; exactly 3 | static + Supabase | yes |
 | 6 | `GET /clusters/data-pull-sql` | 200 | yes | static + Supabase | yes |
-| 7 | `POST /clusters/data-pull-sql/agent/analyze` | 200 | yes | mock analysis + Supabase decision | yes |
+| 7 | `POST /clusters/data-pull-sql/agent/analyze` | 200 | yes; decision + run receipt | live Agent + Supabase summary + S3 trace | yes |
 | 8 | `GET /clusters/data-pull-sql/agent/decision` | 200 | yes | Supabase | yes |
 | 9 | `POST /agent-decisions/{decision_id}/approvals` | 200 | yes | Supabase | yes |
 | 10 | `GET /agent-decisions/{decision_id}/approval` | 200 | yes | Supabase | yes |
@@ -161,7 +164,7 @@ rate was `0.95`.
 | `VF_AGENT_ENABLED` | `.env`: `true` | Exposes Analyze, decision, approval, sample-source, and Discover routes. |
 | `VF_AUTOPROVISION` | unset/default `false` | Start Forge returns the explicit 404 above and cannot spend. |
 | `VF_SERVING_WAKE_ENABLED` | code default `false`; hosted acceptance `true` | Independently gates one-GPU inference wake; Basic invitation, explicit confirmation, concurrency/budget fuses, and idle deletion still apply. |
-| `VF_AGENT_BINDING` | launch override `mock` | Analyze is deterministic and makes no LLM request; decision metadata still lands in Supabase. |
+| `VF_AGENT_BINDING` | hosted `real` | Analyze uses the Gate-C-qualified configured model; the receipt exposes provider/model and never mislabels mock or cached output. Use `mock` only for explicit zero-cost fallback demos. |
 | `VF_API_DATA_MODE` | default `hybrid` | Public modes are `artifacts`, `hybrid`, and `supabase`; `runs` is deprecated local compatibility. |
 | `VF_CORS_ORIGINS` | unset/local default | Allows localhost and 127.0.0.1 on 3000, 5173, and 8080. Comma-separated values replace the list; only explicit `*` opens all origins. |
 

@@ -149,8 +149,11 @@ hosting. `VF_AUTOPROVISION` is enabled only inside this launcher together with
 
 For permanent reviewer hosting, build the root `Dockerfile` and run
 `scripts/start_hosted_backend.sh`. The hosted service uses Supabase, S3,
-invitation auth, mock Agent/training-provisioner bindings, and the dynamic
-serving registry. Deployment and inference rollback are documented
+invitation auth, a Gate-C-qualified live Forge Agent, a disabled-by-default
+training provisioner, and the dynamic serving registry. Discover exposes the
+provider/model, unique trace ID, timestamps, token counts, exact validated
+decision JSON, and persisted read-only tool trace; mock or cached receipts are
+labelled explicitly. Deployment and inference rollback are documented
 in
 [docs/infrastructure/v0.33.0-hosted-backend.md](docs/infrastructure/v0.33.0-hosted-backend.md).
 

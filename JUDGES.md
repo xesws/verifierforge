@@ -57,7 +57,12 @@ The accepted public reviewer is:
 https://verifierforge-production.up.railway.app
 ```
 
-It uses Supabase, deterministic mock Agent, and the same 22-operation contract.
+It uses Supabase, a Gate-C-qualified live `gpt-5.6-luna` Forge Agent, and the
+same 22-operation contract. Clicking **Analyze** explicitly requests a fresh
+run and displays its provider/model, trace ID, timestamps, token counts,
+read-only tool inputs/outputs, and validated terminal decision. The panel is an
+audit receipt—not hidden chain-of-thought—and labels mock/cached results rather
+than passing them off as live.
 Tuned inference is scale-to-zero rather than a permanently rented endpoint. It
 requires HTTP Basic Auth: username `judge`,
 invitation code shared separately. A request without auth returns 401;
@@ -135,7 +140,8 @@ inspection, open `http://127.0.0.1:8014/discover`. On **Data Pull SQL**:
 
 1. inspect `95,000 SQL queries/month` and `$5,500/month`;
 2. click **Input**, keep the default repository source, and confirm;
-3. click **Analyze** to see the mock-bound decision, rationale and config;
+3. click **Analyze** to run the hosted Agent and inspect the fresh run receipt,
+   rationale, config, and four-step read-only tool trace;
 4. continue to **Forge**, click **Approve & Forge**, and observe the durable
    approval receipt;
 5. confirm the separate Start spend boundary remains disabled, then choose the
