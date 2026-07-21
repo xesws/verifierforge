@@ -87,13 +87,13 @@ function SqlAnalysis({ cluster, onClusterReload }: { cluster: Cluster | null; on
     <section className="analysis-workflow reveal reveal-4" id="sql-analysis">
       <div className="workflow-heading"><div><span className="eyebrow">Data Pull SQL · discovery workflow</span><h2>Inspect the input, then ask whether this workload is optimizable.</h2><p>95k monthly calls and {formatCurrency(cluster.monthly_cost_usd)} in monthly model cost make the opportunity visible before any recommendation appears.</p></div><Link2 size={24} /></div>
       <div className="source-row">
-        <label htmlFor="sample-source"><span>Input</span><small>The governed repository source the agent may inspect.</small></label>
+        <label htmlFor="sample-source"><span>Input</span><small>The governed training and evaluation sample set.</small></label>
         <div><input id="sample-source" value={sourceUri} onChange={(event) => setSourceUri(event.target.value)} /><button className="secondary-button" type="button" disabled={busy !== null} onClick={() => void run('input', async () => { if (!client) return; await client.putSampleSource(cluster.cluster_id, { uri: sourceUri, approved_by: 'judge', expected_sha256: SQL_SAMPLE_SOURCE.sha256, expected_row_count: SQL_SAMPLE_SOURCE.rowCount }); onClusterReload(); setMessage('Input source approved and identity-checked.') })}>Input</button></div>
         <code>{cluster.approved_sample_source ? `${cluster.approved_sample_source.row_count} rows · ${cluster.approved_sample_source.sha256.slice(0, 12)}…` : 'Not yet approved'}</code>
       </div>
       <div className="analysis-actions">
-        <button className="primary-button" type="button" disabled={busy !== null} onClick={() => void run('analyze', async () => { if (!client) return; const result = await client.analyze(cluster.cluster_id, { data_source: sourceUri }); setAnalysis(result.data); journey.recordAnalysis(result.data); setMessage(result.data.decision.decision === 'forge' ? 'Opportunity confirmed. Forge is now unlocked.' : 'This workload does not pass the Forge decision gate yet.') })}><Sparkles size={16} />{busy === 'analyze' ? 'Analyzing…' : 'Analyze'}</button>
-        <span>Agent analysis is advisory and cannot provision a GPU.</span>
+        <button className="primary-button" type="button" disabled={busy !== null} onClick={() => void run('analyze', async () => { if (!client) return; const result = await client.analyze(cluster.cluster_id); setAnalysis(result.data); journey.recordAnalysis(result.data); setMessage(result.data.decision.decision === 'forge' ? 'Opportunity confirmed. Forge is now unlocked.' : 'This workload does not pass the Forge decision gate yet.') })}><Sparkles size={16} />{busy === 'analyze' ? 'Analyzing…' : 'Analyze'}</button>
+        <span>Analysis reads server-side traffic evidence, remains advisory, and cannot provision a GPU.</span>
       </div>
       {decision && <AgentDecisionCard analysis={analysis} />}
       {decision?.decision === 'forge' && decision.config && <div className="discovery-handoff"><div><strong>Discovery complete</strong><span>Review and authorize this exact proposal in Forge.</span></div><Link className="primary-button" to="/forge/new">Continue to Forge <ArrowRight size={16} /></Link></div>}

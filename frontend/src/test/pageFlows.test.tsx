@@ -82,6 +82,9 @@ describe('reviewer product path', () => {
 
     fireEvent.click(screen.getByRole('button', { name: 'Analyze' }))
     const forgeLink = await screen.findByRole('link', { name: /Continue to Forge/i })
+    const analyzeCall = vi.mocked(fetch).mock.calls.find(([input, init]) => new URL(String(input)).pathname.endsWith('/agent/analyze') && init?.method === 'POST')
+    expect(analyzeCall).toBeDefined()
+    expect(JSON.parse(String(analyzeCall?.[1]?.body))).toEqual({})
     fireEvent.click(forgeLink)
     expect(await screen.findByText('Approve first. Start separately.')).toBeInTheDocument()
     fireEvent.click(screen.getByRole('button', { name: 'Approve & Forge' }))
