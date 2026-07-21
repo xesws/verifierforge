@@ -1,4 +1,4 @@
-import { CheckCircle2, Clock3, Copy, Info, PackageCheck, Play, ShieldCheck, TerminalSquare } from 'lucide-react'
+import { AlertTriangle, ArrowUp, CheckCircle2, Clock3, Copy, Info, PackageCheck, Play, ShieldCheck, TerminalSquare } from 'lucide-react'
 import { useEffect, useState } from 'react'
 import type { ChatCompletion, RoutingState, RoutePath, ServingStatus } from '../api/contracts'
 import { EmptyGuardian } from '../components/EmptyGuardian'
@@ -26,6 +26,16 @@ interface RequestActivity {
   detail: string
 }
 
+function readinessMessage(status: ServingStatus | null) {
+  if (!status) return { tone: 'waiting', title: 'Checking serving readiness', detail: 'The Run action will unlock only after the registry has been checked.', button: 'Checking serving status…' }
+  if (status.state === 'ready') return { tone: 'ready', title: 'Ready to compile', detail: 'The tuned endpoint passed its identity, vLLM, completion, and public tunnel gates.', button: 'Run tuned completion' }
+  if (status.state === 'provisioning') return { tone: 'waiting', title: 'Step 1 of 3 · GPU provisioning', detail: 'Wake is in progress. Wait for Loading, then Ready; Run does not call a provisioning endpoint.', button: 'Waiting for GPU…' }
+  if (status.state === 'loading') return { tone: 'waiting', title: 'Step 2 of 3 · Model loading', detail: 'The GPU exists, but the tuned endpoint is not ready. Run unlocks automatically only when the registry reports Ready.', button: 'Waiting for Ready…' }
+  if (status.state === 'draining') return { tone: 'blocked', title: 'Endpoint is shutting down', detail: 'Wait for Cold, then explicitly Wake a new serving session before running a compilation.', button: 'Endpoint is draining' }
+  if (status.error_code) return { tone: 'blocked', title: 'The previous Wake failed', detail: `${status.detail}. Review the failure above, then retry Wake.`, button: 'Wake failed · review above' }
+  return { tone: 'blocked', title: 'Model is asleep · Wake required', detail: 'First confirm the budget-capped GPU above, click Wake model, and wait until the serving registry says Ready.', button: 'Wake model above first' }
+}
+
 export function ShipPage() {
   const { client } = useAuth()
   const [routingDraft, setRoutingDraft] = useState<RoutingState | null>(null)
@@ -38,15 +48,22 @@ export function ShipPage() {
   const [completing, setCompleting] = useState(false)
   const [startedAt, setStartedAt] = useState<number | null>(null)
   const [elapsedMs, setElapsedMs] = useState(0)
+  const [gateNotice, setGateNotice] = useState<string | null>(null)
   const route = useResource(async () => { if (!client) throw new Error('API client is unavailable'); return (await client.getRouting('data-pull-sql')).data }, [client], { enabled: Boolean(client) })
   const guardian = useResource(async () => { if (!client) throw new Error('API client is unavailable'); return (await client.getLivePassRate('data-pull-sql')).data }, [client], { enabled: Boolean(client), pollMs: 30_000 })
   const value = routingDraft ?? route.data
+  const readiness = readinessMessage(serving)
+  const canRun = serving?.state === 'ready'
 
   useEffect(() => {
     if (!completing || startedAt === null) return
     const timer = window.setInterval(() => setElapsedMs(performance.now() - startedAt), 100)
     return () => window.clearInterval(timer)
   }, [completing, startedAt])
+
+  useEffect(() => {
+    if (canRun) setGateNotice(null)
+  }, [canRun])
 
   async function save() { if (!client || !value) return; setSaving(true); setMessage(null); try { const saved = await client.putRouting('data-pull-sql', value); setRoutingDraft(saved.data); route.reload(); setMessage('Production canary policy saved to Supabase. The reviewer probe remains tuned-only.') } catch (error) { setMessage(error instanceof Error ? error.message : 'Routing save failed') } finally { setSaving(false) } }
 
@@ -96,6 +113,16 @@ export function ShipPage() {
     setMessage(null)
   }
 
+  function runOrExplain() {
+    if (!canRun) {
+      const current = serving?.state ?? 'unknown'
+      setGateNotice(`Run blocked: serving state is ${current}. Complete the Wake flow above and wait for Ready.`)
+      document.getElementById('wake-model-control')?.scrollIntoView?.({ behavior: 'smooth', block: 'center' })
+      return
+    }
+    void tryCompletion()
+  }
+
   return <div className="page ship-page">
     <PageHeader eyebrow="Ship / Data Pull SQL" title="Serve the selected checkpoint, then try it directly." description="Ship owns scale-to-zero serving, production canary policy, Guardian signals, and a tuned-only reviewer playground. Training and proof are already complete." action={<StatusPill status={serving?.state ?? 'cold'} />} />
     <section className="ship-banner reveal reveal-1"><div><PackageCheck size={20} /><span><strong>Selected artifact</strong><small>{FLAGSHIP_JOB_ID} · step 350</small></span></div><div><ShieldCheck size={20} /><span><strong>Held-out proof</strong><small>58.3% → 78.3% pass@1</small></span></div><span className="local-chip">Live API</span></section>
@@ -103,6 +130,7 @@ export function ShipPage() {
     <WakeModelControl onStatus={setServing} />
     <section className="completion-panel glass-panel reveal reveal-4">
       <div className="completion-intro"><span className="eyebrow"><Play size={13} /> Tuned-only reviewer probe</span><h2>Try one tuned SQL compilation</h2><p>{serving?.state === 'ready' ? 'The registry reports ready. This call goes directly to the tuned endpoint and never enters production canary selection.' : 'The endpoint is cold. Wake it above; reports remain available while you wait.'}</p></div>
+      <div className={`completion-gate ${readiness.tone}`} role="status" aria-live="polite"><span>{canRun ? <CheckCircle2 size={17} /> : <AlertTriangle size={17} />}</span><div><strong>{readiness.title}</strong><small>{readiness.detail}</small></div></div>
       <div className="completion-input">
         <label htmlFor="tuned-sql-query">Natural-language query</label>
         <textarea id="tuned-sql-query" value={prompt} onChange={(event) => choosePrompt(event.target.value)} rows={4} disabled={completing} />
@@ -111,7 +139,8 @@ export function ShipPage() {
           <div>{SQL_PROMPT_EXAMPLES.map((example) => <button key={example.label} type="button" disabled={completing} aria-pressed={prompt === example.prompt} title={example.prompt} onClick={() => choosePrompt(example.prompt)}>{example.label}</button>)}</div>
         </div>
       </div>
-      <button className="primary-button" type="button" disabled={serving?.state !== 'ready' || completing || !prompt.trim()} onClick={() => void tryCompletion()}>{completing ? <><Clock3 size={16} />Running · {(elapsedMs / 1000).toFixed(1)}s</> : <>Run tuned completion <Play size={15} /></>}</button>
+      <button className={`primary-button ${canRun ? '' : 'gated-button'}`} type="button" disabled={completing || !prompt.trim()} aria-disabled={!canRun || completing || !prompt.trim()} aria-describedby="completion-readiness-feedback" onClick={runOrExplain}>{completing ? <><Clock3 size={16} />Running · {(elapsedMs / 1000).toFixed(1)}s</> : canRun ? <>{readiness.button} <Play size={15} /></> : <>{readiness.button} <ArrowUp size={15} /></>}</button>
+      <div id="completion-readiness-feedback" className={`completion-feedback ${gateNotice ? 'visible' : ''}`} role={gateNotice ? 'alert' : undefined}>{gateNotice ?? 'Run requires a Ready serving registry state.'}</div>
       <section className="activity-console request-console" aria-label="Tuned completion activity"><header><TerminalSquare size={14} /><strong>Request activity</strong><span>{completing ? 'live' : result ? 'complete' : 'idle'}</span></header><ol role="log" aria-live="polite">{requestActivity.length ? requestActivity.map((line, index) => <li key={`${line.at}-${index}`}><time>{new Date(line.at).toLocaleTimeString()}</time><b>{line.state}</b><span>{line.detail}</span></li>) : <li><time>—</time><b>waiting</b><span>Wake the model, then run a query to see each request phase.</span></li>}</ol></section>
       <section className={`completion-output ${result ? 'has-result' : ''}`} aria-label="Tuned SQL result">
         <header><div><span className="eyebrow"><CheckCircle2 size={13} /> Result</span><h3>{result ? 'Result is ready' : 'Compiled SQL will appear here'}</h3></div>{result && <button className="secondary-button" type="button" onClick={() => void copyResult()}><Copy size={14} />Copy SQL</button>}</header>

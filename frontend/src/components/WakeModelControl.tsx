@@ -107,7 +107,7 @@ export function WakeModelControl({ onStatus }: { onStatus?: (status: ServingStat
   }
 
   return (
-    <GlassPanel className="wake-panel">
+    <GlassPanel className="wake-panel" id="wake-model-control">
       <div className="wake-heading"><div className="cluster-icon"><CloudCog size={22} /></div><div><span className="eyebrow">Scale-to-zero serving</span><h2>Wake the tuned model</h2></div><StatusPill status={visualState} /></div>
       <div className="wake-progress" aria-label={`Serving state ${visualState}`}>
         {['provisioning', 'loading', 'ready'].map((step) => <span key={step} className={status && ['provisioning', 'loading', 'ready'].indexOf(status.state) >= ['provisioning', 'loading', 'ready'].indexOf(step) ? 'active' : ''}><i />{step}</span>)}

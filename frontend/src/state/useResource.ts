@@ -34,6 +34,22 @@ export function useResource<T>(
     }
     let cancelled = false
     let timer: number | undefined
+    let nextPollMs: number | null = null
+    const schedule = (delay: number) => {
+      if (timer !== undefined) window.clearTimeout(timer)
+      timer = window.setTimeout(() => {
+        timer = undefined
+        void load()
+      }, delay)
+    }
+    const resumeWhenVisible = () => {
+      if (document.hidden) {
+        if (timer !== undefined) window.clearTimeout(timer)
+        timer = undefined
+      } else if (nextPollMs !== null && timer === undefined) {
+        schedule(0)
+      }
+    }
     const load = async () => {
       setState((current) => ({ status: current.data === null ? 'loading' : current.status, data: current.data, error: null }))
       try {
@@ -41,15 +57,21 @@ export function useResource<T>(
         if (cancelled || !mounted.current) return
         setState({ status: empty?.(data) ? 'empty' : 'ready', data, error: null })
         const interval = typeof pollMs === 'function' ? pollMs(data) : pollMs
-        if (interval && !document.hidden) timer = window.setTimeout(load, interval)
+        nextPollMs = interval && interval > 0 ? interval : null
+        if (nextPollMs !== null && !document.hidden) schedule(nextPollMs)
       } catch (error) {
         if (!cancelled && mounted.current) {
           setState((current) => ({ status: 'error', data: current.data, error: error instanceof Error ? error.message : 'Request failed' }))
         }
       }
     }
+    document.addEventListener('visibilitychange', resumeWhenVisible)
     void load()
-    return () => { cancelled = true; if (timer) window.clearTimeout(timer) }
+    return () => {
+      cancelled = true
+      document.removeEventListener('visibilitychange', resumeWhenVisible)
+      if (timer !== undefined) window.clearTimeout(timer)
+    }
     // dependencies are supplied by callers to control loader identity deliberately.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [...dependencies, enabled, revision])

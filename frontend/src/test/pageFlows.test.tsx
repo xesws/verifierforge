@@ -16,6 +16,7 @@ const arena = { win_rate: .7, samples: Array.from({ length: 10 }, (_, index) => 
 const job = { job_id: 'd4-m3-1p5b-r1-v0125', template: 'nl2sql', status: 'done', model: 'Qwen/Qwen2.5-1.5B-Instruct', created_at: '2026-07-16T00:00:00Z', metrics: { steps: [1, 2], reward_mean: [.3, .7], pass_at_1: [.4, .8], entropy: [.7, .4] }, control: { pass_at_1: [.4, .45] }, report: { baseline_pass_at_1: .583333, final_pass_at_1: .783333, control_final_pass_at_1: .466667, verdict: 'real_gain', narrative: 'The tuned checkpoint improved on unseen SQL tasks.', projected_monthly_savings_usd: 3850, arena, savings_projection: { current_monthly_cost_usd: 5500, projected_monthly_cost_usd: 1650, projected_monthly_savings_usd: 3850, formula: 'savings = 5500 - 1650', assumptions: ['70% of eligible calls route to the specialist.'] }, provenance: { artifact_version: 'v1', s3_prefix: null, generated_at: '2026-07-16T00:00:00Z', content_sha256: 'a'.repeat(64), sources: [{ path: 'held-out.jsonl', sha256: 'b'.repeat(64) }] } }, endpoint: { base_url: 'registry://vf-demo', model_name: 'step-350' } }
 const cold = { session_id: null, model_id: 'vf-demo', state: 'cold', url: null, detail: 'Endpoint is cold; click Wake model.', error_code: null, gpu_model: null, hourly_price_usd: null, cost_accrued_usd: 0, cold_start_seconds: 267, updated_at: '2026-07-20T00:00:00Z' }
 const ready = { ...cold, session_id: 'sv-ready', state: 'ready', url: 'https://model.example/v1', detail: 'S3 identity, vLLM, completion, and public tunnel gates passed', gpu_model: 'RTX 4000 Ada', hourly_price_usd: .2, cold_start_seconds: 272, updated_at: '2026-07-20T00:05:00Z' }
+const loading = { ...ready, state: 'loading', url: null, detail: 'capacity allocated; model identity and vLLM readiness pending', cold_start_seconds: null, updated_at: '2026-07-20T00:02:00Z' }
 
 function response(payload: unknown, status = 200, headers: Record<string, string> = {}) { return new Response(JSON.stringify(payload), { status, headers: { 'Content-Type': 'application/json', ...headers } }) }
 
@@ -118,6 +119,21 @@ describe('reviewer product path', () => {
     const completionCall = vi.mocked(fetch).mock.calls.find(([input, init]) => new URL(String(input)).pathname === '/serving/tuned-completion' && init?.method === 'POST')
     const completionBody = JSON.parse(String(completionCall?.[1]?.body)) as { messages: Array<{ role: string; content: string }> }
     expect(completionBody.messages[1].content).toBe('For every project whose combined employee hours are no less than 100, output the project name and total hours, sorted by project name ascending.')
+  })
+
+  it.each([
+    { status: cold, button: 'Wake model above first', title: 'Model is asleep · Wake required', state: 'cold' },
+    { status: loading, button: 'Waiting for Ready…', title: 'Step 2 of 3 · Model loading', state: 'loading' },
+  ])('explains and responds when Run is attempted while serving is $state', async ({ status, button, title, state }) => {
+    seedJourney('ship')
+    renderAt('/ship/data-pull-sql', apiFixture(status))
+    expect(await screen.findByText(title)).toBeInTheDocument()
+    const run = screen.getByRole('button', { name: button })
+    expect(run).toHaveAttribute('aria-disabled', 'true')
+    expect(run).not.toBeDisabled()
+    fireEvent.click(run)
+    expect(await screen.findByRole('alert')).toHaveTextContent(`Run blocked: serving state is ${state}`)
+    expect(vi.mocked(fetch).mock.calls.some(([input]) => new URL(String(input)).pathname === '/serving/tuned-completion')).toBe(false)
   })
 
   it('restores a valid session journey and resets it when leaving', async () => {
