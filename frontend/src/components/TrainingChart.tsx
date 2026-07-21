@@ -1,5 +1,4 @@
 import { CartesianGrid, Legend, Line, LineChart, ReferenceLine, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts'
-import { trainingEvidence } from '../data/evidence'
 import type { EvidenceMetric, MetricPoint } from '../types'
 
 interface ChartRow { step: number; main?: number; control?: number }
@@ -10,11 +9,11 @@ const metricConfig: Record<EvidenceMetric, { key: keyof Pick<MetricPoint, 'pass_
   entropy: { key: 'entropy', label: 'Token entropy', percent: false, domain: [0, 0.8] },
 }
 
-function chartRows(metric: EvidenceMetric): ChartRow[] {
+function chartRows(metric: EvidenceMetric, main: MetricPoint[], control: MetricPoint[]): ChartRow[] {
   const key = metricConfig[metric].key
   const rows = new Map<number, ChartRow>()
-  trainingEvidence.main.forEach((point) => rows.set(point.step, { step: point.step, main: point[key] }))
-  trainingEvidence.control.forEach((point) => rows.set(point.step, { ...rows.get(point.step), step: point.step, control: point[key] }))
+  main.forEach((point) => rows.set(point.step, { step: point.step, main: point[key] }))
+  control.forEach((point) => rows.set(point.step, { ...rows.get(point.step), step: point.step, control: point[key] }))
   return [...rows.values()]
 }
 
@@ -37,12 +36,14 @@ function TrainingTooltip({ active, label, payload, metric }: TrainingTooltipProp
   )
 }
 
-export function TrainingChart({ metric }: { metric: EvidenceMetric }) {
+export function TrainingChart({ metric, main, control, selectedStep }: { metric: EvidenceMetric; main: MetricPoint[]; control: MetricPoint[]; selectedStep?: number | null }) {
   const config = metricConfig[metric]
+  const rows = chartRows(metric, main, control)
+  const finalStep = Math.max(1, ...rows.map((row) => row.step))
   return (
-    <div className="chart-wrap" role="img" aria-label={`${config.label} from step 1 through 400. Main model is solid blue and green. Random reward control is dashed graphite and ends at step 200. Selected checkpoint is step 350.`}>
+    <div className="chart-wrap" role="img" aria-label={`${config.label} from step 1 through ${finalStep}. Main model is solid blue and green; the random reward control is dashed graphite.`}>
       <ResponsiveContainer width="100%" height="100%">
-        <LineChart data={chartRows(metric)} margin={{ top: 18, right: 20, left: 2, bottom: 8 }} accessibilityLayer>
+        <LineChart data={rows} margin={{ top: 18, right: 20, left: 2, bottom: 8 }} accessibilityLayer>
           <defs>
             <linearGradient id={`main-${metric}`} x1="0" y1="0" x2="1" y2="0">
               <stop offset="0%" stopColor="#087cf0" />
@@ -50,11 +51,11 @@ export function TrainingChart({ metric }: { metric: EvidenceMetric }) {
             </linearGradient>
           </defs>
           <CartesianGrid stroke="rgba(23,33,43,.08)" vertical={false} />
-          <XAxis dataKey="step" type="number" domain={[0, 400]} ticks={[0, 100, 200, 300, 400]} tickLine={false} axisLine={false} tick={{ fill: '#63717d', fontSize: 11 }} label={{ value: 'TRAINING STEP', position: 'insideBottomRight', offset: -4, fill: '#7a8792', fontSize: 10 }} />
+          <XAxis dataKey="step" type="number" domain={[0, finalStep]} tickLine={false} axisLine={false} tick={{ fill: '#63717d', fontSize: 11 }} label={{ value: 'TRAINING STEP', position: 'insideBottomRight', offset: -4, fill: '#7a8792', fontSize: 10 }} />
           <YAxis domain={config.domain} tickFormatter={(value: number) => config.percent ? `${Math.round(value * 100)}%` : value.toFixed(1)} tickLine={false} axisLine={false} width={42} tick={{ fill: '#63717d', fontSize: 11 }} />
           <Tooltip content={<TrainingTooltip metric={metric} />} cursor={{ stroke: 'rgba(8,124,240,.25)' }} />
           <Legend verticalAlign="top" align="right" iconType="plainline" wrapperStyle={{ fontSize: 11, fontFamily: 'IBM Plex Mono', paddingBottom: 12 }} />
-          <ReferenceLine x={350} stroke="#00a67e" strokeDasharray="3 4" label={{ value: 'SELECTED · 350', fill: '#007e61', position: 'insideTopLeft', fontSize: 10 }} />
+          {selectedStep && <ReferenceLine x={selectedStep} stroke="#00a67e" strokeDasharray="3 4" label={{ value: `SELECTED · ${selectedStep}`, fill: '#007e61', position: 'insideTopLeft', fontSize: 10 }} />}
           <Line name="Main · 1.5B" type="linear" dataKey="main" stroke={`url(#main-${metric})`} strokeWidth={3} dot={false} activeDot={{ r: 4 }} connectNulls={false} isAnimationActive animationDuration={900} />
           <Line name="Random reward · 0.5B" type="linear" dataKey="control" stroke="#5c6973" strokeWidth={2} strokeDasharray="7 6" dot={false} activeDot={{ r: 3 }} connectNulls={false} isAnimationActive animationDuration={700} />
         </LineChart>

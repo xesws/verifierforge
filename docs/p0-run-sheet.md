@@ -3209,12 +3209,18 @@ remains available through the Wake model scale-to-zero path.
 - [x] **F1 — typed API boundary.** Cover exactly 21 frozen operations,
   `VITE_VF_API_BASE_URL`, runtime Basic invitation, safe errors, and cold/
   fallback semantics without a backend change.
-- [ ] **F2 — five-page product wiring.** Discover/Forge/Job/Report/Ship consume
+- [x] **F2 — five-page product wiring.** Discover/Forge/Job/Report/Ship consume
   real contracts and expose Input, Analyze, Approve, Start, routing, Guardian,
   credentials, and serving controls in Nora's visual language.
-- [ ] **F3 — resilience.** Loading, empty, error, readonly, disabled, cold,
+- [x] **F3 — resilience.** Loading, empty, error, readonly, disabled, cold,
   provisioning, loading, ready, draining, and failed behavior never red-screens
   immutable evidence.
+
+F2/F3 checkpoint: the static JSON generator and localStorage Job simulation
+were removed. The five pages now consume the frozen typed client; cold serving
+leaves all report evidence visible, mutations are explicit, and Start Forge is
+separate from approval. Validation at commit time: 9 frontend tests passed,
+ESLint had zero warnings, and the production TypeScript/Vite build passed.
 - [ ] **F4 — local/public acceptance.** Exercise all 21 operations from the UI,
   capture page evidence, run one authorized Wake and tuned completion, restore
   product state, drain immediately, and prove provider inventory zero.

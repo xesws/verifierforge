@@ -1,11 +1,12 @@
 import { BarChart3, FlaskConical, PackageCheck, Radar, ShieldCheck } from 'lucide-react'
 import { NavLink } from 'react-router-dom'
+import { FLAGSHIP_JOB_ID } from '../data/presentation'
 
 const navItems = [
   { label: 'Discover', to: '/discover', icon: Radar },
   { label: 'Forge', to: '/forge/new', icon: FlaskConical },
-  { label: 'Runs', to: '/jobs/d4-m3-1p5b-r1-v0125', icon: BarChart3 },
-  { label: 'Prove', to: '/reports/d4-m3-1p5b-r1-v0125', icon: ShieldCheck },
+  { label: 'Runs', to: `/jobs/${FLAGSHIP_JOB_ID}`, icon: BarChart3 },
+  { label: 'Prove', to: `/reports/${FLAGSHIP_JOB_ID}`, icon: ShieldCheck },
   { label: 'Ship', to: '/ship/data-pull-sql', icon: PackageCheck },
 ] as const
 
@@ -25,7 +26,7 @@ export function FloatingNav() {
         ))}
       </nav>
       <div className="nav-evidence">
-        <span><i className="status-dot" />Static Demo</span>
+        <span><i className="status-dot" />Live API</span>
         <span><ShieldCheck size={13} aria-hidden="true" />Evidence locked</span>
       </div>
     </aside>

@@ -1,44 +1,45 @@
-import { Activity, ArrowRight, CheckCircle2, Clock3, Cpu, DatabaseZap, Gauge, ShieldCheck } from 'lucide-react'
+import { Activity, ArrowRight, Cpu, Gauge, ShieldCheck } from 'lucide-react'
 import { useState } from 'react'
 import { Link, useParams } from 'react-router-dom'
+import { controlPoints, metricPoints, selectedCheckpoint } from '../api/mappers'
 import { EvidenceBadge } from '../components/EvidenceBadge'
 import { GlassPanel } from '../components/GlassPanel'
 import { MetricCard } from '../components/MetricCard'
 import { PageHeader } from '../components/PageHeader'
+import { ErrorState, LoadingState } from '../components/ResourceState'
 import { StatusPill } from '../components/StatusPill'
 import { TrainingChart } from '../components/TrainingChart'
-import { jobEvidence } from '../data/evidence'
-import { findLocalJob } from '../data/localJobs'
+import { useAuth } from '../state/AuthContext'
+import { useResource } from '../state/useResource'
 import type { EvidenceMetric } from '../types'
 
 const tabs: readonly { id: EvidenceMetric; label: string }[] = [{ id: 'quality', label: 'Quality' }, { id: 'reward', label: 'Reward' }, { id: 'entropy', label: 'Entropy' }]
 
 export function JobPage() {
   const { jobId = '' } = useParams()
+  const { client } = useAuth()
   const [metric, setMetric] = useState<EvidenceMetric>('quality')
-  const isVerifiedJob = jobId === jobEvidence.mainJobId
-  const localJob = isVerifiedJob ? undefined : findLocalJob(jobId)
+  const resource = useResource(async () => {
+    if (!client) throw new Error('API client is unavailable')
+    const [job, metrics] = await Promise.all([client.getJob(jobId), client.getMetrics(jobId)])
+    return { job: job.data, metrics: metrics.data }
+  }, [client, jobId], { enabled: Boolean(client && jobId) })
 
-  if (!isVerifiedJob) {
-    return (
-      <div className="page"><PageHeader eyebrow="Local run" title={localJob?.clusterName ?? 'Local forge job'} description="This queued state exists only in your browser. No trainer or backend was contacted." action={<StatusPill status="queued" />} /><GlassPanel className="queued-panel reveal reveal-1"><div className="queue-orbit"><Clock3 size={28} /></div><span className="eyebrow">Queued locally</span><h2>Static job created successfully</h2><p>{localJob?.description ?? 'The local job record is unavailable in this browser session.'}</p><div className="queue-facts"><span><DatabaseZap size={16} />{localJob?.clusterName ?? 'Unknown cluster'}</span><span><Clock3 size={16} />{localJob ? new Date(localJob.createdAt).toLocaleString() : 'Not persisted'}</span></div><Link className="secondary-button" to="/jobs/d4-m3-1p5b-r1-v0125">View completed evidence run <ArrowRight size={16} /></Link></GlassPanel></div>
-    )
-  }
+  if (resource.status === 'loading' || resource.status === 'idle') return <LoadingState label="Loading the run ledger…" />
+  if (resource.status === 'error' || !resource.data) return <ErrorState message={resource.error ?? 'Job unavailable'} onRetry={resource.reload} />
+  const { job, metrics } = resource.data
+  const main = metricPoints(metrics)
+  const control = controlPoints(metrics, job.control)
+  const selected = selectedCheckpoint(job)
 
-  return (
-    <div className="page job-page">
-      <PageHeader eyebrow={`Run / ${jobEvidence.mainJobId}`} title="Training converged. Now inspect the evidence." description="Raw training monitor points from the committed artifact, compared with the random-reward control on the same axes." action={<StatusPill status="done" />} />
-      <section className="job-metrics reveal reveal-1">
-        <MetricCard label="MODEL" value="Qwen 2.5 · 1.5B" note={jobEvidence.mainModel} icon={<Cpu size={17} />} />
-        <MetricCard label="TRAINING" value={`${jobEvidence.mainSteps} steps`} note={`${jobEvidence.trainingRows} training rows`} icon={<Activity size={17} />} />
-        <MetricCard label="SELECTED" value={`Step ${jobEvidence.selectedCheckpoint}`} note="maximum held-out pass@1" icon={<ShieldCheck size={17} />} tone="green" />
-      </section>
-      <GlassPanel className="training-panel reveal reveal-2">
-        <div className="panel-heading chart-heading"><div><EvidenceBadge>Artifact-derived</EvidenceBadge><h2>Training monitor</h2><p>Quality uses the 10-row monitoring split. It is intentionally separate from held-out proof.</p></div><div className="chart-tabs" role="tablist" aria-label="Training chart metric">{tabs.map((tab) => <button key={tab.id} role="tab" aria-selected={metric === tab.id} className={metric === tab.id ? 'active' : ''} onClick={() => setMetric(tab.id)}>{tab.label}</button>)}</div></div>
-        <TrainingChart metric={metric} />
-        <div className="chart-notes"><span><i className="main-line" />Main · {jobEvidence.mainModel}</span><span><i className="control-line" />Control ends at step {jobEvidence.controlSteps}</span><span><Gauge size={14} />No smoothing or extrapolation</span></div>
-      </GlassPanel>
-      <div className="job-footer reveal reveal-3"><div><CheckCircle2 size={20} /><p><strong>Checkpoint selection is held-out.</strong> The monitor is diagnostic; the independent report makes the shipping decision.</p></div><Link className="primary-button" to={`/reports/${jobEvidence.mainJobId}`}>Open proof report <ArrowRight size={16} /></Link></div>
-    </div>
-  )
+  return <div className="page job-page">
+    <PageHeader eyebrow={`Run / ${job.job_id}`} title={job.status === 'done' ? 'Training converged. Now inspect the evidence.' : 'This run is recorded in the live job ledger.'} description="The main training curve and random-reward control share the same axes and preserve every API point—no frontend smoothing or extrapolation." action={<StatusPill status={job.status} />} />
+    <section className="job-metrics reveal reveal-1">
+      <MetricCard label="MODEL" value={job.model.includes('1.5B') ? 'Qwen 2.5 · 1.5B' : job.model} note={job.model} icon={<Cpu size={17} />} />
+      <MetricCard label="MAIN CURVE" value={`${metrics.steps.length} points`} note={`last step ${metrics.steps.at(-1) ?? 0}`} icon={<Activity size={17} />} />
+      <MetricCard label="SELECTED" value={selected ? `Step ${selected}` : 'Pending'} note={selected ? 'maximum held-out pass@1' : 'not selected yet'} icon={<ShieldCheck size={17} />} tone="green" />
+    </section>
+    <GlassPanel className="training-panel reveal reveal-2"><div className="panel-heading chart-heading"><div><EvidenceBadge>API artifact</EvidenceBadge><h2>Training vs. spurious control</h2><p>{main.length} main points and {control.length} control points, rendered together.</p></div><div className="chart-tabs" role="tablist" aria-label="Training chart metric">{tabs.map((tab) => <button key={tab.id} role="tab" aria-selected={metric === tab.id} className={metric === tab.id ? 'active' : ''} onClick={() => setMetric(tab.id)}>{tab.label}</button>)}</div></div><TrainingChart metric={metric} main={main} control={control} selectedStep={selected} /><div className="chart-notes"><span><i className="main-line" />Main · {main.length} points</span><span><i className="control-line" />Random reward · {control.length} points</span><span><Gauge size={14} />Exact API values</span></div></GlassPanel>
+    <div className="job-footer reveal reveal-3"><p><ShieldCheck size={17} /><span><strong>Training is monitoring, not proof.</strong> The held-out report determines whether this checkpoint ships.</span></p>{job.report && <Link className="primary-button" to={`/reports/${job.job_id}`}>Open proof report <ArrowRight size={16} /></Link>}</div>
+  </div>
 }

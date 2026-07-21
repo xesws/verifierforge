@@ -3,6 +3,8 @@ models/
 *.safetensors
 __pycache__/
 .env
+.env.*
+!.env.example
 node_modules/
 assets/*
 !assets/forge-agent/
@@ -10,3 +12,5 @@ assets/*
 !assets/lane-a-v0.22.5-*
 app/proxy/traffic.db*
 /tq/
+.vercel/
+coverage/

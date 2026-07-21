@@ -5,8 +5,6 @@
   "type": "module",
   "scripts": {
     "dev": "vite",
-    "generate:data": "node scripts/generate-demo-data.mjs",
-    "prebuild": "npm run generate:data",
     "build": "tsc -b && vite build",
     "lint": "eslint .",
     "test": "vitest run",
