@@ -89,7 +89,8 @@ The deployable reviewer image is intentionally separate from GPU execution. It
 is a single non-root Uvicorn service with no torch, vLLM, verl, Ray, or
 Transformers dependency. An invite-protected wake allocates one capacity-aware
 serving GPU, verifies the frozen S3 model, starts vLLM, and publishes its
-ephemeral endpoint into Supabase; an idle reaper deletes it again.
+ephemeral endpoint into Supabase. Leave session explicitly proves deletion and
+returns the registry to cold; an idle reaper remains the abandoned-tab fallback.
 The browser sets `VITE_VF_API_BASE_URL` to the reviewer origin, so a backend
 rollback or tuned-endpoint rotation does not require a frontend rebuild unless
 the reviewer origin itself changes.
@@ -157,7 +158,8 @@ The fixed product frontend is
 `https://verifierforge-production.up.railway.app`. Product paths require the
 separately shared Basic Auth invitation. Training autoprovision remains off.
 Serving wake has its own explicit confirmation, one-session concurrency limit,
-`$5` cap, and idle reaper; report and arena evidence do not require a live GPU.
+`$5` cap, explicit Leave-to-cold shutdown, and idle reaper; report and arena
+evidence do not require a live GPU.
 
 Owners can expose the full product composition—Supabase repositories, the
 configured real tuned endpoint, mock Agent, mock provisioner and Guardian—via

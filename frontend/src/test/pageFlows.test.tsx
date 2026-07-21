@@ -77,6 +77,7 @@ function apiFixture(serving: Record<string, unknown> = cold, agentAnalysis: Reco
     if (path.endsWith('/sample-source')) return response(null)
     if (path.includes('/settings/provider-credentials/')) return response({ user_id: 'judge', provider: 'runpod', configured: false, source: 'missing', credential_id: null, updated_at: null })
     if (path === '/serving/status') return response(serving)
+    if (path === '/serving/sleep' && method === 'POST') return response(cold)
     if (path === '/serving/tuned-completion' && method === 'POST') return response({ id: 'chatcmpl-tuned-1', model: 'verifierforge-step-350', choices: [{ index: 0, message: { role: 'assistant', content: 'SELECT p.name AS project, SUM(ep.hours) AS hours FROM projects p JOIN employee_projects ep ON ep.project_id = p.id GROUP BY p.id ORDER BY p.name;' }, finish_reason: 'stop' }], usage: { prompt_tokens: 18, completion_tokens: 24, total_tokens: 42 } }, 200, { 'X-VerifierForge-Route': 'tuned' })
     return response({ detail: `missing fixture ${method} ${path}` }, 404)
   }
@@ -324,12 +325,45 @@ describe('reviewer product path', () => {
     expect(screen.getByText('SQL generated')).toBeInTheDocument()
   })
 
-  it('restores a valid session journey and resets it when leaving', async () => {
+  it('cools the model before clearing a valid reviewer session', async () => {
     seedJourney('proof')
-    renderAt(`/reports/${job.job_id}`)
+    const fixture = apiFixture(ready)
+    let finishSleep: ((value: Response) => void) | undefined
+    renderAt(`/reports/${job.job_id}`, (path, method) => {
+      if (path === '/serving/sleep' && method === 'POST') {
+        return new Promise<Response>((resolve) => { finishSleep = resolve })
+      }
+      return fixture(path, method)
+    })
     expect(await screen.findByText('78.3%')).toBeInTheDocument()
     fireEvent.click(screen.getByRole('button', { name: 'Leave session' }))
+    expect(await screen.findByRole('button', { name: 'Closing demo…' })).toBeDisabled()
+    expect(window.sessionStorage.getItem('verifierforge.journey.session.v1')).not.toBeNull()
+    await act(async () => {
+      finishSleep?.(response(cold))
+      await Promise.resolve()
+    })
     expect(await screen.findByText('Reviewer access')).toBeInTheDocument()
     expect(window.sessionStorage.getItem('verifierforge.journey.session.v1')).toBeNull()
+    const sleepCall = vi.mocked(fetch).mock.calls.find(([input, init]) => new URL(String(input)).pathname === '/serving/sleep' && init?.method === 'POST')
+    expect(JSON.parse(String(sleepCall?.[1]?.body))).toEqual({ model_id: 'vf-demo' })
+  })
+
+  it('keeps the session open when provider shutdown is not proven', async () => {
+    seedJourney('proof')
+    const fixture = apiFixture(ready)
+    renderAt(`/reports/${job.job_id}`, (path, method) => {
+      if (path === '/serving/sleep' && method === 'POST') {
+        return response({ detail: 'Provider deletion could not be proven' }, 409)
+      }
+      return fixture(path, method)
+    })
+
+    expect(await screen.findByText('78.3%')).toBeInTheDocument()
+    fireEvent.click(screen.getByRole('button', { name: 'Leave session' }))
+
+    expect(await screen.findByRole('alert')).toHaveTextContent('Provider deletion could not be proven')
+    expect(screen.getByText('78.3%')).toBeInTheDocument()
+    expect(window.sessionStorage.getItem('verifierforge.journey.session.v1')).not.toBeNull()
   })
 })

@@ -58,7 +58,7 @@ https://verifierforge-production.up.railway.app
 ```
 
 It uses Supabase, a Gate-C-qualified live `gpt-5.6-luna` Forge Agent, and the
-same 22-operation contract. Clicking **Analyze** explicitly requests a fresh
+same 23-operation contract. Clicking **Analyze** explicitly requests a fresh
 run and displays its provider/model, trace ID, timestamps, token counts,
 read-only tool inputs/outputs, and validated terminal decision. The panel is an
 audit receipt—not hidden chain-of-thought—and labels mock/cached results rather
@@ -75,7 +75,7 @@ permits only one session and has a `$5` cap. While its visible state advances
 through `provisioning` and `loading`, inspect the flagship Job report: the two
 curves, held-out arena, and `0.5833 → 0.7833` result do not need a live GPU.
 The Ship activity window shows only real registry state/detail changes, elapsed
-time, and the measured 267–282 second estimate; it does not fabricate pod logs.
+time, and the measured 267–298 second range; it does not fabricate pod logs.
 `ready` is shown before the tuned-only SQL generation probe is offered, while a
 failed wake shows a readable reason and leaves reports available. After SQL is
 generated, click **Run SQL on frozen demo data**. A local Web Worker creates a
@@ -83,8 +83,12 @@ fresh SQLite/WASM database, loads the same synthetic frozen schema used by the
 verifier, and displays the actual columns and rows (or the real SQLite error),
 execution ID, hashes, and timing. This second action makes no API, GPU, or LLM
 request and remains available if the serving session returns to cold.
-After 30 idle minutes the production reaper deletes the pod. Do not confuse
-this with Start Forge: training autoprovision remains disabled.
+Clicking **Leave session** first calls the idempotent serving sleep boundary,
+waits for provider deletion and a durable `cold` state, and only then clears
+the browser invitation and journey. If shutdown cannot be proven, the session
+stays open with a retryable error. Closing the tab cannot offer that guarantee;
+after 30 idle minutes the production reaper remains the fallback. Do not
+confuse this with Start Forge: training autoprovision remains disabled.
 
 If the hosted service is unavailable, the owner may recreate the local full
 fallback with:

@@ -9,6 +9,7 @@ from fastapi.testclient import TestClient
 from app.api import serving as serving_api
 from app.proxy.main import TunedCompletionUnavailable, TunedCompletionUpstreamError
 from app.proxy.upstream import ForwardedResponse
+from app.serving.session import ServingControlError
 from core.serving_contracts import ServingState, ServingStatus
 
 
@@ -21,6 +22,8 @@ class _Coordinator:
     def __init__(self) -> None:
         self.created = True
         self.wakes = 0
+        self.sleeps = 0
+        self.sleep_error: ServingControlError | None = None
 
     def request_wake(self, model_id: str):
         self.wakes += 1
@@ -40,6 +43,16 @@ class _Coordinator:
             model_id=model_id or "vf-demo",
             state=ServingState.COLD,
             detail="No serving session is active",
+        )
+
+    def request_sleep(self, model_id: str):
+        self.sleeps += 1
+        if self.sleep_error is not None:
+            raise self.sleep_error
+        return ServingStatus(
+            model_id=model_id,
+            state=ServingState.COLD,
+            detail="Provider deletion confirmed; managed inventory is zero",
         )
 
 
@@ -86,6 +99,40 @@ def test_idempotent_wake_is_200_and_status_is_contract_shaped(monkeypatch) -> No
     assert status.status_code == 200
     assert status.json()["state"] == "cold"
     assert status.json()["url"] is None
+
+
+def test_sleep_requires_invitation_and_returns_confirmed_cold(monkeypatch) -> None:
+    client, fake = _client(monkeypatch)
+    assert client.post(
+        "/serving/sleep", json={"model_id": "vf-demo"}
+    ).status_code == 401
+
+    response = client.post(
+        "/serving/sleep",
+        headers=_auth(),
+        json={"model_id": "vf-demo"},
+    )
+
+    assert response.status_code == 200
+    assert response.json()["state"] == "cold"
+    assert response.json()["url"] is None
+    assert fake.sleeps == 1
+
+
+def test_sleep_exposes_stable_control_errors_without_provider_details(monkeypatch) -> None:
+    client, fake = _client(monkeypatch)
+    fake.sleep_error = ServingControlError(
+        "Provider deletion could not be proven", code="termination_unproven"
+    )
+
+    response = client.post(
+        "/serving/sleep",
+        headers=_auth(),
+        json={"model_id": "vf-demo"},
+    )
+
+    assert response.status_code == 409
+    assert response.json() == {"detail": "Provider deletion could not be proven"}
 
 
 def test_reviewer_parent_owns_serving_reaper_startup(monkeypatch) -> None:

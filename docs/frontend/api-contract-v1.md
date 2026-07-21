@@ -1,7 +1,7 @@
 # Frontend API Contract v1
 
-**Target coverage:** **22 documented = 22 frozen = 22 real/mock parity**
-**Revision:** v0.35.7 · 2026-07-20 · additive Agent receipt
+**Target coverage:** **23 documented = 23 frozen = 23 real/mock parity**
+**Revision:** v0.39.1 · 2026-07-21 · additive serving sleep boundary
 
 This is the additive integration boundary for the Monday frontend. JSON field
 names and meanings below are frozen. The real API and `mock/server.py` use the
@@ -58,6 +58,22 @@ States are `cold | provisioning | loading | ready | draining`; only `ready`
 contains `url`. Endpoint key material is never returned. With
 `VF_SERVING_WAKE_ENABLED=false`, POST is an explicit 404 with zero provider
 mutation while status/report/arena reads remain available.
+
+Leaving the reviewer session uses the explicit inverse operation:
+
+```http
+POST /serving/sleep
+Authorization: Basic <base64("judge:<invite-code>")>
+Content-Type: application/json
+
+{"model_id":"vf-demo"}
+```
+
+It returns the same `ServingStatus` shape with `state: "cold"`. The operation
+is idempotent: absent/already-cold state performs no provider work. An active
+session returns only after provider deletion is confirmed and the registry is
+durably cold. A deletion failure is non-success and the frontend keeps its
+reviewer session open so the operator can retry.
 
 ### Tuned-only reviewer completion
 
@@ -502,7 +518,7 @@ available at `/docs` and `/openapi.json` for generated frontend clients.
 
 ## Internal and debug routes — frontend must not use
 
-These routes are intentionally outside the 22-operation frozen contract:
+These routes are intentionally outside the 23-operation frozen contract:
 
 - `GET /discover` — FastAPI-hosted demonstration page.
 - `POST /copilot/nl2sql/proposals` and `POST /copilot/nl2sql/validate` —
@@ -511,4 +527,4 @@ These routes are intentionally outside the 22-operation frozen contract:
   discovery and health surfaces.
 
 They may change without a frontend contract revision. Product code must use
-the 22 frozen operations above.
+the 23 frozen operations above.

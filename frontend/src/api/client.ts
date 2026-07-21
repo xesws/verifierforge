@@ -18,6 +18,7 @@ import type {
   RoutingState,
   SampleSourceRequest,
   ServingStatus,
+  ServingSleepRequest,
   ServingWakeRequest,
   StartForgeRequest,
 } from './contracts'
@@ -122,6 +123,7 @@ export class VerifierForgeClient {
   putProviderCredential = (provider: 'runpod' | 'nebius', userId: string, apiKey: string) =>
     this.request<ProviderCredentialStatus>(`/settings/provider-credentials/${provider}`, 'PUT', { user_id: userId, api_key: apiKey })
   wakeServing = (body: ServingWakeRequest) => this.request<ServingStatus>('/serving/wake', 'POST', body)
+  sleepServing = (body: ServingSleepRequest) => this.request<ServingStatus>('/serving/sleep', 'POST', body)
   getServingStatus = (modelId = 'vf-demo') =>
     this.request<ServingStatus>(`/serving/status?model_id=${encodeURIComponent(modelId)}`)
   tunedCompletion = (body: Record<string, unknown>) =>

@@ -19,7 +19,11 @@ from app.proxy.main import (
 )
 from app.serving.session import ServingControlError, ServingCoordinator
 from app.serving.settings import ServingSettings
-from core.serving_contracts import ServingStatus, ServingWakeRequest
+from core.serving_contracts import (
+    ServingSleepRequest,
+    ServingStatus,
+    ServingWakeRequest,
+)
 
 
 router = APIRouter()
@@ -65,6 +69,23 @@ def serving_status(raw_request: Request, model_id: str | None = None) -> Serving
         return serving_coordinator().status(model_id)
     except (DatabaseOperationError, OSError, RuntimeError, ValueError):
         raise HTTPException(status_code=503, detail="Serving status is unavailable") from None
+
+
+@router.post("/serving/sleep", response_model=ServingStatus)
+def sleep_serving(
+    request: ServingSleepRequest,
+    raw_request: Request,
+) -> ServingStatus:
+    """Drain the reviewer endpoint before its browser session is cleared."""
+
+    require_invitation(raw_request)
+    try:
+        return serving_coordinator().request_sleep(request.model_id)
+    except ServingControlError as error:
+        status_code = 404 if error.code == "unknown_model" else 409
+        raise HTTPException(status_code=status_code, detail=str(error)) from error
+    except (DatabaseOperationError, OSError, RuntimeError, ValueError):
+        raise HTTPException(status_code=503, detail="Serving shutdown is unavailable") from None
 
 
 @router.post(

@@ -52,6 +52,7 @@ class ServingCoordinator:
         self.runtime_factory = runtime_factory or self._runtime
         self._threads: dict[str, threading.Thread] = {}
         self._thread_lock = threading.Lock()
+        self._drain_lock = threading.Lock()
 
     def request_wake(self, model_id: str) -> tuple[ServingStatus, bool]:
         if not self.settings.enabled:
@@ -96,6 +97,18 @@ class ServingCoordinator:
             )
         return status_from_record(record)
 
+    def request_sleep(self, model_id: str) -> ServingStatus:
+        if model_id != self.settings.model_id:
+            raise ServingControlError("Unknown serving model", code="unknown_model")
+        current = self.status(model_id)
+        if current.state is ServingState.COLD:
+            return current
+        return self.drain(
+            model_id,
+            reason="reviewer left the demo session",
+            actor="reviewer",
+        )
+
     def drain(
         self,
         model_id: str,
@@ -121,9 +134,35 @@ class ServingCoordinator:
         actor: str = "idle-reaper",
         error_code: str | None = None,
     ) -> ServingStatus:
+        with self._drain_lock:
+            return await self._drain_serialized(
+                model_id,
+                reason=reason,
+                actor=actor,
+                error_code=error_code,
+            )
+
+    async def _drain_serialized(
+        self,
+        model_id: str,
+        *,
+        reason: str,
+        actor: str,
+        error_code: str | None,
+    ) -> ServingStatus:
         record = self._get(model_id)
         if record.state == ServingState.COLD.value:
             return status_from_record(record)
+        if (
+            record.external_id
+            and not record.external_id.startswith("mock-")
+            and record.provider
+            and self.settings.binding != record.provider
+        ):
+            raise ServingControlError(
+                "Serving provider binding does not match the active endpoint",
+                code="binding_mismatch",
+            )
         if record.state != ServingState.DRAINING.value:
             draining = replace(
                 record,

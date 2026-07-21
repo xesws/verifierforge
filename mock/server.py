@@ -46,7 +46,12 @@ from core.p4_contracts import (
     StartForgeRequest,
 )
 from core.provisioning_contracts import ProvisionProvider
-from core.serving_contracts import ServingState, ServingStatus, ServingWakeRequest
+from core.serving_contracts import (
+    ServingSleepRequest,
+    ServingState,
+    ServingStatus,
+    ServingWakeRequest,
+)
 from app.api.agent import (
     AgentAnalyzeRequest,
     ApprovedSampleSourceRequest,
@@ -593,6 +598,20 @@ def serving_status(model_id: str | None = None) -> ServingStatus:
             state=ServingState.COLD,
             detail="No serving session is active",
         )
+    return _SERVING_STATUS
+
+
+@app.post("/serving/sleep", response_model=ServingStatus)
+def sleep_serving(request: ServingSleepRequest) -> ServingStatus:
+    global _SERVING_STATUS
+    if request.model_id != "vf-demo":
+        raise HTTPException(status_code=404, detail="Unknown serving model")
+    _SERVING_STATUS = ServingStatus(
+        model_id="vf-demo",
+        state=ServingState.COLD,
+        detail="Mock serving session closed",
+        updated_at=datetime.now(timezone.utc),
+    )
     return _SERVING_STATUS
 
 

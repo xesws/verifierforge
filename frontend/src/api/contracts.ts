@@ -253,6 +253,10 @@ export interface ServingWakeRequest {
   confirm_provider_spend: true
 }
 
+export interface ServingSleepRequest {
+  model_id: string
+}
+
 export interface DemoTrafficRequest {
   total?: number
   rate?: number

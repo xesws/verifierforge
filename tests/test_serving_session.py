@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from concurrent.futures import ThreadPoolExecutor
+from dataclasses import replace
 from datetime import timedelta
 import time
 from pathlib import Path
@@ -77,6 +79,62 @@ def test_wake_is_idempotent_then_idle_reaper_cleans_and_allows_second_wake(
     _wait_state(service, ServingState.READY)
     assert second.session_id != ready.session_id
     assert runtime.starts == 2
+
+
+def test_reviewer_sleep_is_idempotent_and_serializes_provider_termination(
+    coordinator,
+) -> None:
+    service, runtime = coordinator
+    service.request_wake("vf-demo")
+    _wait_state(service, ServingState.READY)
+
+    with ThreadPoolExecutor(max_workers=2) as pool:
+        results = list(pool.map(service.request_sleep, ["vf-demo", "vf-demo"]))
+
+    assert [result.state for result in results] == [
+        ServingState.COLD,
+        ServingState.COLD,
+    ]
+    assert runtime.terminations == 1
+    assert service.status().state is ServingState.COLD
+    again = service.request_sleep("vf-demo")
+    assert again.state is ServingState.COLD
+    assert runtime.terminations == 1
+
+
+def test_reviewer_sleep_rejects_unknown_model_without_provider_work(
+    coordinator,
+) -> None:
+    service, runtime = coordinator
+    with pytest.raises(ServingControlError) as captured:
+        service.request_sleep("unknown-model")
+    assert captured.value.code == "unknown_model"
+    assert runtime.terminations == 0
+
+
+def test_reviewer_sleep_refuses_to_fake_delete_a_real_provider_handle(
+    coordinator,
+) -> None:
+    service, runtime = coordinator
+    service.request_wake("vf-demo")
+    _wait_state(service, ServingState.READY)
+    record = service.gateway.call(
+        lambda repositories: repositories.serving_endpoints.get("vf-demo")
+    )
+    assert record is not None
+    service.gateway.call(
+        lambda repositories: repositories.serving_endpoints.put(
+            replace(record, external_id="real-runpod-handle"),
+            expected_state=ServingState.READY.value,
+        )
+    )
+
+    with pytest.raises(ServingControlError) as captured:
+        service.request_sleep("vf-demo")
+
+    assert captured.value.code == "binding_mismatch"
+    assert runtime.terminations == 0
+    assert service.status().state is ServingState.READY
 
 
 def test_disabled_wake_has_no_provider_or_database_side_effect(tmp_path: Path) -> None:

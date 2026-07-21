@@ -44,6 +44,17 @@ class ServingWakeRequest(ServingModel):
         return value
 
 
+class ServingSleepRequest(ServingModel):
+    model_id: str = Field(default="vf-demo", min_length=1, max_length=128)
+
+    @field_validator("model_id")
+    @classmethod
+    def validate_model_id(cls, value: str) -> str:
+        if value.strip() != value or any(character.isspace() for character in value):
+            raise ValueError("model_id must be a stable non-whitespace identifier")
+        return value
+
+
 class ServingStatus(ServingModel):
     session_id: str | None = Field(default=None, min_length=1, max_length=128)
     model_id: str = Field(min_length=1, max_length=128)
@@ -86,5 +97,6 @@ __all__ = [
     "ACTIVE_SERVING_STATES",
     "ServingState",
     "ServingStatus",
+    "ServingSleepRequest",
     "ServingWakeRequest",
 ]
