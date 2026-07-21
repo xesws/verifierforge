@@ -9,6 +9,7 @@ from pathlib import Path
 from uuid import uuid4
 
 from fastapi import FastAPI, HTTPException, Response
+from fastapi.responses import JSONResponse
 import uvicorn
 
 # ``python mock/server.py`` puts mock/ (rather than the repo root) on sys.path.
@@ -50,6 +51,7 @@ from app.api.agent import (
 )
 from app.api.cors import configure_cors
 from app.proxy.clusters import list_cluster_profiles
+from app.proxy.upstream import fake_tuned_chat_completion
 
 
 app = FastAPI(title="VerifierForge Mock API")
@@ -581,6 +583,20 @@ def serving_status(model_id: str | None = None) -> ServingStatus:
             detail="No serving session is active",
         )
     return _SERVING_STATUS
+
+
+@app.post(
+    "/serving/tuned-completion",
+    response_model=dict[str, object],
+)
+def tuned_completion(request: dict[str, object]) -> JSONResponse:
+    if _SERVING_STATUS.state is not ServingState.READY:
+        raise HTTPException(status_code=409, detail="Tuned endpoint is cold; wake it first")
+    forwarded = fake_tuned_chat_completion(request)
+    return JSONResponse(
+        content=forwarded.payload,
+        headers={"X-VerifierForge-Route": "tuned"},
+    )
 
 
 def _approval_context(approval_id: str) -> tuple[ApprovalRecord, AgentAnalysisResponse]:

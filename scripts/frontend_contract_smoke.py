@@ -101,7 +101,17 @@ def main() -> int:
             checked("POST", "/serving/wake", {200, 202}, {"model_id": "vf-demo", "confirm_provider_spend": True})
         else:
             print("skip POST /serving/wake (paid operation requires --include-wake)")
-        checked("GET", "/serving/status?model_id=vf-demo", {200})
+        serving = checked("GET", "/serving/status?model_id=vf-demo", {200})
+        probe_body = {
+            "model": "vf-demo",
+            "messages": [{"role": "user", "content": "Return SELECT 1"}],
+        }
+        if serving.get("state") == "cold":
+            checked("POST", "/serving/tuned-completion", {409}, probe_body)
+        elif args.include_wake:
+            checked("POST", "/serving/tuned-completion", {200}, probe_body)
+        else:
+            print("skip POST /serving/tuned-completion (ready endpoint requires --include-wake)")
         return 0
     finally:
         try:

@@ -7,10 +7,17 @@ import hmac
 import os
 import threading
 import time
+from typing import Any
 
 from fastapi import APIRouter, HTTPException, Request, Response
+from fastapi.responses import JSONResponse
 
 from app.db import DatabaseOperationError, repository_gateway
+from app.proxy.main import (
+    TunedCompletionUnavailable,
+    TunedCompletionUpstreamError,
+    forward_tuned_completion,
+)
 from app.serving.session import ServingControlError, ServingCoordinator
 from app.serving.settings import ServingSettings
 from core.serving_contracts import ServingStatus, ServingWakeRequest
@@ -59,6 +66,37 @@ def serving_status(raw_request: Request, model_id: str | None = None) -> Serving
         return serving_coordinator().status(model_id)
     except (DatabaseOperationError, OSError, RuntimeError, ValueError):
         raise HTTPException(status_code=503, detail="Serving status is unavailable") from None
+
+
+@router.post(
+    "/serving/tuned-completion",
+    response_model=dict[str, Any],
+)
+def tuned_completion(
+    request: dict[str, Any],
+    raw_request: Request,
+) -> JSONResponse:
+    """Run an authenticated reviewer probe against only the tuned endpoint."""
+
+    _require_invitation(raw_request)
+    try:
+        forwarded = forward_tuned_completion(request)
+    except TunedCompletionUnavailable as error:
+        raise HTTPException(status_code=409, detail=str(error)) from error
+    except TunedCompletionUpstreamError as error:
+        raise HTTPException(status_code=502, detail=str(error)) from error
+    except HTTPException:
+        raise
+    except (DatabaseOperationError, OSError, RuntimeError, ValueError):
+        raise HTTPException(
+            status_code=503,
+            detail="Tuned completion control plane is unavailable",
+        ) from None
+    return JSONResponse(
+        content=forwarded.payload,
+        status_code=forwarded.status_code,
+        headers={"X-VerifierForge-Route": "tuned"},
+    )
 
 
 def start_serving_reaper() -> None:

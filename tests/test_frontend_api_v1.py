@@ -38,11 +38,12 @@ FROZEN_OPERATIONS = (
     ("put", "/settings/provider-credentials/{provider}", "200"),
     ("post", "/serving/wake", "202"),
     ("get", "/serving/status", "200"),
+    ("post", "/serving/tuned-completion", "200"),
 )
 
 
 def test_mock_and_real_openapi_freeze_the_same_request_and_response_shapes() -> None:
-    assert len(FROZEN_OPERATIONS) == 21
+    assert len(FROZEN_OPERATIONS) == 22
     real = api_main.app.openapi()
     mock = mock_server.app.openapi()
 

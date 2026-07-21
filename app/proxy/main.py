@@ -104,6 +104,85 @@ class SelectedUpstream:
     model_id: str | None = None
 
 
+class TunedCompletionUnavailable(RuntimeError):
+    """The serving registry has no ready tuned endpoint."""
+
+
+class TunedCompletionUpstreamError(RuntimeError):
+    """The tuned endpoint failed without exposing its provider response."""
+
+
+def forward_tuned_completion(
+    request: Mapping[str, Any],
+    *,
+    gateway: RepositoryGateway | None = None,
+    settings: ProxySettings | None = None,
+    resolver: RegistryTunedResolver | None = None,
+    real_forwarder: RealForwarder = forward_real,
+    guardian_draw: RandomDraw = random.random,
+    guardian_scheduler: GuardianScheduler | None = None,
+) -> ForwardedResponse:
+    """Send one reviewer probe to the ready tuned endpoint without fallback."""
+
+    _validate_request(request)
+    resolved = settings or ProxySettings.from_env()
+    active_gateway = gateway or repository_gateway()
+    active_resolver = resolver or RegistryTunedResolver(
+        lambda: active_gateway,
+        model_id=os.environ.get("VF_SERVING_MODEL_ID", "vf-demo").strip()
+        or "vf-demo",
+        environ=os.environ,
+    )
+    endpoint = active_resolver.resolve()
+    if endpoint is None:
+        raise TunedCompletionUnavailable("Tuned endpoint is cold; wake it first")
+
+    started = time.perf_counter()
+    try:
+        forwarded = _forward(
+            request,
+            upstream=SelectedUpstream(endpoint.url, endpoint.api_key, endpoint.model_id),
+            settings=resolved,
+            real_forwarder=real_forwarder,
+        )
+    except (LLMConfigurationError, UpstreamRequestError) as error:
+        raise TunedCompletionUpstreamError(
+            "Tuned endpoint did not return a completion"
+        ) from error
+    if not 200 <= forwarded.status_code < 300:
+        raise TunedCompletionUpstreamError(
+            "Tuned endpoint did not return a completion"
+        )
+
+    system_prompt = _system_prompt(request)
+    decision = RouteDecision(
+        cluster_id_for_system_prompt(system_prompt),
+        "tuned",
+        DEFAULT_TARGET_UPSTREAM,
+    )
+    _record_best_effort(
+        record_traffic,
+        request={**request, "model": endpoint.model_id},
+        response=forwarded.payload,
+        settings=resolved,
+        latency_ms=(time.perf_counter() - started) * 1_000,
+        system_prompt=system_prompt,
+        route_path="tuned",
+        gateway=active_gateway,
+    )
+    _schedule_guardian_best_effort(
+        guardian_scheduler or _schedule_background,
+        decision=decision,
+        request=request,
+        response=forwarded.payload,
+        status_code=forwarded.status_code,
+        settings=resolved,
+        draw=guardian_draw,
+        gateway=active_gateway,
+    )
+    return forwarded
+
+
 def create_app(
     *,
     settings: ProxySettings | None = None,
