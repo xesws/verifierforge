@@ -120,8 +120,9 @@ Open `http://127.0.0.1:8012/docs` for the API. The optional mock Agent demo is
 documented in [JUDGES.md](JUDGES.md); it uses the real Discover UI and stores a
 decision/approval locally without a paid call.
 
-The fixed full reviewer is available at
-`https://verifierforge-production.up.railway.app`; product paths require the
+The fixed product frontend is
+`https://verifierforge-web.vercel.app`; it calls the Railway API at
+`https://verifierforge-production.up.railway.app`. Product paths require the
 separately shared Basic Auth invitation. Training autoprovision remains off.
 Serving wake has its own explicit confirmation, one-session concurrency limit,
 `$5` cap, and idle reaper; report and arena evidence do not require a live GPU.

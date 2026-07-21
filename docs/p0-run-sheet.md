@@ -3234,6 +3234,14 @@ ESLint had zero warnings, and the production TypeScript/Vite build passed.
 - [ ] **F5 — Vercel preview.** Device-authorize the CLI, deploy the `frontend`
   root, report its URL for owner Railway CORS configuration, verify direct
   routes, and update JUDGES on the feature branch.
+  - [x] Device authorization completed as Vercel user `xesws`; project
+    `verifierforge-web` is Ready. Stable alias:
+    `https://verifierforge-web.vercel.app`.
+  - [x] `/`, `/discover`, flagship Job, flagship Report, and Ship deep links
+    each returned HTTP 200 with the SPA shell. The built JavaScript resolves
+    `VITE_VF_API_BASE_URL` to the Railway public origin.
+  - [x] Railway CORS preflight from the exact Vercel origin returned HTTP 200
+    with matching `access-control-allow-origin`.
 - [ ] **F6 — owner gate and production.** After explicit visual approval,
   update from main, revalidate, merge/push, deploy production, verify, and tag
   `frontend-v1-live`.

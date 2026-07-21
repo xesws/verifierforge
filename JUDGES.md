@@ -16,6 +16,25 @@ credential-gated live S3 test.
 
 ## 2. Start the reviewer sandbox (about 1 minute)
 
+The primary product UI is the fixed Vercel frontend:
+
+```text
+https://verifierforge-web.vercel.app
+```
+
+Enter the invitation code shared separately. The browser keeps it only in
+session storage; it is never part of the URL or frontend build. The page calls
+the Railway control plane below and follows the same frozen 21-operation API.
+
+Recommended visual path: **Discover** → review three real cluster cards → on
+Data Pull SQL inspect the governed Input and Agent proposal → observe the
+separate Approve and Start Forge boundaries → open **Runs** for the 400/200
+curves → **Prove** for `58.3% → 78.3%`, arena, savings, and verdict → **Ship**
+for canary, Guardian, and scale-to-zero status. Reports remain available while
+serving is cold.
+
+For a clone-only fallback, start the local reviewer sandbox:
+
 ```bash
 bash scripts/start_reviewer_sandbox.sh
 ```
@@ -30,7 +49,7 @@ Proxy: http://127.0.0.1:8013/v1/chat/completions
 The API reads immutable committed evidence; the proxy uses a deterministic fake
 upstream. This fallback remains the no-secret path for a fresh clone.
 
-### Hosted full reviewer
+### Hosted API control plane
 
 The accepted public reviewer is:
 
@@ -45,7 +64,7 @@ invitation code shared separately. A request without auth returns 401;
 `/healthz` remains public. `VF_AUTOPROVISION=false`, so Start Forge returns an
 explicit disabled response and cannot create a paid resource.
 
-Start the hosted walkthrough by clicking **Wake model** on Discover. The action
+Start a live-inference walkthrough by clicking **Wake model** on Discover. The action
 permits only one session and has a `$5` cap. While its visible state advances
 through `provisioning` and `loading`, inspect the flagship Job report: the two
 curves, held-out arena, and `0.5833 → 0.7833` result do not need a live GPU.
@@ -91,7 +110,7 @@ shasum -a 256 data/demo-artifacts/jobs/d4-m3-1p5b-r1-v0125/metrics.jsonl
 Expected SHA-256:
 `be3fdb965dc72a2333761a8f50181053af3c4b5355e83624c3784b6be30cd433`.
 
-## 4. Demo Discover → Agent → approval locally (about 2 minutes)
+## 4. Demo Discover → Agent → approval (about 2 minutes)
 
 In a separate terminal, run the real API/UI with the deterministic Agent
 binding and an isolated SQLite file:
@@ -104,7 +123,8 @@ VF_PROXY_DB_PATH=./runs/judges-agent.sqlite3 \
 python -m uvicorn app.api.main:app --host 127.0.0.1 --port 8014
 ```
 
-Open `http://127.0.0.1:8014/discover`. On **Data Pull SQL**:
+Prefer `https://verifierforge-web.vercel.app/discover`. For local API-only
+inspection, open `http://127.0.0.1:8014/discover`. On **Data Pull SQL**:
 
 1. inspect `95,000 SQL queries/month` and `$5,500/month`;
 2. click **Input**, keep the default repository source, and confirm;

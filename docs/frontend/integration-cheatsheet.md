@@ -5,6 +5,9 @@ against Supabase Postgres and the dynamic serving registry. The Forge Agent is
 deterministic mock and training autoprovision is off. Serving wake is an
 independent, invite-protected action with explicit spend confirmation.
 
+Production frontend: `https://verifierforge-web.vercel.app`. Its Vercel build
+contains only the public Railway origin; the invitation remains runtime-only.
+
 ## Read this first: intentional data split
 
 1. The completed D4 Job is complete in all three public modes: before
