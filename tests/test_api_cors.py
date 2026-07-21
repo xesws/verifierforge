@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from fastapi import FastAPI
+from fastapi import FastAPI, Response
 from fastapi.testclient import TestClient
 import pytest
 
@@ -78,3 +78,21 @@ def test_hosted_preview_regex_is_explicit_and_validated() -> None:
     )
     with pytest.raises(ValueError, match="valid regular expression"):
         cors_origin_regex({"VF_CORS_ORIGIN_REGEX": "["})
+
+
+def test_tuned_route_header_is_exposed_to_browser_clients() -> None:
+    app = FastAPI()
+    configure_cors(app)
+
+    @app.get("/probe")
+    def probe() -> Response:
+        return Response(headers={"X-VerifierForge-Route": "tuned"})
+
+    response = TestClient(app).get(
+        "/probe",
+        headers={"Origin": "http://localhost:5173"},
+    )
+    assert response.status_code == 200
+    assert response.headers["access-control-expose-headers"] == (
+        "X-VerifierForge-Route"
+    )

@@ -11,10 +11,29 @@ python -m pip install -r requirements-app.txt
 pytest -q
 ```
 
-Expected at this revision: `474 passed, 1 skipped`. The skip is the explicitly
+Expected at this revision: `478 passed, 1 skipped`. The skip is the explicitly
 credential-gated live S3 test.
 
 ## 2. Start the reviewer sandbox (about 1 minute)
+
+The primary product UI is the fixed Vercel frontend:
+
+```text
+https://verifierforge-web.vercel.app
+```
+
+Enter the invitation code shared separately. The browser keeps it only in
+session storage; it is never part of the URL or frontend build. The page calls
+the Railway control plane below and follows the same frozen 22-operation API.
+
+The UI enforces this visual path: **Discover** → inspect three real cluster
+cards, Input, Analyze, and the Agent decision → **Forge** → review the proposed
+config, record approval, then explicitly continue with the completed flagship
+run → **Runs** → inspect the 400/200 curves → **Proof** → inspect
+`58.3% → 78.3%`, arena, savings, and verdict → **Ship** → inspect canary,
+Guardian, and scale-to-zero serving. Locked steps cannot be deep-linked around.
+
+For a clone-only fallback, start the local reviewer sandbox:
 
 ```bash
 bash scripts/start_reviewer_sandbox.sh
@@ -30,7 +49,7 @@ Proxy: http://127.0.0.1:8013/v1/chat/completions
 The API reads immutable committed evidence; the proxy uses a deterministic fake
 upstream. This fallback remains the no-secret path for a fresh clone.
 
-### Hosted full reviewer
+### Hosted API control plane
 
 The accepted public reviewer is:
 
@@ -38,20 +57,32 @@ The accepted public reviewer is:
 https://verifierforge-production.up.railway.app
 ```
 
-It uses Supabase, deterministic mock Agent, and the same 21-operation contract.
+It uses Supabase, a Gate-C-qualified live `gpt-5.6-luna` Forge Agent, and the
+same 22-operation contract. Clicking **Analyze** explicitly requests a fresh
+run and displays its provider/model, trace ID, timestamps, token counts,
+read-only tool inputs/outputs, and validated terminal decision. The panel is an
+audit receipt—not hidden chain-of-thought—and labels mock/cached results rather
+than passing them off as live.
 Tuned inference is scale-to-zero rather than a permanently rented endpoint. It
 requires HTTP Basic Auth: username `judge`,
 invitation code shared separately. A request without auth returns 401;
 `/healthz` remains public. `VF_AUTOPROVISION=false`, so Start Forge returns an
 explicit disabled response and cannot create a paid resource.
 
-Start the hosted walkthrough by clicking **Wake model** on Discover. The action
+Start a live-inference walkthrough only after reaching **Ship**, then click
+**Wake model**. The action
 permits only one session and has a `$5` cap. While its visible state advances
 through `provisioning` and `loading`, inspect the flagship Job report: the two
 curves, held-out arena, and `0.5833 → 0.7833` result do not need a live GPU.
-Return to Discover after about 4.5 minutes; the two measured cold starts were
-282 and 267 seconds. `ready` is shown before live inference is offered, while a
-failed wake shows `failed` plus a readable reason and leaves reports available.
+The Ship activity window shows only real registry state/detail changes, elapsed
+time, and the measured 267–282 second estimate; it does not fabricate pod logs.
+`ready` is shown before the tuned-only SQL generation probe is offered, while a
+failed wake shows a readable reason and leaves reports available. After SQL is
+generated, click **Run SQL on frozen demo data**. A local Web Worker creates a
+fresh SQLite/WASM database, loads the same synthetic frozen schema used by the
+verifier, and displays the actual columns and rows (or the real SQLite error),
+execution ID, hashes, and timing. This second action makes no API, GPU, or LLM
+request and remains available if the serving session returns to cold.
 After 30 idle minutes the production reaper deletes the pod. Do not confuse
 this with Start Forge: training autoprovision remains disabled.
 
@@ -91,7 +122,7 @@ shasum -a 256 data/demo-artifacts/jobs/d4-m3-1p5b-r1-v0125/metrics.jsonl
 Expected SHA-256:
 `be3fdb965dc72a2333761a8f50181053af3c4b5355e83624c3784b6be30cd433`.
 
-## 4. Demo Discover → Agent → approval locally (about 2 minutes)
+## 4. Demo Discover → Agent → approval (about 2 minutes)
 
 In a separate terminal, run the real API/UI with the deterministic Agent
 binding and an isolated SQLite file:
@@ -104,14 +135,17 @@ VF_PROXY_DB_PATH=./runs/judges-agent.sqlite3 \
 python -m uvicorn app.api.main:app --host 127.0.0.1 --port 8014
 ```
 
-Open `http://127.0.0.1:8014/discover`. On **Data Pull SQL**:
+Prefer `https://verifierforge-web.vercel.app/discover`. For local API-only
+inspection, open `http://127.0.0.1:8014/discover`. On **Data Pull SQL**:
 
 1. inspect `95,000 SQL queries/month` and `$5,500/month`;
 2. click **Input**, keep the default repository source, and confirm;
-3. click **Analyze** to see the mock-bound decision, rationale and config;
-4. click **Approve & Forge** and observe the durable approval receipt;
-5. on the hosted reviewer, confirm the separate spend boundary and click
-   **Start Forge**; the default-off flag visibly rejects it without spending.
+3. click **Analyze** to run the hosted Agent and inspect the fresh run receipt,
+   rationale, config, and four-step read-only tool trace;
+4. continue to **Forge**, click **Approve & Forge**, and observe the durable
+   approval receipt;
+5. confirm the separate Start spend boundary remains disabled, then choose the
+   explicitly labelled completed flagship run to continue without spending.
 
 This UI path is structurally real but intentionally zero-cost. The separate
 live Gate C evidence is `1.0 / 1.0 / 0 / 1.0` under tag
@@ -124,6 +158,8 @@ gate closed.
 Frontend implementers can use the frozen request/response examples in
 [`docs/frontend/api-contract-v1.md`](docs/frontend/api-contract-v1.md); the
 real and mock OpenAPI schemas are parity-tested for all listed operations.
+The live SQL runner is deliberately not operation 23: it is browser-local and
+keeps the frozen HTTP contract at 22 operations.
 
 ## 5. Inspect delivery and persistence evidence (about 2 minutes)
 

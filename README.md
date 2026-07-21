@@ -1,3 +1,15 @@
+<p align="center">
+  <img src="assets/brand/verifierforge-wordmark.svg" alt="VerifierForge" width="520" />
+</p>
+
+<p align="center"><strong>Turn repetitive, verifiable LLM work into an evidence-backed small-model forge.</strong></p>
+
+<p align="center">
+  <img alt="tests passing" src="https://img.shields.io/badge/tests-passing-00a67e" />
+  <img alt="version v0.36.0" src="https://img.shields.io/badge/version-v0.36.0-087cf0" />
+  <img alt="Python 3.11" src="https://img.shields.io/badge/python-3.11-17212b" />
+</p>
+
 # VerifierForge
 
 VerifierForge turns production traffic with a programmatic success criterion
@@ -8,6 +20,20 @@ disposable GPU path publishes results through durable storage.
 The v1 prototype is deliberately narrow and inspectable. NL→SQL is the proved
 vertical; the verifier is the source of truth; held-out data selects the model;
 and routing remains reversible.
+
+## Technical Deep Dive
+
+The full engineering account is available as a public, invitation-free
+[visual article](https://verifierforge-web.vercel.app/tech) and as the
+[versioned Markdown source](docs/blog/technical-deep-dive.md). It covers:
+
+- the executable NL→SQL verifier, GRPO group-relative update, and gate A;
+- the M3 quality run versus its deliberately imperfect random-reward
+  falsification reference;
+- eight-checkpoint held-out selection and why step 350 shipped;
+- the strict-schema Forge Agent and Gate C evaluator; and
+- disposable S3 workers, Supabase facts, capacity-aware provisioning, and
+  scale-to-zero serving—with limitations kept beside the numbers.
 
 ## What is proved in this repository
 
@@ -31,13 +57,15 @@ Other completed gates are equally explicit:
 | Forge Agent | Live 12-scenario Gate C on `gpt-5.6-luna`: decision `1.0`, chain `1.0`, illegal actions `0`, config legality `1.0`; feature flag remains off by default. |
 | Product decision | A source-less production Analyze returned `need_more_data`; after a human-approved 50-row source, a fresh run returned `forge` at confidence `0.98` and created an approval in Supabase. |
 | Database | SQLite remains local default; the same async SQLAlchemy repositories and Alembic schema passed a real Supabase Postgres migration, reconciliation, and product smoke. |
-| Delivery | The reviewer API/proxy is a fixed Railway control plane; tuned GPU inference is now scale-to-zero. Public acceptance covers 21/21 operations. Two RunPod wake cycles reached ready in 282.14s and 266.68s, served real traffic, then idled to provider-inventory zero. The live 200-request proof split 111 default / 89 tuned with no fallback and Guardian `0.95`. |
+| Delivery | The reviewer API/proxy is a fixed Railway control plane; tuned GPU inference is now scale-to-zero. The frozen frontend boundary covers 22 operations, including a tuned-only reviewer probe that cannot mutate canary routing or fall back. Generated SQL can then run live in an ephemeral browser SQLite/WASM database against the frozen fixture—no canned rows, backend execution, GPU, or second model call. Two RunPod wake cycles reached ready in 282.14s and 266.68s, served real traffic, then idled to provider-inventory zero. The live 200-request proof split 111 default / 89 tuned with no fallback and Guardian `0.95`. |
 | Provisioning | P-1 mock lifecycle/fuses pass. P-2 executed an approved 0.5B/100-step S3 run and deleted the pod. P-4 then proved the separate web approval → explicit Start Forge → real RunPod readiness → delete wiring. Before every allocation, RunPod live capacity is queried, approved offers are price-ranked with bounded fallback, and the chosen GPU/rate is audited; the live proof selected RTX 4000 Ada at `$0.20/hr` and deleted it immediately. |
 
 ## Architecture
 
 ```text
 Vercel frontend ──▶ Railway reviewer API + proxy ──▶ on-demand GPU vLLM
+       │
+       └── browser SQLite/WASM ──▶ frozen synthetic demo rows
                            │          │                  ▲
                            │          └── guardian       │ wake/idle reap
                            │                             │
@@ -97,6 +125,10 @@ only as a temporary local fake-trainer compatibility mode.
    random-reward control, and selects only on held-out evidence.
 7. The proxy canaries the tuned endpoint while a non-blocking guardian scores
    sampled SQL output; setting canary to zero restores the default path.
+8. In Ship, a reviewer can explicitly execute the exact generated SQL in a
+   fresh browser-side SQLite database and inspect real rows or the real SQLite
+   error. This execution is separate from model generation and can continue
+   after the GPU returns to cold.
 
 ## Quickstart
 
@@ -120,8 +152,9 @@ Open `http://127.0.0.1:8012/docs` for the API. The optional mock Agent demo is
 documented in [JUDGES.md](JUDGES.md); it uses the real Discover UI and stores a
 decision/approval locally without a paid call.
 
-The fixed full reviewer is available at
-`https://verifierforge-production.up.railway.app`; product paths require the
+The fixed product frontend is
+`https://verifierforge-web.vercel.app`; it calls the Railway API at
+`https://verifierforge-production.up.railway.app`. Product paths require the
 separately shared Basic Auth invitation. Training autoprovision remains off.
 Serving wake has its own explicit confirmation, one-session concurrency limit,
 `$5` cap, and idle reaper; report and arena evidence do not require a live GPU.
@@ -142,8 +175,11 @@ hosting. `VF_AUTOPROVISION` is enabled only inside this launcher together with
 
 For permanent reviewer hosting, build the root `Dockerfile` and run
 `scripts/start_hosted_backend.sh`. The hosted service uses Supabase, S3,
-invitation auth, mock Agent/training-provisioner bindings, and the dynamic
-serving registry. Deployment and inference rollback are documented
+invitation auth, a Gate-C-qualified live Forge Agent, a disabled-by-default
+training provisioner, and the dynamic serving registry. Discover exposes the
+provider/model, unique trace ID, timestamps, token counts, exact validated
+decision JSON, and persisted read-only tool trace; mock or cached receipts are
+labelled explicitly. Deployment and inference rollback are documented
 in
 [docs/infrastructure/v0.33.0-hosted-backend.md](docs/infrastructure/v0.33.0-hosted-backend.md).
 
@@ -167,6 +203,14 @@ The pod receives presigned model objects, not AWS credentials, and must prove
 all 13 file hashes, the canonical tree, `/v1/models`, and one completion before
 the registry becomes ready. A cold or failed endpoint falls back without
 breaking the static flagship report.
+
+The Ship SQL runner has a smaller trust boundary: `sql.js` runs in a Web
+Worker, creates a fresh in-memory database for each click, loads the frozen
+synthetic schema/fixture, enforces one read-only query, caps output, and kills
+a query that exceeds two seconds. It does not call Railway or Supabase and it
+does not consult frozen reference answers. A successful execution therefore
+means “this SQL ran and returned these rows,” not “the query is semantically
+correct.”
 
 ## Database operations
 
@@ -221,6 +265,10 @@ BYO credentials through Settings and keep that fallback unset.
   and approval is required.
 - Demo artifacts exclude weights, checkpoints, credentials, raw traffic, and
   any paid-provider dependency.
+- The live SQL runner intentionally targets the public frozen demo dataset.
+  The production roadmap is a separately governed connector to a customer's
+  read-only data-warehouse replica; v0.35.4 does not accept database URLs or
+  customer credentials.
 
 
 ## How we worked with Codex

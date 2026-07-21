@@ -1,7 +1,7 @@
 # Frontend API Contract v1
 
-**Coverage:** **21 documented = 21 frozen = 21 real/mock parity**
-**Frozen:** v0.34.0 · 2026-07-20 · tags `frontend-api-v1`, `frontend-api-v1.1`, `frontend-api-v1.2`
+**Target coverage:** **22 documented = 22 frozen = 22 real/mock parity**
+**Revision:** v0.35.7 · 2026-07-20 · additive Agent receipt
 
 This is the additive integration boundary for the Monday frontend. JSON field
 names and meanings below are frozen. The real API and `mock/server.py` use the
@@ -58,6 +58,36 @@ States are `cold | provisioning | loading | ready | draining`; only `ready`
 contains `url`. Endpoint key material is never returned. With
 `VF_SERVING_WAKE_ENABLED=false`, POST is an explicit 404 with zero provider
 mutation while status/report/arena reads remain available.
+
+### Tuned-only reviewer completion
+
+The Ship playground does not use production canary selection. Once status is
+`ready`, it sends one OpenAI-compatible, non-streaming request directly through
+the registered tuned endpoint:
+
+```http
+POST /serving/tuned-completion
+Authorization: Basic <base64("judge:<invite-code>")>
+Content-Type: application/json
+
+{
+  "model": "vf-demo",
+  "messages": [
+    {"role": "system", "content": "Compile the request into SQLite SQL."},
+    {"role": "user", "content": "List the five highest-value customers."}
+  ],
+  "temperature": 0,
+  "max_tokens": 180
+}
+```
+
+Success is the upstream OpenAI chat-completion object unchanged, plus response
+header `X-VerifierForge-Route: tuned`. The server replaces the request model
+with the registry model ID, records the request as tuned traffic, and schedules
+Guardian scoring best-effort. It never changes the routing table and never
+falls back to the default upstream. A non-ready registry is HTTP 409; a tuned
+upstream failure is a secret-safe HTTP 502. Endpoint URL and key are never
+returned.
 
 Public acceptance reached ready twice in 282.14 and 266.68 seconds, proved a
 200-request 44.5% tuned canary with no fallback, and returned the registry and
@@ -154,7 +184,7 @@ Content-Type: application/json
 {
   "data_source": "app/proxy/traffic.db",
   "execution_profile": "standard",
-  "force_refresh": false
+  "force_refresh": true
 }
 ```
 
@@ -178,12 +208,58 @@ The body is optional. Response:
     }
   },
   "cached": false,
-  "created_at": "2026-07-19T12:00:00Z"
+  "created_at": "2026-07-20T12:00:01Z",
+  "trace_id": "trace-01",
+  "provider": "openai",
+  "model": "gpt-5.6-luna",
+  "total_input_tokens": 4200,
+  "total_output_tokens": 320,
+  "trace": {
+    "trace_id": "trace-01",
+    "cluster_id": "data-pull-sql",
+    "provider": "openai",
+    "model": "gpt-5.6-luna",
+    "started_at": "2026-07-20T12:00:00Z",
+    "finished_at": "2026-07-20T12:00:01Z",
+    "tool_calls": [
+      {
+        "tool_name": "analyze_traffic",
+        "arguments": {"cluster_id": "data-pull-sql"},
+        "output": {"request_count": 200, "monthly_calls": 95000},
+        "started_at": "2026-07-20T12:00:00Z",
+        "finished_at": "2026-07-20T12:00:00Z",
+        "input_tokens": 800,
+        "output_tokens": 40,
+        "error": null
+      }
+    ],
+    "total_input_tokens": 4200,
+    "total_output_tokens": 320,
+    "status": "completed",
+    "guard_events": [],
+    "terminal_decision": {
+      "decision": "forge",
+      "rationale": "Deterministic verification and positive payback support a forge.",
+      "confidence": 0.98,
+      "config": {
+        "base_model": "Qwen/Qwen2.5-1.5B-Instruct",
+        "steps": 400,
+        "k": 8,
+        "checkpoint_interval": 50,
+        "budget_usd_cap": 5.0,
+        "provider_pref": "runpod"
+      }
+    }
+  }
 }
 ```
 
 Decision values are `forge | skip | need_more_data`; only `forge` includes a
-config. Reload the latest result with
+config. `force_refresh=true` requires a new Agent run; otherwise identical
+evidence may reuse a persisted result and return `cached=true`. The trace is a
+validated record of read-only tool calls and the terminal structured output,
+not hidden chain-of-thought. `provider=mock` must be displayed as a deterministic
+fixture, never as a live model. Reload the latest result with
 `GET /clusters/{cluster_id}/agent/decision`.
 
 ### 2. Approve & Forge (no spend)
@@ -426,7 +502,7 @@ available at `/docs` and `/openapi.json` for generated frontend clients.
 
 ## Internal and debug routes — frontend must not use
 
-These routes are intentionally outside the 21-operation frozen contract:
+These routes are intentionally outside the 22-operation frozen contract:
 
 - `GET /discover` — FastAPI-hosted demonstration page.
 - `POST /copilot/nl2sql/proposals` and `POST /copilot/nl2sql/validate` —
@@ -435,4 +511,4 @@ These routes are intentionally outside the 21-operation frozen contract:
   discovery and health surfaces.
 
 They may change without a frontend contract revision. Product code must use
-the 21 frozen operations above.
+the 22 frozen operations above.

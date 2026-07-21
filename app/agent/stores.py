@@ -32,6 +32,8 @@ class AgentDecisionStore(Protocol):
 class AgentTraceStore(Protocol):
     def put(self, trace: AgentTrace) -> str: ...
 
+    def get(self, key: str) -> AgentTrace: ...
+
 
 class ApprovalStore(Protocol):
     def put(self, decision_id: str, approved_by: str) -> ApprovalRecord: ...
@@ -154,7 +156,10 @@ class S3AgentTraceStore:
         return key
 
     def get(self, key: str) -> AgentTrace:
-        payload = self.client.get_object(Bucket=self.bucket, Key=key)["Body"].read()
+        try:
+            payload = self.client.get_object(Bucket=self.bucket, Key=key)["Body"].read()
+        except Exception as error:  # noqa: BLE001 - normalize SDK-specific failures.
+            raise OSError("agent trace archive is unavailable") from error
         return AgentTrace.model_validate_json(payload)
 
 

@@ -63,6 +63,7 @@ def configure_cors(
         allow_credentials=False,
         allow_methods=["*"],
         allow_headers=["*"],
+        expose_headers=["X-VerifierForge-Route"],
     )
 
 

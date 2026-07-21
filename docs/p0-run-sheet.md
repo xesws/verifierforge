@@ -1,5 +1,47 @@
 # P0 Run Sheet — v0.6.1 data freeze
 
+## 2026-07-20 v0.36.0 — technical deep dive and brand placement
+
+**Status:** complete; documentation gate committed before implementation.
+
+- [x] TB-1: publish one English technical narrative with claim-level evidence
+  paths and explicit limitations.
+- [x] TB-2: publish six mandatory deterministic SVG figures; real curves read
+  only tracked M3/M4 and held-out artifacts.
+- [x] TB-3: add a public, no-API `/tech` route with ToC, collapsible sections,
+  responsive layout, and Vercel acceptance.
+- [x] TB-4: add the README lockup, badges, and concise deep-dive entry without
+  deleting existing content.
+- [x] TB-5: publish a small SVG mark/wordmark and favicon.
+
+Truth boundaries fixed before code: M3/M4 is a falsification reference rather
+than a controlled causal estimate; the verifier selects the highest achieved
+tier rather than summing weights; `$0.177846` is a provider estimate; `474
+passed, 1 skipped` is the v0.34 closeout snapshot; the timed S3 node-death drill
+remained incomplete; and the augmentation log does not independently prove the
+resolved OpenRouter model slug.
+
+**Acceptance:** deterministic figure check, frontend test/lint/build, full
+pytest, secret scan, browser QA when a browser surface is available, and public
+`/tech` return green. **Stop:** omit an unsupported claim rather than invent
+evidence; do not deploy a failed build.
+
+**Result:** the canonical 340-line article and all six mandatory figures were
+published. `python -m scripts.build_blog_assets --check` reports 17 current
+outputs; pytest reports `485 passed, 1 skipped`; Vitest reports `30 passed`;
+ESLint, Vite build, secret scan, and `git diff --check` pass. Production
+deployment `dpl_HcXm6wKjBHJLzLn5zoPPHkfiv2tS` is READY; the stable route
+`https://verifierforge-web.vercel.app/tech` and favicon both return HTTP 200.
+
+The first Vercel attempt failed with `Could not resolve
+"../../../docs/blog/technical-deep-dive.md?raw"` because that project's upload
+root contains only `frontend/`. The repair keeps `docs/blog/` as the only
+manually maintained prose and makes the deterministic generator emit an exact
+deployment mirror, with a byte-equality regression test. Interactive browser
+QA could not run because no browser instance was available in this session;
+this is a validation limitation, not a claimed pass. Public HTTP, component
+tests, production build, and responsive CSS checks passed.
+
 **Status:** resumed — v0.10.0 U1–U3 training/held-out gate update
 **Owner:** Codex on `main`
 **Starting commit:** `78912f1` (`v0.6.0 Data: discard malformed expansion responses`)
@@ -3198,3 +3240,159 @@ secret scan passed, shell syntax passed.
 or cold-reviewer dependency and may be safely closed by the owner. Closing it
 does not remove any reviewer report/arena/Discover experience; live inference
 remains available through the Wake model scale-to-zero path.
+
+## 2026-07-20 v0.35.0 — frontend API integration and Vercel delivery
+
+**Status:** in progress. This section is the execution record for F0–F6.
+
+- [x] **F0 — branch and documentation gate.** Push the v0.34.2 review,
+  branch from current main, reserve v0.35.0 docs, cherry-pick Nora commit
+  `642e335`, and prove the untouched visual baseline still builds.
+- [x] **F1 — typed API boundary.** Cover exactly 22 frozen operations,
+  `VITE_VF_API_BASE_URL`, runtime Basic invitation, safe errors, and cold/
+  fallback semantics without a backend change.
+- [x] **F2 — five-page product wiring.** Discover/Forge/Job/Report/Ship consume
+  real contracts and expose Input, Analyze, Approve, Start, routing, Guardian,
+  credentials, and serving controls in Nora's visual language.
+- [x] **F3 — resilience.** Loading, empty, error, readonly, disabled, cold,
+  provisioning, loading, ready, draining, and failed behavior never red-screens
+  immutable evidence.
+
+F2/F3 checkpoint: the static JSON generator and localStorage Job simulation
+were removed. The five pages now consume the frozen typed client; cold serving
+leaves all report evidence visible, mutations are explicit, and Start Forge is
+separate from approval. Final validation: 14 frontend tests passed,
+ESLint had zero warnings, and the production TypeScript/Vite build passed.
+- [ ] **F4 — local/public acceptance.** Exercise all 22 operations from the UI,
+  capture page evidence, run one authorized Wake and tuned completion, restore
+  product state, drain immediately, and prove provider inventory zero.
+  - [x] Public secret-safe contract smoke: 21 no-Wake calls exercised every
+    safe branch of the 22-operation Railway boundary; the paid Wake was
+    deliberately skipped. Expected disabled Start returned HTTP 404, cold
+    tuned completion returned HTTP 409, execution status remained readable as
+    `approved`, and temporary Job/credential rows were deleted.
+  - [ ] Screenshot pass is blocked in this session because browser discovery
+    returned no available browser instance. Local reviewer/API and Vite were
+    started successfully; do not substitute an unrelated automation surface.
+  - [x] Deterministic acceptance: `pytest -q` reported `478 passed, 1 skipped`;
+    frontend Vitest reported `14 passed`; ESLint and the production Vite build
+    passed. Direct deep-link rejection, staged unlocks, session reset, real
+    status activity, and full tuned result rendering have component coverage.
+- [x] **F5 — Vercel production entry.** Device-authorize the CLI, deploy the `frontend`
+  root, report its URL for owner Railway CORS configuration, verify direct
+  routes, and update JUDGES on the feature branch.
+  - [x] Device authorization completed as Vercel user `xesws`; project
+    `verifierforge-web` is Ready. Stable alias:
+    `https://verifierforge-web.vercel.app`.
+  - [x] `/`, `/discover`, flagship Job, flagship Report, and Ship deep links
+    each returned HTTP 200 with the SPA shell. The built JavaScript resolves
+    `VITE_VF_API_BASE_URL` to the Railway public origin.
+  - [x] Railway CORS preflight from the exact Vercel origin returned HTTP 200
+    with matching `access-control-allow-origin`.
+  - [x] Reviewer-journey correction redeployed: Railway deployment
+    `c06cb26c-7a57-47aa-ad02-5d045ae1669c` is Online; Vercel deployment
+    `dpl_BWc4iuu3ocBkgHcCNsiESZ3F3ygz` is Ready on the stable alias. All five
+    SPA deep links returned HTTP 200 and the built bundle contained the staged
+    handoff, Ship Wake, and tuned-result controls.
+- [ ] **F6 — owner gate and production.** After explicit visual approval,
+  update from main, revalidate, merge/push, deploy production, verify, and tag
+  `frontend-v1-live`.
+
+### Fixed safety decisions
+
+- Existing dirty runtime logs are never staged by this feature.
+- `VF_AUTOPROVISION=false` remains the expected public state; no training is
+  started. The only paid action is one budget-fused serving wake.
+- The invite is session-only and excluded from screenshots/video. Mutations
+  are never retried automatically.
+- Any single item blocked over 30 minutes is recorded and skipped, but no
+  missing acceptance can be relabeled complete or receive the live tag.
+
+## 2026-07-20 v0.35.1 — Discover Analyze source fix
+
+**Status:** complete on deployed feature candidate; owner visual confirmation pending.
+
+- [x] **Diagnosis.** The screenshot error is the API's intended path guard:
+  the UI incorrectly passed the approved repository JSONL as the internal
+  proxy traffic `data_source`; Analyze failed and the journey correctly stayed
+  locked.
+- [x] **Frontend fix.** Keep Input on the sample-source endpoint; send Analyze
+  without a client filesystem path and clarify both meanings in the UI.
+- [x] **Regression.** Assert request shape plus Forge unlock, then run Vitest,
+  ESLint, build, and full pytest.
+- [x] **Public acceptance.** Redeploy the zero-cost candidate and prove one
+  public mock-bound Analyze returns `forge` and unlocks Forge.
+  - Vitest: 14 passed; ESLint and production build passed.
+  - Pytest: `478 passed, 1 skipped, 1 warning`; the warning is the existing
+    aiosqlite shutdown race in `test_serving_session`.
+  - Vercel: `dpl_JCpL9W2qproT5MVqsWJAQHkL5LGQ`, stable alias unchanged.
+  - Public Analyze evidence: HTTP 200, `cluster_id=data-pull-sql`,
+    `decision=forge`, config present, request body `{}`, mock-bound/cached and
+    therefore zero paid provider action.
+
+## 2026-07-20 v0.35.2 — Ship sample prompts
+
+**Status:** complete on deployed feature candidate.
+
+- [x] **Scope.** Replace the schema-incompatible customer-order default and
+  add six one-click examples sourced from the frozen employee/project domain.
+- [x] **UI and accessibility.** Selection fills but never submits, selected
+  state is visible/semantic, and chips remain usable responsively.
+- [x] **Regression.** Prove the chosen prompt reaches the existing tuned-only
+  request unchanged; run frontend and repository suites.
+- [x] **Deployment.** Publish the zero-cost Vercel candidate and verify its
+  bundle; do not Wake or call the tuned model.
+  - Vitest: 14 passed; ESLint and production build passed.
+  - Pytest: `478 passed, 1 skipped, 1 warning` (existing aiosqlite shutdown
+    race only).
+  - Vercel: `dpl_AbsnJbCAtqJ3iVTbpxUkWGB1LYg1`, stable alias unchanged; all
+    six prompt labels were present in the served bundle.
+  - Spend: zero Wake and zero tuned completion requests.
+
+## 2026-07-20 v0.35.3 — Ship readiness messaging
+
+**Status:** complete on deployed feature candidate.
+
+- [x] **Diagnosis.** Cold/loading Run used native disabled behavior with active
+  styling and no local dependency explanation; hidden-tab polling also never
+  resumed, so status could remain stale after the registry reached Ready.
+- [x] **Messaging gate.** Show state-specific Wake → Ready → Run instructions,
+  explicit premature-click feedback, and honest disabled styling.
+- [x] **Polling recovery.** Resume registry polling when a hidden tab becomes
+  visible and cover the behavior with a regression test.
+- [x] **Acceptance.** Run all frontend/repository gates and deploy the zero-cost
+  candidate without Wake or tuned inference.
+  - Vitest: 17 passed across three files; ESLint and production build passed.
+  - Pytest: `478 passed, 1 skipped`.
+  - Vercel: `dpl_9xpQvKHu3oq97Pd2gQNJ93NtXRt8`, stable alias unchanged; served
+    bundle contains cold/loading/blocked-click messaging.
+  - Spend: zero Wake and zero tuned completion requests.
+
+## 2026-07-20 v0.35.4 — Browser-local live SQL execution
+
+**Status:** deployed; owner visual acceptance pending.
+
+- [x] **Documentation gate.** Reserve v0.35.4 and document the frontend plus
+  verifier boundary before code (`fba65f6`).
+- [x] **30-minute feasibility gate.** `sql.js==1.14.1`, the real frozen-fixture
+  smoke, Worker/WASM bundle, and production build passed in under ten minutes;
+  the server endpoint fallback was not activated and the API remains 22 ops.
+- [x] **Fresh execution.** Each click creates a new in-memory database, loads
+  the 50-row pool's unique 2.3KB schema/INSERT fixture, executes the exact model
+  output, returns at most 100 rows, and terminates a two-second query.
+- [x] **No canned result proof.** Two executions of an employee query with
+  `randomblob()` returned different nonce values and execution IDs. Reference
+  SQL and expected results are absent from the browser asset.
+- [x] **UX and failures.** Generation and execution are separate; actual worker
+  stages, result rows, metadata, truncation, native SQLite errors, and timeouts
+  are visible. Generated SQL remains executable after serving goes cold.
+- [x] **Automated acceptance.** Vitest `25 passed`; ESLint and Vite build clean;
+  pytest `479 passed, 1 skipped`; frozen source/schema SHA check passed.
+- [ ] **Visual acceptance.** Browser discovery returned no available browser
+  instance. Do not claim a screenshot; verify the public Vercel deployment in
+  an owner browser.
+- [x] **Deployment artifact gate.** Vercel deployment
+  `dpl_4RbQL5VWB99WJgRw7FH3fs5pQXdm` is READY on
+  `https://verifierforge-web.vercel.app`. Ship, the dedicated Worker, and WASM
+  returned HTTP 200; the WASM MIME is `application/wasm`, and the public Worker
+  contains the expected dataset ID plus schema SHA.

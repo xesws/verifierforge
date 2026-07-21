@@ -30,6 +30,9 @@ class MemoryTraceStore:
         self.values[key] = trace
         return key
 
+    def get(self, key):
+        return self.values[key]
+
 
 def _service_factory(db_path: Path, traces: MemoryTraceStore, *, binding: str = "mock"):
     decisions = SQLiteAgentDecisionStore(db_path)
@@ -54,6 +57,7 @@ def _install_services(
     monkeypatch.setattr(
         agent_api, "_services", _service_factory(db_path, traces, binding=binding)
     )
+    monkeypatch.setattr(agent_api, "_trace_store", lambda: traces)
     monkeypatch.setattr(
         agent_api,
         "_stores",
@@ -99,6 +103,16 @@ def test_analyze_caches_identical_fingerprint_and_approval_is_idempotent(
     assert first.json()["cached"] is False
     assert second.json()["cached"] is True
     assert second.json()["decision_id"] == first.json()["decision_id"]
+    assert second.json()["trace_id"] == first.json()["trace_id"]
+    assert second.json()["provider"] == "mock"
+    assert second.json()["model"] == "vf-agent-deterministic-mock"
+    assert [item["tool_name"] for item in first.json()["trace"]["tool_calls"]] == [
+        "analyze_traffic",
+        "inspect_samples",
+        "estimate_economics",
+        "check_verifiability",
+    ]
+    assert first.json()["trace"]["terminal_decision"] == first.json()["decision"]
     assert len(traces.values) == 1
     decision_id = first.json()["decision_id"]
     monkeypatch.setattr(

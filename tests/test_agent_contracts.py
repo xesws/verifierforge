@@ -110,6 +110,21 @@ def test_trace_contains_only_public_audit_fields() -> None:
 
 
 def test_product_envelope_round_trip_is_additive() -> None:
+    trace = AgentTrace(
+        trace_id="trace-1",
+        cluster_id="data-pull-sql",
+        provider="mock",
+        model="vf-agent-deterministic-mock",
+        started_at="2026-07-17T11:59:59Z",
+        finished_at="2026-07-17T12:00:00Z",
+        tool_calls=[],
+        total_input_tokens=12,
+        total_output_tokens=6,
+        status=AgentRunStatus.COMPLETED,
+        terminal_decision=AgentDecision(
+            decision="forge", rationale="viable", confidence=0.9, config=_config()
+        ),
+    )
     response = AgentAnalysisResponse(
         decision_id="decision-1",
         cluster_id="data-pull-sql",
@@ -118,6 +133,12 @@ def test_product_envelope_round_trip_is_additive() -> None:
         ),
         cached=False,
         created_at="2026-07-17T12:00:00Z",
+        trace_id=trace.trace_id,
+        provider=trace.provider,
+        model=trace.model,
+        total_input_tokens=trace.total_input_tokens,
+        total_output_tokens=trace.total_output_tokens,
+        trace=trace,
     )
 
     assert AgentAnalysisResponse.model_validate_json(response.model_dump_json()) == response

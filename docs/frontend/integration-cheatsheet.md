@@ -1,9 +1,19 @@
 # Frontend integration cheatsheet
 
-Last verified: **2026-07-20 · v0.34.0** from the fixed Railway public origin
-against Supabase Postgres and the dynamic serving registry. The Forge Agent is
+Last verified: **2026-07-20 · v0.35.3 candidate** from the fixed Railway public
+origin and Vercel production alias. The 22-operation boundary passed its
+secret-safe, no-Wake smoke against Supabase Postgres and the dynamic serving
+registry. The Forge Agent is
 deterministic mock and training autoprovision is off. Serving wake is an
 independent, invite-protected action with explicit spend confirmation.
+
+Discover's **Input** path is the approved training/evaluation JSONL. Analyze
+does not send that repository path as `data_source`; it reads proxy traffic
+from the server-configured store. The public no-path Analyze returned HTTP 200
+with a forgeable decision.
+
+Production frontend: `https://verifierforge-web.vercel.app`. Its Vercel build
+contains only the public Railway origin; the invitation remains runtime-only.
 
 ## Read this first: intentional data split
 
@@ -14,8 +24,8 @@ independent, invite-protected action with explicit spend confirmation.
 2. `artifacts` serves the frozen presentation, `hybrid` combines it with
    Supabase relationship facts, and `supabase` serves the deterministic
    `summary_json` projection. Artifacts/S3 remain authoritative if they differ.
-3. The contract has exactly 21 documented, frozen, and real/mock-parity
-   operations.
+3. The v0.35.0 target contract has exactly 22 documented, frozen, and
+   real/mock-parity operations.
 4. Cluster GETs currently materialize the static catalog into the repository,
    so they update catalog timestamps while reading. No product value changed in
    this check, but the route is not strictly read-only internally.
@@ -34,7 +44,10 @@ variables used for a newly generated Agent trace stay in ignored `.env`.
 ```bash
 VF_DB_BACKEND=postgres \
 VF_AGENT_ENABLED=true \
-VF_AGENT_BINDING=mock \
+VF_AGENT_BINDING=real \
+VF_AGENT_GATE_C_PASSED=true \
+VF_LLM_PROVIDER=openai \
+VF_LLM_MODEL=gpt-5.6-luna \
 VF_AUTOPROVISION=false \
 VF_SERVING_WAKE_ENABLED=false \
 VF_PROVISION_BINDING=mock \
@@ -85,6 +98,7 @@ environment. Generate it without echoing it into a command or log, store it in
 | `PUT /settings/provider-credentials/{provider}` | none | `Content-Type: application/json`; never retain or log the key in the browser |
 | `POST /serving/wake` | reviewer invitation required, including loopback | Basic `Authorization`; `Content-Type: application/json` |
 | `GET /serving/status` | reviewer invitation required, including loopback | Basic `Authorization` |
+| `POST /serving/tuned-completion` | reviewer invitation required, including loopback | Basic `Authorization`; `Content-Type: application/json` |
 
 All GET routes are header-free on loopback. When the same calls go through the
 reviewer sandbox, add its Basic `Authorization` header to every row above.
@@ -103,7 +117,7 @@ was read directly where that claim applies.
 | 4 | `GET /jobs/{job_id}/metrics` | 200 | yes | artifacts or Supabase projection | yes |
 | 5 | `GET /clusters` | 200 | yes; exactly 3 | static + Supabase | yes |
 | 6 | `GET /clusters/data-pull-sql` | 200 | yes | static + Supabase | yes |
-| 7 | `POST /clusters/data-pull-sql/agent/analyze` | 200 | yes | mock analysis + Supabase decision | yes |
+| 7 | `POST /clusters/data-pull-sql/agent/analyze` | 200 | yes; decision + run receipt | live Agent + Supabase summary + S3 trace | yes |
 | 8 | `GET /clusters/data-pull-sql/agent/decision` | 200 | yes | Supabase | yes |
 | 9 | `POST /agent-decisions/{decision_id}/approvals` | 200 | yes | Supabase | yes |
 | 10 | `GET /agent-decisions/{decision_id}/approval` | 200 | yes | Supabase | yes |
@@ -118,6 +132,13 @@ was read directly where that claim applies.
 | 19 | `PUT /settings/provider-credentials/nebius` | 200 | yes; key never returned | Supabase | yes |
 | 20 | `POST /serving/wake` | 404 by code default; 202 on accepted hosted wake | lifecycle shape; literal spend confirmation | Supabase + RunPod | yes |
 | 21 | `GET /serving/status` | 200 | lifecycle shape; endpoint key absent | Supabase registry | yes |
+| 22 | `POST /serving/tuned-completion` | 409 while cold; 200 only when ready | OpenAI completion + `X-VerifierForge-Route: tuned` | Supabase registry + tuned endpoint | yes; cold branch verified, live branch requires separately authorized Wake |
+
+Ship's **Run SQL on frozen demo data** action is intentionally absent from this
+HTTP table. It executes the exact generated response inside a browser Web
+Worker using the bundled frozen SQLite fixture, so it adds no API operation,
+auth header, CORS requirement, provider request, or Supabase write. The frozen
+contract remains 22 operations.
 
 All scoped self-check Job, credential, and approval rows were removed. Routing
 and sample-source product values were restored, and
@@ -143,7 +164,7 @@ rate was `0.95`.
 | `VF_AGENT_ENABLED` | `.env`: `true` | Exposes Analyze, decision, approval, sample-source, and Discover routes. |
 | `VF_AUTOPROVISION` | unset/default `false` | Start Forge returns the explicit 404 above and cannot spend. |
 | `VF_SERVING_WAKE_ENABLED` | code default `false`; hosted acceptance `true` | Independently gates one-GPU inference wake; Basic invitation, explicit confirmation, concurrency/budget fuses, and idle deletion still apply. |
-| `VF_AGENT_BINDING` | launch override `mock` | Analyze is deterministic and makes no LLM request; decision metadata still lands in Supabase. |
+| `VF_AGENT_BINDING` | hosted `real` | Analyze uses the Gate-C-qualified configured model; the receipt exposes provider/model and never mislabels mock or cached output. Use `mock` only for explicit zero-cost fallback demos. |
 | `VF_API_DATA_MODE` | default `hybrid` | Public modes are `artifacts`, `hybrid`, and `supabase`; `runs` is deprecated local compatibility. |
 | `VF_CORS_ORIGINS` | unset/local default | Allows localhost and 127.0.0.1 on 3000, 5173, and 8080. Comma-separated values replace the list; only explicit `*` opens all origins. |
 
@@ -152,7 +173,8 @@ boundary and remains disabled in this launch. Do not treat `POST /jobs` as a
 training action; it only queues metadata.
 
 The v0.33.0 public acceptance covered the then-current 19 operations; v0.34.0
-adds two serving operations, bringing frozen parity to 21. The live serving
+added wake/status and v0.35.0 adds the tuned-only reviewer completion, bringing
+target frozen parity to 22. The live serving
 acceptance reached ready twice, served 111 default / 89 tuned requests without
 fallback, and returned provider inventory to zero twice. The flagship report contained
 400 main and 200 control points, ten held-out arena samples, `$3,850` projected

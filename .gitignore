@@ -3,10 +3,17 @@ models/
 *.safetensors
 __pycache__/
 .env
+.env.*
 node_modules/
 assets/*
 !assets/forge-agent/
 !assets/forge-agent/**
 !assets/lane-a-v0.22.5-*
+!assets/brand/
+!assets/brand/**
+!assets/blog/
+!assets/blog/**
 app/proxy/traffic.db*
 /tq/
+.vercel/
+coverage/

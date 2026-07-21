@@ -1,0 +1,42 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 680" role="img" aria-labelledby="title desc">
+<title id="title">NL2SQL verifier tier pipeline</title>
+<desc id="desc">SQL is extracted, parsed, executed read-only against frozen SQLite, and its result multiset is compared with expected rows.</desc>
+<metadata>{&quot;facts&quot;:{&quot;length_penalty&quot;:0.05,&quot;tiers&quot;:[0.2,0.5,1.0],&quot;verifier_version&quot;:2},&quot;sources&quot;:[{&quot;path&quot;:&quot;core/rewards/nl2sql.py&quot;,&quot;sha256&quot;:&quot;b76707e5c0603d227393d03ffc0bdc7c66ec072a139c6aa717c282f4082de47f&quot;}]}</metadata>
+<defs>
+<filter id="shadow" x="-15%" y="-15%" width="130%" height="140%"><feDropShadow dx="0" dy="10" stdDeviation="14" flood-color="#304d5b" flood-opacity=".10"/></filter>
+<linearGradient id="accent" x1="0" x2="1"><stop stop-color="#087cf0"/><stop offset="1" stop-color="#00a67e"/></linearGradient>
+<style>text{font-family:Manrope,Inter,Arial,sans-serif;fill:#17212b}.mono{font-family:"IBM Plex Mono",Menlo,monospace}.label{font-size:13px;letter-spacing:.09em;text-transform:uppercase;font-weight:700}.small{font-size:13px}.tiny{font-size:11px}.body{font-size:16px}.heading{font-size:26px;font-weight:750;letter-spacing:-.03em}.hero{font-size:34px;font-weight:780;letter-spacing:-.04em}.muted{fill:#62717d}.soft{fill:#82909a}.blue{fill:#087cf0}.green{fill:#00a67e}.amber{fill:#a96900}.coral{fill:#dd6b5b}.white{fill:#fff}.stroke{stroke:#d6e2e6;stroke-width:1.5}.arrow{stroke:#82909a;stroke-width:2;fill:none;marker-end:url(#arrow)}</style>
+<marker id="arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse"><path d="M 0 0 L 10 5 L 0 10 z" fill="#82909a"/></marker>
+</defs>
+<rect width="1200" height="680" rx="28" fill="#edf5f7"/>
+<text x="48" y="48" class="label blue" text-anchor="start">FIGURE 4 · PROGRAMMATIC VERIFIER</text>
+<text x="48" y="84" class="heading" text-anchor="start">A score you can debug one tier at a time</text>
+<text x="48" y="111" class="small muted" text-anchor="start">The highest achieved tier wins; this is not a weighted sum.</text>
+<rect x="44" y="140" width="1112" height="470" rx="18" fill="#ffffff" stroke="#d6e2e6" filter="url(#shadow)"/>
+<rect x="80" y="205" width="210" height="220" rx="18" fill="#f8fbfc" stroke="#d6e2e6"/>
+<circle cx="114" cy="239" r="18" fill="#087cf0"/>
+<text x="114" y="244" class="small mono white" text-anchor="middle">1</text>
+<text x="104" y="286" class="label" text-anchor="start" fill="#087cf0">EXTRACT</text>
+<text x="104" y="330" class="small" text-anchor="start"><tspan x="104" dy="0">Markdown SQL fence</tspan><tspan x="104" dy="25">retain raw completion</tspan></text>
+<path d="M290 315 L325 315" stroke="#82909a" stroke-width="2" fill="none" marker-end="url(#arrow)"/>
+<rect x="335" y="205" width="210" height="220" rx="18" fill="#f8fbfc" stroke="#d6e2e6"/>
+<circle cx="369" cy="239" r="18" fill="#087cf0"/>
+<text x="369" y="244" class="small mono white" text-anchor="middle">2</text>
+<text x="359" y="286" class="label" text-anchor="start" fill="#087cf0">PARSE + GUARD</text>
+<text x="359" y="330" class="small" text-anchor="start"><tspan x="359" dy="0">one SELECT / WITH</tspan><tspan x="359" dy="25">tier = 0.2</tspan></text>
+<path d="M545 315 L580 315" stroke="#82909a" stroke-width="2" fill="none" marker-end="url(#arrow)"/>
+<rect x="590" y="205" width="210" height="220" rx="18" fill="#f8fbfc" stroke="#d6e2e6"/>
+<circle cx="624" cy="239" r="18" fill="#00a67e"/>
+<text x="624" y="244" class="small mono white" text-anchor="middle">3</text>
+<text x="614" y="286" class="label" text-anchor="start" fill="#00a67e">EXECUTE</text>
+<text x="614" y="330" class="small" text-anchor="start"><tspan x="614" dy="0">frozen SQLite schema</tspan><tspan x="614" dy="25">read-only · tier = 0.5</tspan></text>
+<path d="M800 315 L835 315" stroke="#82909a" stroke-width="2" fill="none" marker-end="url(#arrow)"/>
+<rect x="845" y="205" width="210" height="220" rx="18" fill="#f8fbfc" stroke="#d6e2e6"/>
+<circle cx="879" cy="239" r="18" fill="#00a67e"/>
+<text x="879" y="244" class="small mono white" text-anchor="middle">4</text>
+<text x="869" y="286" class="label" text-anchor="start" fill="#00a67e">COMPARE</text>
+<text x="869" y="330" class="small" text-anchor="start"><tspan x="869" dy="0">Counter(result rows)</tspan><tspan x="869" dy="25">exact multiset · tier = 1.0</tspan></text>
+<rect x="130" y="468" width="940" height="94" rx="18" fill="#eef6ff" stroke="#c8e1f8"/>
+<text x="600" y="501" class="heading" text-anchor="middle">final score = highest achieved tier</text>
+<text x="600" y="530" class="small mono muted" text-anchor="middle">completion &gt; 400 characters → subtract 0.05 · pass threshold ≥ 0.95</text>
+</svg>
