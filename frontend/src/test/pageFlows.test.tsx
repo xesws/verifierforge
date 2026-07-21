@@ -171,6 +171,10 @@ describe('reviewer product path', () => {
     expect(screen.getByText(/queries run against the frozen demo dataset/i)).toBeInTheDocument()
     const completionCall = vi.mocked(fetch).mock.calls.find(([input, init]) => new URL(String(input)).pathname === '/serving/tuned-completion' && init?.method === 'POST')
     const completionBody = JSON.parse(String(completionCall?.[1]?.body)) as { messages: Array<{ role: string; content: string }> }
+    expect(completionBody.messages[0].content).toContain('CREATE TABLE departments')
+    expect(completionBody.messages[0].content).toContain('department_id INTEGER NOT NULL')
+    expect(completionBody.messages[0].content).toContain('active INTEGER NOT NULL')
+    expect(completionBody.messages[0].content).not.toContain('INSERT INTO')
     expect(completionBody.messages[1].content).toBe('For every project whose combined employee hours are no less than 100, output the project name and total hours, sorted by project name ascending.')
   })
 

@@ -32,6 +32,19 @@ describe('browser SQL runtime', () => {
     expect(result.dataset.schemaSha256).toBe('688cfaf8a4fff6743b541dcfec2c2de10793232458342c8160178394c510631d')
   })
 
+  it('executes the schema-grounded Engineering sample query', async () => {
+    const { SQL, version } = await runtime()
+    const result = await executeSql(
+      SQL,
+      fixtureSql,
+      request("SELECT e.name FROM employees AS e JOIN departments AS d ON d.id = e.department_id WHERE e.active = 1 AND d.name = 'Engineering' ORDER BY e.name"),
+      version,
+    )
+
+    expect(result.status).toBe('succeeded')
+    expect(result.rows).toEqual([['Ada'], ['Frances'], ['Grace']])
+  })
+
   it('executes a complete Markdown fence without silently selecting a statement', async () => {
     const { SQL, version } = await runtime()
     const success = await executeSql(SQL, fixtureSql, request('```sql\nSELECT name FROM departments WHERE id = 1;\n```'), version)

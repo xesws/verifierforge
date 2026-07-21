@@ -1,7 +1,13 @@
+import frozenPromptSchema from './generated/nl2sql-review-schema.sql?raw'
+
 export const FLAGSHIP_JOB_ID = 'd4-m3-1p5b-r1-v0125'
 export const SERVING_MODEL_ID = 'vf-demo'
 export const DEFAULT_BASE_MODEL = 'Qwen/Qwen2.5-1.5B-Instruct'
-export const SQL_SYSTEM_PROMPT = 'Return exactly one read-only SQL SELECT or WITH statement. Do not include an explanation.'
+export const SQL_SYSTEM_PROMPT = [
+  'Return exactly one read-only SQLite SELECT or WITH statement. Do not include an explanation.',
+  'Use only the tables and columns in this exact frozen schema:',
+  frozenPromptSchema.trim(),
+].join('\n\n')
 export const SQL_PROMPT_EXAMPLES = [
   { label: 'Top earner', prompt: 'Find the name of the top-earning employee.' },
   { label: 'Planned projects', prompt: 'Give me an alphabetical list of project names that have a planned status.' },

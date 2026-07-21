@@ -3,5 +3,6 @@
   "sourcePath": "data/nl2sql/v0.10.0-training-pool.jsonl",
   "sourceSha256": "c97a5adea789fae3be249bc9ac95a1902ae5a9769de9eefbc08277f056878e8c",
   "schemaSha256": "688cfaf8a4fff6743b541dcfec2c2de10793232458342c8160178394c510631d",
+  "promptSchemaSha256": "7aa3240d901cd982b381aa3e75e538d5136f72bdf60ca405ede3d667cd073878",
   "sourceRowCount": 50
 }
