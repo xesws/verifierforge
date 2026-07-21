@@ -2,16 +2,20 @@
 
 ## 2026-07-20 v0.37.1 — isolate mock provisioning from host SSH state
 
-**Status:** planned; documentation gate created before the test repair.
+**Status:** implemented and locally validated; pushed CI confirmation pending.
 
 - [x] **Version gate.** Record the clean-runner root cause, strict non-goals,
   affected test/infrastructure areas, and validation plan.
-- [ ] **Fixture isolation.** Inject an explicit synthetic public key only into
+- [x] **Fixture isolation.** Inject an explicit synthetic public key only into
   the P4 mock lifecycle test; preserve live RunPod fail-closed behavior.
-- [ ] **Validation.** Pass empty-HOME reproduction, exact security selection,
+- [x] **Validation.** Pass missing-key-path reproduction, exact security selection,
   full pytest, secret scan, compilation, and diff checks.
 - [ ] **Delivery.** Commit/push, require GitHub `security` green, and confirm
   the docs/test-only Railway deployment plus production cleanup invariants.
+
+**Local result:** the controlled missing-key-path test now passes; exact
+security selection 23 passed; full pytest `492 passed, 1 skipped`; secret scan,
+compilation, and diff checks pass.
 
 ## 2026-07-20 v0.37.0 — one-click demo traffic simulation
 

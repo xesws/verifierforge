@@ -137,6 +137,7 @@ def test_approval_then_separate_start_runs_complete_mock_lifecycle(
     monkeypatch.setenv("VF_AGENT_ENABLED", "true")
     monkeypatch.setenv("VF_AUTOPROVISION", "true")
     monkeypatch.setenv("VF_PROVISION_BINDING", "mock")
+    monkeypatch.setenv("VF_PROVISION_SSH_PUBLIC_KEY", "ssh-ed25519 " + "a" * 48)
     monkeypatch.setenv("VF_PROVISION_SYSTEM_BUDGET_USD_CAP", "1")
 
     before = TestClient(app).get("/approvals/approval-p4/forge-execution")
