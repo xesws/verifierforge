@@ -3206,7 +3206,7 @@ remains available through the Wake model scale-to-zero path.
 - [x] **F0 — branch and documentation gate.** Push the v0.34.2 review,
   branch from current main, reserve v0.35.0 docs, cherry-pick Nora commit
   `642e335`, and prove the untouched visual baseline still builds.
-- [ ] **F1 — typed API boundary.** Cover exactly 21 frozen operations,
+- [x] **F1 — typed API boundary.** Cover exactly 21 frozen operations,
   `VITE_VF_API_BASE_URL`, runtime Basic invitation, safe errors, and cold/
   fallback semantics without a backend change.
 - [ ] **F2 — five-page product wiring.** Discover/Forge/Job/Report/Ship consume

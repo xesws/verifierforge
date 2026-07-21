@@ -1,0 +1,25 @@
+export const FROZEN_OPERATIONS = [
+  ['GET', '/jobs'],
+  ['POST', '/jobs'],
+  ['GET', '/jobs/{job_id}'],
+  ['GET', '/jobs/{job_id}/metrics'],
+  ['GET', '/clusters'],
+  ['GET', '/clusters/{cluster_id}'],
+  ['POST', '/clusters/{cluster_id}/agent/analyze'],
+  ['GET', '/clusters/{cluster_id}/agent/decision'],
+  ['POST', '/agent-decisions/{decision_id}/approvals'],
+  ['GET', '/agent-decisions/{decision_id}/approval'],
+  ['POST', '/approvals/{approval_id}/start-forge'],
+  ['GET', '/approvals/{approval_id}/forge-execution'],
+  ['GET', '/clusters/{cluster_id}/routing'],
+  ['PUT', '/clusters/{cluster_id}/routing'],
+  ['GET', '/clusters/{cluster_id}/live-pass-rate'],
+  ['GET', '/clusters/{cluster_id}/sample-source'],
+  ['PUT', '/clusters/{cluster_id}/sample-source'],
+  ['GET', '/settings/provider-credentials/{provider}'],
+  ['PUT', '/settings/provider-credentials/{provider}'],
+  ['POST', '/serving/wake'],
+  ['GET', '/serving/status'],
+] as const
+
+export type FrozenOperation = (typeof FROZEN_OPERATIONS)[number]
