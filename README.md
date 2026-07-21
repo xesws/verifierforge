@@ -1,3 +1,15 @@
+<p align="center">
+  <img src="assets/brand/verifierforge-wordmark.svg" alt="VerifierForge" width="520" />
+</p>
+
+<p align="center"><strong>Turn repetitive, verifiable LLM work into an evidence-backed small-model forge.</strong></p>
+
+<p align="center">
+  <img alt="tests passing" src="https://img.shields.io/badge/tests-passing-00a67e" />
+  <img alt="version v0.36.0" src="https://img.shields.io/badge/version-v0.36.0-087cf0" />
+  <img alt="Python 3.11" src="https://img.shields.io/badge/python-3.11-17212b" />
+</p>
+
 # VerifierForge
 
 VerifierForge turns production traffic with a programmatic success criterion
@@ -8,6 +20,20 @@ disposable GPU path publishes results through durable storage.
 The v1 prototype is deliberately narrow and inspectable. NL→SQL is the proved
 vertical; the verifier is the source of truth; held-out data selects the model;
 and routing remains reversible.
+
+## Technical Deep Dive
+
+The full engineering account is available as a public, invitation-free
+[visual article](https://verifierforge-web.vercel.app/tech) and as the
+[versioned Markdown source](docs/blog/technical-deep-dive.md). It covers:
+
+- the executable NL→SQL verifier, GRPO group-relative update, and gate A;
+- the M3 quality run versus its deliberately imperfect random-reward
+  falsification reference;
+- eight-checkpoint held-out selection and why step 350 shipped;
+- the strict-schema Forge Agent and Gate C evaluator; and
+- disposable S3 workers, Supabase facts, capacity-aware provisioning, and
+  scale-to-zero serving—with limitations kept beside the numbers.
 
 ## What is proved in this repository
 
