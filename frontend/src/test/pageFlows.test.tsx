@@ -104,6 +104,10 @@ describe('reviewer product path', () => {
     seedJourney('ship')
     renderAt('/ship/data-pull-sql', apiFixture(ready))
     const run = await screen.findByRole('button', { name: /Run tuned completion/i })
+    const sample = screen.getByRole('button', { name: 'Aggregate hours' })
+    fireEvent.click(sample)
+    expect(sample).toHaveAttribute('aria-pressed', 'true')
+    expect(screen.getByLabelText('Natural-language query')).toHaveValue('For every project whose combined employee hours are no less than 100, output the project name and total hours, sorted by project name ascending.')
     fireEvent.click(run)
     expect(await screen.findByText('Result is ready')).toBeInTheDocument()
     expect(screen.getByText(/SELECT customer_id, SUM\(total\)/)).toBeInTheDocument()
@@ -111,6 +115,9 @@ describe('reviewer product path', () => {
     expect(screen.getByText('42')).toBeInTheDocument()
     expect(screen.getAllByText('tuned').length).toBeGreaterThan(0)
     expect(screen.getByText(/Canary is not consulted/i)).toBeInTheDocument()
+    const completionCall = vi.mocked(fetch).mock.calls.find(([input, init]) => new URL(String(input)).pathname === '/serving/tuned-completion' && init?.method === 'POST')
+    const completionBody = JSON.parse(String(completionCall?.[1]?.body)) as { messages: Array<{ role: string; content: string }> }
+    expect(completionBody.messages[1].content).toBe('For every project whose combined employee hours are no less than 100, output the project name and total hours, sorted by project name ascending.')
   })
 
   it('restores a valid session journey and resets it when leaving', async () => {

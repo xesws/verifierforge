@@ -8,7 +8,7 @@ import { PageHeader } from '../components/PageHeader'
 import { RoutingControl } from '../components/RoutingControl'
 import { StatusPill } from '../components/StatusPill'
 import { WakeModelControl } from '../components/WakeModelControl'
-import { FLAGSHIP_JOB_ID, SQL_SYSTEM_PROMPT } from '../data/presentation'
+import { FLAGSHIP_JOB_ID, SQL_PROMPT_EXAMPLES, SQL_SYSTEM_PROMPT } from '../data/presentation'
 import { useAuth } from '../state/AuthContext'
 import { useResource } from '../state/useResource'
 
@@ -32,7 +32,7 @@ export function ShipPage() {
   const [saving, setSaving] = useState(false)
   const [message, setMessage] = useState<string | null>(null)
   const [serving, setServing] = useState<ServingStatus | null>(null)
-  const [prompt, setPrompt] = useState('List the five customers with the highest total order value.')
+  const [prompt, setPrompt] = useState<string>(SQL_PROMPT_EXAMPLES[0].prompt)
   const [result, setResult] = useState<ProbeResult | null>(null)
   const [requestActivity, setRequestActivity] = useState<RequestActivity[]>([])
   const [completing, setCompleting] = useState(false)
@@ -89,6 +89,13 @@ export function ShipPage() {
     setMessage('SQL copied to the clipboard.')
   }
 
+  function choosePrompt(next: string) {
+    setPrompt(next)
+    setResult(null)
+    setRequestActivity([])
+    setMessage(null)
+  }
+
   return <div className="page ship-page">
     <PageHeader eyebrow="Ship / Data Pull SQL" title="Serve the selected checkpoint, then try it directly." description="Ship owns scale-to-zero serving, production canary policy, Guardian signals, and a tuned-only reviewer playground. Training and proof are already complete." action={<StatusPill status={serving?.state ?? 'cold'} />} />
     <section className="ship-banner reveal reveal-1"><div><PackageCheck size={20} /><span><strong>Selected artifact</strong><small>{FLAGSHIP_JOB_ID} · step 350</small></span></div><div><ShieldCheck size={20} /><span><strong>Held-out proof</strong><small>58.3% → 78.3% pass@1</small></span></div><span className="local-chip">Live API</span></section>
@@ -96,7 +103,14 @@ export function ShipPage() {
     <WakeModelControl onStatus={setServing} />
     <section className="completion-panel glass-panel reveal reveal-4">
       <div className="completion-intro"><span className="eyebrow"><Play size={13} /> Tuned-only reviewer probe</span><h2>Try one tuned SQL compilation</h2><p>{serving?.state === 'ready' ? 'The registry reports ready. This call goes directly to the tuned endpoint and never enters production canary selection.' : 'The endpoint is cold. Wake it above; reports remain available while you wait.'}</p></div>
-      <label className="completion-input"><span>Natural-language query</span><textarea value={prompt} onChange={(event) => setPrompt(event.target.value)} rows={4} disabled={completing} /></label>
+      <div className="completion-input">
+        <label htmlFor="tuned-sql-query">Natural-language query</label>
+        <textarea id="tuned-sql-query" value={prompt} onChange={(event) => choosePrompt(event.target.value)} rows={4} disabled={completing} />
+        <div className="prompt-examples" aria-label="Sample SQL questions">
+          <span>Try an example from the frozen schema</span>
+          <div>{SQL_PROMPT_EXAMPLES.map((example) => <button key={example.label} type="button" disabled={completing} aria-pressed={prompt === example.prompt} title={example.prompt} onClick={() => choosePrompt(example.prompt)}>{example.label}</button>)}</div>
+        </div>
+      </div>
       <button className="primary-button" type="button" disabled={serving?.state !== 'ready' || completing || !prompt.trim()} onClick={() => void tryCompletion()}>{completing ? <><Clock3 size={16} />Running · {(elapsedMs / 1000).toFixed(1)}s</> : <>Run tuned completion <Play size={15} /></>}</button>
       <section className="activity-console request-console" aria-label="Tuned completion activity"><header><TerminalSquare size={14} /><strong>Request activity</strong><span>{completing ? 'live' : result ? 'complete' : 'idle'}</span></header><ol role="log" aria-live="polite">{requestActivity.length ? requestActivity.map((line, index) => <li key={`${line.at}-${index}`}><time>{new Date(line.at).toLocaleTimeString()}</time><b>{line.state}</b><span>{line.detail}</span></li>) : <li><time>—</time><b>waiting</b><span>Wake the model, then run a query to see each request phase.</span></li>}</ol></section>
       <section className={`completion-output ${result ? 'has-result' : ''}`} aria-label="Tuned SQL result">
