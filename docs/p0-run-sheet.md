@@ -1,5 +1,17 @@
 # P0 Run Sheet — v0.6.1 data freeze
 
+## 2026-07-20 v0.36.1 — align report logo with product VF
+
+**Status:** planned; documentation gate created before implementation.
+
+- [ ] Replace the one-off graphite/checkmark mark with an SVG rendering of the
+  existing frontend `.brand-mark` visual language.
+- [ ] Regenerate README, `/tech`, and favicon assets from that single source.
+- [ ] Add identity regression coverage, validate, deploy, and verify the stable
+  `/tech` route.
+
+**Stop:** no layout or product-flow changes; the product mark is the authority.
+
 ## 2026-07-20 v0.36.0 — technical deep dive and brand placement
 
 **Status:** complete; documentation gate committed before implementation.
