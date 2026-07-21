@@ -1,4 +1,4 @@
-import { ArrowRight, Coins, Cpu, DatabaseZap, Gauge, Layers3, Link2, ShieldCheck, Sparkles } from 'lucide-react'
+import { ArrowRight, Coins, Cpu, DatabaseZap, Gauge, Layers3, Link2, LoaderCircle, ShieldCheck, Sparkles } from 'lucide-react'
 import { useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { ApiError } from '../api/client'
@@ -63,6 +63,7 @@ function SqlAnalysis({ cluster, onClusterReload }: { cluster: Cluster | null; on
   const [analysis, setAnalysis] = useState<AgentAnalysisResponse | null>(null)
   const [sourceUri, setSourceUri] = useState<string>(SQL_SAMPLE_SOURCE.uri)
   const [busy, setBusy] = useState<string | null>(null)
+  const [analysisStartedAt, setAnalysisStartedAt] = useState<number | null>(null)
   const [message, setMessage] = useState<string | null>(null)
 
   useEffect(() => {
@@ -92,12 +93,40 @@ function SqlAnalysis({ cluster, onClusterReload }: { cluster: Cluster | null; on
         <code>{cluster.approved_sample_source ? `${cluster.approved_sample_source.row_count} rows · ${cluster.approved_sample_source.sha256.slice(0, 12)}…` : 'Not yet approved'}</code>
       </div>
       <div className="analysis-actions">
-        <button className="primary-button" type="button" disabled={busy !== null} onClick={() => void run('analyze', async () => { if (!client) return; const result = await client.analyze(cluster.cluster_id, { force_refresh: true }); setAnalysis(result.data); journey.recordAnalysis(result.data); setMessage(result.data.decision.decision === 'forge' ? 'Opportunity confirmed. Forge is now unlocked.' : 'This workload does not pass the Forge decision gate yet.') })}><Sparkles size={16} />{busy === 'analyze' ? 'Analyzing…' : 'Analyze'}</button>
+        <button className="primary-button" type="button" aria-busy={busy === 'analyze'} aria-describedby={busy === 'analyze' ? 'agent-analysis-progress' : undefined} disabled={busy !== null} onClick={() => void run('analyze', async () => { if (!client) return; setAnalysis(null); setAnalysisStartedAt(Date.now()); try { const result = await client.analyze(cluster.cluster_id, { force_refresh: true }); setAnalysis(result.data); journey.recordAnalysis(result.data); setMessage(result.data.decision.decision === 'forge' ? 'Opportunity confirmed. Forge is now unlocked.' : 'This workload does not pass the Forge decision gate yet.') } finally { setAnalysisStartedAt(null) } })}><Sparkles size={16} />{busy === 'analyze' ? 'Analyzing…' : 'Analyze'}</button>
         <span>Analysis reads server-side traffic evidence, remains advisory, and cannot provision a GPU.</span>
       </div>
+      {busy === 'analyze' && analysisStartedAt !== null && <AgentAnalysisProgress startedAt={analysisStartedAt} />}
       {decision && <AgentDecisionCard analysis={analysis} />}
       {decision?.decision === 'forge' && decision.config && <div className="discovery-handoff"><div><strong>Discovery complete</strong><span>Review and authorize this exact proposal in Forge.</span></div><Link className="primary-button" to="/forge/new">Continue to Forge <ArrowRight size={16} /></Link></div>}
       {message && <div className="inline-notice" role="status">{message}</div>}
+    </section>
+  )
+}
+
+function AgentAnalysisProgress({ startedAt }: { startedAt: number }) {
+  const [elapsedSeconds, setElapsedSeconds] = useState(0)
+
+  useEffect(() => {
+    const update = () => setElapsedSeconds(Math.max(0, Math.floor((Date.now() - startedAt) / 1000)))
+    update()
+    const timer = window.setInterval(update, 1000)
+    return () => window.clearInterval(timer)
+  }, [startedAt])
+
+  return (
+    <section id="agent-analysis-progress" className="agent-analysis-progress" role="status" aria-live="polite" aria-label="Agent analysis progress">
+      <header>
+        <div><LoaderCircle className="analysis-spinner" size={17} /><strong>Live Agent analysis in progress</strong></div>
+        <span>{elapsedSeconds}s elapsed</span>
+      </header>
+      <div className="analysis-indeterminate" aria-hidden="true"><i /></div>
+      <ol>
+        <li className="complete"><i /><span><strong>Request dispatched</strong><small>The fresh-run request reached the API.</small></span></li>
+        <li className="active"><i /><span><strong>Agent evaluating evidence</strong><small>Traffic, samples, economics, and verifiability are being evaluated.</small></span></li>
+        <li><i /><span><strong>Validated receipt</strong><small>The exact tool trace and decision will appear when persistence completes.</small></span></li>
+      </ol>
+      <p>This is live elapsed time, not a fabricated percentage. Exact completed tool steps appear only in the audited receipt.</p>
     </section>
   )
 }

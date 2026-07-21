@@ -82,7 +82,7 @@ function apiFixture(serving: Record<string, unknown> = cold, agentAnalysis: Reco
   }
 }
 
-function renderAt(path: string, fetcher = apiFixture()) {
+function renderAt(path: string, fetcher: (path: string, method: string) => Response | Promise<Response> = apiFixture()) {
   window.history.replaceState({}, '', path)
   window.sessionStorage.setItem('verifierforge.invitation.session.v1', 'fixture-invite')
   vi.stubGlobal('fetch', vi.fn((input: RequestInfo | URL, init?: RequestInit) => fetcher(new URL(String(input)).pathname, init?.method ?? 'GET')))
@@ -162,6 +162,25 @@ describe('reviewer product path', () => {
     const receipt = await screen.findByLabelText('Agent run receipt')
     expect(receipt).toHaveTextContent('Deterministic mock · not a live model')
     expect(receipt).toHaveTextContent('trace-mock-1')
+  })
+
+  it('shows honest live progress while a fresh Agent request is pending', async () => {
+    const foreverPending = new Promise<Response>(() => undefined)
+    const fixture = apiFixture()
+    renderAt('/discover', (path, method) => path.endsWith('/agent/analyze') && method === 'POST' ? foreverPending : fixture(path, method))
+
+    const analyzeButton = await screen.findByRole('button', { name: 'Analyze' })
+    fireEvent.click(analyzeButton)
+
+    const progress = await screen.findByRole('status', { name: 'Agent analysis progress' })
+    expect(progress).toHaveTextContent('Live Agent analysis in progress')
+    expect(progress).toHaveTextContent('0s elapsed')
+    expect(progress).toHaveTextContent('Request dispatched')
+    expect(progress).toHaveTextContent('Agent evaluating evidence')
+    expect(progress).toHaveTextContent('Validated receipt')
+    expect(progress).toHaveTextContent('not a fabricated percentage')
+    expect(analyzeButton).toHaveAttribute('aria-busy', 'true')
+    expect(analyzeButton).toBeDisabled()
   })
 
   it('shows the complete tuned result and request activity instead of only an ID', async () => {
