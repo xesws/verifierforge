@@ -1,12 +1,12 @@
 # Frontend integration cheatsheet
 
-Last verified: **2026-07-20 · v0.35.3 candidate** from the fixed Railway public
-origin and Vercel production alias. The 23-operation boundary includes the
-v0.39.1 serving sleep action; the previous 22-operation boundary passed its
-secret-safe, no-Wake smoke against Supabase Postgres and the dynamic serving
-registry. The Forge Agent is
-deterministic mock and training autoprovision is off. Serving wake is an
-independent, invite-protected action with explicit spend confirmation.
+Last verified: **2026-07-21 · v0.39.1** from the fixed Railway public origin and
+Vercel production alias. The 23-operation boundary includes the serving sleep
+action; public acceptance returned authenticated HTTP 200/cold and rejected an
+unauthenticated shutdown with HTTP 401. The Forge Agent is the Gate-C-qualified
+real `gpt-5.6-luna` binding and training autoprovision is off. Serving wake is
+an independent, invite-protected action with explicit spend confirmation;
+Leave session now proves deletion before clearing browser state.
 
 Discover's **Input** path is the approved training/evaluation JSONL. Analyze
 does not send that repository path as `data_source`; it reads proxy traffic
