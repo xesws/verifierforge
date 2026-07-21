@@ -1,5 +1,18 @@
 # P0 Run Sheet — v0.6.1 data freeze
 
+## 2026-07-20 v0.37.1 — isolate mock provisioning from host SSH state
+
+**Status:** planned; documentation gate created before the test repair.
+
+- [x] **Version gate.** Record the clean-runner root cause, strict non-goals,
+  affected test/infrastructure areas, and validation plan.
+- [ ] **Fixture isolation.** Inject an explicit synthetic public key only into
+  the P4 mock lifecycle test; preserve live RunPod fail-closed behavior.
+- [ ] **Validation.** Pass empty-HOME reproduction, exact security selection,
+  full pytest, secret scan, compilation, and diff checks.
+- [ ] **Delivery.** Commit/push, require GitHub `security` green, and confirm
+  the docs/test-only Railway deployment plus production cleanup invariants.
+
 ## 2026-07-20 v0.37.0 — one-click demo traffic simulation
 
 **Status:** complete; deployed and publicly accepted.
