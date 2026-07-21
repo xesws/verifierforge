@@ -3309,14 +3309,19 @@ ESLint had zero warnings, and the production TypeScript/Vite build passed.
 
 ## 2026-07-20 v0.35.3 — Ship readiness messaging
 
-**Status:** in progress.
+**Status:** complete on deployed feature candidate.
 
 - [x] **Diagnosis.** Cold/loading Run used native disabled behavior with active
   styling and no local dependency explanation; hidden-tab polling also never
   resumed, so status could remain stale after the registry reached Ready.
-- [ ] **Messaging gate.** Show state-specific Wake → Ready → Run instructions,
+- [x] **Messaging gate.** Show state-specific Wake → Ready → Run instructions,
   explicit premature-click feedback, and honest disabled styling.
-- [ ] **Polling recovery.** Resume registry polling when a hidden tab becomes
+- [x] **Polling recovery.** Resume registry polling when a hidden tab becomes
   visible and cover the behavior with a regression test.
-- [ ] **Acceptance.** Run all frontend/repository gates and deploy the zero-cost
+- [x] **Acceptance.** Run all frontend/repository gates and deploy the zero-cost
   candidate without Wake or tuned inference.
+  - Vitest: 17 passed across three files; ESLint and production build passed.
+  - Pytest: `478 passed, 1 skipped`.
+  - Vercel: `dpl_9xpQvKHu3oq97Pd2gQNJ93NtXRt8`, stable alias unchanged; served
+    bundle contains cold/loading/blocked-click messaging.
+  - Spend: zero Wake and zero tuned completion requests.
