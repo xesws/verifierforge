@@ -31,7 +31,7 @@ export function InviteGate() {
   return (
     <div className="invite-screen">
       <form className="invite-card" onSubmit={submit}>
-        <span className="brand-mark" aria-hidden="true"><i>V</i><i>F</i></span>
+        <img className="brand-mark brand-mark-image" src="/favicon.svg" alt="" aria-hidden="true" />
         <span className="eyebrow">Reviewer access</span>
         <h1>Enter your invitation.</h1>
         <p>The code is held only for this browser session and is never placed in the URL or build.</p>

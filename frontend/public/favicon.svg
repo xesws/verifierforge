@@ -1,7 +1,15 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 96 96" role="img" aria-labelledby="vf-mark-title vf-mark-desc">
 <title id="vf-mark-title">VerifierForge mark</title>
-<desc id="vf-mark-desc">A graphite VF monogram crossed by a blue verification stroke.</desc>
-<rect width="96" height="96" rx="26" fill="#17212b"/>
-<path d="M22 25h13l13 35 13-35h13L54 73H42L22 25Z" fill="#fff"/>
-<path d="M18 68 39 47l11 10 29-31" fill="none" stroke="#087cf0" stroke-width="8" stroke-linecap="round" stroke-linejoin="round"/>
+<desc id="vf-mark-desc">The product VF monogram on its blue-to-green gradient tile.</desc>
+<defs>
+<linearGradient id="vf-product-gradient" x1="0" y1="0" x2="1" y2="1">
+<stop offset="0" stop-color="#1488f4"/>
+<stop offset="0.55" stop-color="#0872dd"/>
+<stop offset="1" stop-color="#00a67e"/>
+</linearGradient>
+</defs>
+<rect width="96" height="96" rx="32" fill="url(#vf-product-gradient)"/>
+<text x="18" y="39" fill="#fff" font-family="Manrope,Inter,Arial,sans-serif" font-size="30" font-weight="700">V</text>
+<text x="59" y="80" fill="#fff" font-family="Manrope,Inter,Arial,sans-serif" font-size="30" font-weight="700">F</text>
+<path d="M17 73 79 18" fill="none" stroke="#fff" stroke-opacity=".5" stroke-width="3" stroke-linecap="round"/>
 </svg>

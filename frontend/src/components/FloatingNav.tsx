@@ -24,7 +24,7 @@ export function FloatingNav() {
   return (
     <aside className="floating-nav" aria-label="Primary navigation">
       <div className="brand-lockup" aria-label="VerifierForge">
-        <span className="brand-mark" aria-hidden="true"><i>V</i><i>F</i></span>
+        <img className="brand-mark brand-mark-image" src="/favicon.svg" alt="" aria-hidden="true" />
         <span className="brand-name">Verifier<br />Forge</span>
       </div>
       <nav className="nav-links">

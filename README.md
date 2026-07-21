@@ -6,7 +6,7 @@
 
 <p align="center">
   <img alt="tests passing" src="https://img.shields.io/badge/tests-passing-00a67e" />
-  <img alt="version v0.36.0" src="https://img.shields.io/badge/version-v0.36.0-087cf0" />
+  <img alt="version v0.36.1" src="https://img.shields.io/badge/version-v0.36.1-087cf0" />
   <img alt="Python 3.11" src="https://img.shields.io/badge/python-3.11-17212b" />
 </p>
 

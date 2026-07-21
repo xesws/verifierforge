@@ -62,6 +62,20 @@ def test_favicon_is_the_canonical_mark() -> None:
     assert mark.read_bytes() == favicon.read_bytes()
 
 
+def test_brand_mark_matches_the_product_vf_visual_language() -> None:
+    root = ET.fromstring(
+        (build_blog_assets.BRAND_DIR / "verifierforge-mark.svg").read_text()
+    )
+    gradient = root.find(f".//{SVG}linearGradient[@id='vf-product-gradient']")
+    assert gradient is not None
+    assert [stop.attrib["stop-color"] for stop in gradient.findall(f"{SVG}stop")] == [
+        "#1488f4",
+        "#0872dd",
+        "#00a67e",
+    ]
+    assert [node.text for node in root.findall(f"{SVG}text")] == ["V", "F"]
+
+
 def test_frontend_bundle_is_generated_from_the_canonical_sources() -> None:
     web = build_blog_assets.WEB_CONTENT_DIR
     assert (web / "technical-deep-dive.md").read_bytes() == (
