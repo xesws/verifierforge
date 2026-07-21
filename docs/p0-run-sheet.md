@@ -3287,3 +3287,16 @@ ESLint had zero warnings, and the production TypeScript/Vite build passed.
   - Public Analyze evidence: HTTP 200, `cluster_id=data-pull-sql`,
     `decision=forge`, config present, request body `{}`, mock-bound/cached and
     therefore zero paid provider action.
+
+## 2026-07-20 v0.35.2 — Ship sample prompts
+
+**Status:** in progress.
+
+- [x] **Scope.** Replace the schema-incompatible customer-order default and
+  add six one-click examples sourced from the frozen employee/project domain.
+- [ ] **UI and accessibility.** Selection fills but never submits, selected
+  state is visible/semantic, and chips remain usable responsively.
+- [ ] **Regression.** Prove the chosen prompt reaches the existing tuned-only
+  request unchanged; run frontend and repository suites.
+- [ ] **Deployment.** Publish the zero-cost Vercel candidate and verify its
+  bundle; do not Wake or call the tuned model.
