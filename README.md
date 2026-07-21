@@ -383,7 +383,65 @@ train or replace the final Qwen specialist model.
 
 ## How we worked with Codex
 
-### 2026-07-21 — v0.38.0 through v0.39.1 reviewer-truth log
+### How we built this with Codex
+
+One person and Codex built VerifierForge in eight days across four operating
+environments: a local laptop, SSH-connected GPU training pods, managed cloud
+control planes, and temporary machines provisioned by the system itself.
+
+### The operating loop for every development wave
+
+1. **Write the operating order first.** Before implementation, each wave began
+   with a versioned work order defining the objective, acceptance gates, budget
+   ceiling, and explicit stop conditions.
+2. **Plan deeply, then ask for approval.** Codex produced an execution plan and
+   the owner reviewed the reasoning before authorizing implementation or any
+   paid operation.
+3. **Execute autonomously across environments.** Once approved, Codex operated
+   the laptop, SSH pods, and cloud services, and recovered from incidents such
+   as port remapping, dependency drift, and a full network volume.
+4. **Make every wave durable.** Each wave wrote a mechanically increasing
+   record under `docs/versions/`; milestones received semantic Git tags rather
+   than being inferred from the latest commit.
+5. **Pass the gates before integration.** A wave closed only after its tests,
+   secret scan, and applicable evaluation gate passed. Only the frontend track
+   used a feature branch; it was reviewed and merged back so development
+   converged instead of accumulating long-lived branches.
+
+### The build in hard numbers
+
+- **8 calendar days**, from July 14 through July 21, 2026.
+- **107 version records** from `v0.1.x` through `v0.39.5`, representing
+  **106 unique version numbers**; `v0.18.0` intentionally has separate provider
+  and frontend records.
+- **More than 80 autonomous development waves**, with a verified
+  **485-passing-test baseline** at the Technical Deep Dive milestone (plus one
+  expected skip).
+- **16 semantic Git tags** covering data freeze, Agent Gate C, database
+  migration, hosted delivery, provisioning, and scale-to-zero serving.
+- **Four machine shapes:** the local development laptop; directly managed L4,
+  RTX PRO 6000 Blackwell, and H100 SXM GPU pods; Railway, Vercel, Supabase, S3,
+  and RunPod control planes; and short-lived RunPod workers created and retired
+  by VerifierForge itself.
+
+### One long-lived session
+
+Thanks to Codex running on GPT-5.6 Sol Ultra, the build remained in one
+long-lived Codex session for roughly seven days without a crash or context
+reset: plans, incident evidence, and version history stayed available
+throughout. The model roles were deliberately separate: Codex on GPT-5.6 Sol
+Ultra was the development partner, while GPT-5.6 Luna became the product's
+runtime decision brain behind strict tools, schemas, gates, and human approval.
+
+Evidence lives in [`docs/versions/`](docs/versions/), the
+[`P0 run sheet`](docs/p0-run-sheet.md), and the repository's
+[GitHub tags](https://github.com/xesws/verifierforge/tags).
+
+### Wave-by-wave log
+
+The complete wave-by-wave record follows; the methodology is above.
+
+#### 2026-07-21 — v0.38.0 through v0.39.1 reviewer-truth log
 
 1. **The demo story no longer matched the product.** Planning copy still used
    an old quantitative-finance persona, but the shipped dataset contains
@@ -416,7 +474,7 @@ train or replace the final Qwen specialist model.
    target absence, and zero managed inventory. Closing a tab still relies on
    the 30-minute idle reaper; the UI does not claim otherwise.
 
-### 2026-07-20 — v0.32.3 through v0.37.1 hosted-product log
+#### 2026-07-20 — v0.32.3 through v0.37.1 hosted-product log
 
 1. **The frozen report contract existed but returned incomplete evidence.**
    Supabase-backed Job reports had `arena=null` and
@@ -500,7 +558,7 @@ train or replace the final Qwen specialist model.
    Codex injected a synthetic public key only in the test fixture—leaving live
    RunPod validation fail-closed—and restored CI in `dd2695f` (`v0.37.1`).
 
-### 2026-07-19 — v0.29.0 through v0.32.2 product-delivery log
+#### 2026-07-19 — v0.29.0 through v0.32.2 product-delivery log
 
 1. **Approval stopped one step before execution.** P2 could run a bounded
    worker, but the product recorded only an approval and had no safe way to use
@@ -544,7 +602,7 @@ train or replace the final Qwen specialist model.
    (`v0.32.2`); multi-gigabyte weights, `.safetensors`, invitation codes, and
    secrets remained excluded.
 
-### 2026-07-18–19 — v0.18.0 through v0.28.5 product/infrastructure log
+#### 2026-07-18–19 — v0.18.0 through v0.28.5 product/infrastructure log
 
 1. **The product had evidence but no decision layer.** The human specified an
    advisory Forge Agent with read-only tools, strict action space, a live Gate
@@ -585,7 +643,7 @@ train or replace the final Qwen specialist model.
    created `provisioner-p2-live`. The `$0.177846` run estimate is not presented
    as settled billing.
 
-### 2026-07-14 — v0.2.0 / v0.3.0 infrastructure log
+#### 2026-07-14 — v0.2.0 / v0.3.0 infrastructure log
 
 1. **Laptop/GPU split — problem:** a rented GPU pod can disappear, so it could not be the owner of the development session or durable training state. **Diagnosis:** the human established that the laptop holds the main Codex session and acts as the development host; RunPod is a stateless SSH-driven compute executor. All persistent training state lives on the `/workspace` network volume and crosses a worker lifetime through the pluggable `Storage` contract. **Decision and ownership:** this architecture and its failure assumption came from the human specification. Codex implemented the corresponding control plane in `a41cc0c` (`scripts/vf` subcommands `bootstrap`, `train`, `watch`, `logs`, `status`, `kill`, and `model`) and the tmux-detach discipline, so a job survives the initiating SSH connection rather than the pod being treated as a long-lived workstation.
 
@@ -595,7 +653,7 @@ train or replace the final Qwen specialist model.
 
 4. **D1 acceptance gate — problem:** before writing any D1 implementation code, the human required proof of the full laptop → pod → laptop loop, not merely a successful SSH login. **Diagnosis:** the pre-code D1 gate produced a GPU-free fake-trainer run of 150 steps in detached tmux on the pod; `vf watch` rsynced its metrics to the laptop and the local/remote JSONL SHA-256 values matched (`a30b250de8932c6ffef67ab14ade294d51d881df201a2640eafe37e11295ab00`). The local API then served the synchronized curve from `GET /jobs/demo1/metrics` (on port 8010 because port 8000 was occupied). To close an evidence gap in the initial record, Codex also ran an isolated `resumecheck`: it checkpointed at step 20, was stopped with `vf kill`, then restarted with the log `Resuming resumecheck from step 20` followed by step 21; its prior metrics remained append-only. **Decision and ownership:** the human set the gate and the no-real-training boundary; Codex implemented the fake trainer, atomic checkpoint path, rsync exclusions, and evidence capture in `a41cc0c` and `d76a219`. That gave us a tested control plane before provisioning the real runtime.
 
-### 2026-07-15 — v0.4.x D2 engineering log
+#### 2026-07-15 — v0.4.x D2 engineering log
 
 1. **Real GRPO runtime — problem:** the D2 specification required a real one-L4 GRPO smoke, but verl 0.8's PPO path still imported FlashAttention padding helpers even when Qwen was configured for SDPA. **Diagnosis:** the first real preflight reached the trainer and failed with `ModuleNotFoundError: No module named 'flash_attn'`; the direct eager fallback in `5b43320` then made Ray's control processes import the trainer path and Ray timed out waiting for its metrics-agent port. **Decision and ownership:** the human-owned D2 gate required a real run, not a fake replacement. Codex made the runtime compatibility judgment in `1b6effb`: install a lazy import hook only when `verl.utils.attention_utils` resolves the missing helpers, with Transformers 4.57.6 pinned by `575ba55`. The resulting pod stack was Python 3.12.3, torch 2.8.0+cu128, vLLM 0.10.2, verl 0.8.0, and Ray 2.56.0; Python 3.12 remains a documented pod deviation from the repository's 3.11 target.
 
