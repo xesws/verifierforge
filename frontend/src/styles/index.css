@@ -178,6 +178,7 @@ h3 { letter-spacing: -.02em; }
 .tech-proof-strip { margin-top: 28px; display: grid; grid-template-columns: repeat(3,1fr); gap: 1px; overflow: hidden; border: 1px solid var(--hairline); border-radius: 16px; background: var(--hairline); }
 .tech-proof-strip span { padding: 14px; display: grid; gap: 2px; color: var(--muted); background: rgba(255,255,255,.62); font-size: 9px; }
 .tech-proof-strip strong { color: var(--graphite); font-size: 14px; }
+.tech-print-meta { display: none; }
 .tech-chapter { scroll-margin-top: 20px; overflow: hidden; border-radius: 24px; }
 .tech-chapter > summary { padding: 22px 26px; display: flex; justify-content: space-between; align-items: center; gap: 20px; cursor: pointer; list-style: none; }
 .tech-chapter > summary::-webkit-details-marker { display: none; }
@@ -200,6 +201,50 @@ h3 { letter-spacing: -.02em; }
 .tech-markdown th { color: #315160; background: rgba(225,241,244,.75); }
 .tech-markdown .katex-display { max-width: 100%; padding: 14px 0; overflow-x: auto; overflow-y: hidden; }
 .tech-nav-item { min-height: 49px; margin-top: 9px; border-top: 1px solid var(--hairline); border-radius: 12px; }
+
+@media print {
+  @page { size: A4; margin: 18mm 14mm 18mm; }
+  html, body, #root { min-width: 0; background: #fff !important; }
+  body { overflow: visible; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+  body::after, .ambient { display: none !important; }
+  .tech-shell { min-height: 0; padding: 0; background: #fff; }
+  .tech-topbar { min-height: 15mm; margin: 0 0 5mm; }
+  .tech-brand img { width: 72mm; height: 14mm; }
+  .tech-product-link { display: none; }
+  .tech-layout { max-width: none; display: flex; flex-direction: column; gap: 0; }
+  .tech-article { display: contents; }
+  .tech-hero { order: 1; min-height: 195mm; padding: 18mm 14mm; display: flex; flex-direction: column; justify-content: center; break-inside: avoid-page; break-after: page; border: 1px solid #d7e5e7; border-radius: 9mm; box-shadow: none; background: linear-gradient(145deg,#f6faf9,#edf7f6); }
+  .tech-hero h1 { max-width: 160mm; margin-bottom: 8mm; font-size: 34pt; line-height: 1.02; }
+  .tech-hero > p { max-width: 155mm; font-size: 11pt; line-height: 1.65; }
+  .tech-proof-strip { margin-top: 8mm; }
+  .tech-proof-strip span { padding: 5mm; font-size: 7.5pt; }
+  .tech-proof-strip strong { font-size: 11pt; }
+  .tech-print-meta { margin: 7mm 0 0 !important; display: block; color: #62717d; font-family: 'IBM Plex Mono', monospace; font-size: 8pt !important; text-transform: uppercase; letter-spacing: .08em; }
+  .tech-toc { order: 2; min-height: 235mm; max-height: none; padding: 14mm 12mm; position: static; overflow: visible; break-after: page; border: 1px solid #dce8ea; border-radius: 6mm; box-shadow: none; background: #f8fbfb; }
+  .tech-toc > strong { margin: 2mm 0 7mm; font-size: 20pt; }
+  .tech-toc nav { grid-template-columns: repeat(2,minmax(0,1fr)); }
+  .tech-toc nav a { min-height: 17mm; padding: 4mm 2mm; align-content: center; grid-template-columns: 10mm 1fr; font-size: 9pt; }
+  .tech-toc nav span { font-size: 7.5pt; }
+  .tech-source-link { margin-top: 8mm; font-size: 8pt; }
+  .tech-chapter { order: 3; overflow: visible; break-before: page; border: 0; border-radius: 0; box-shadow: none; background: transparent; backdrop-filter: none; }
+  .tech-chapter > summary { padding: 0 0 6mm; align-items: flex-start; break-after: avoid-page; border-bottom: 2px solid #b9d9d4 !important; }
+  .tech-chapter > summary span { max-width: 165mm; display: grid; grid-template-columns: 13mm 1fr; align-items: baseline; color: #17212b; font-size: 22pt; line-height: 1.12; }
+  .tech-chapter > summary span::before { content: attr(data-chapter-number); color: #008a69; font-family: 'IBM Plex Mono', monospace; font-size: 9pt; letter-spacing: .08em; }
+  .tech-chapter > summary small { display: none; }
+  .tech-markdown { padding: 7mm 0 0; color: #314650; font-size: 9.5pt; line-height: 1.58; }
+  .tech-markdown p, .tech-markdown li { max-width: none; orphans: 3; widows: 3; }
+  .tech-markdown h3 { margin: 9mm 0 3mm; break-after: avoid-page; font-size: 15pt; }
+  .tech-markdown h4 { break-after: avoid-page; }
+  .tech-markdown img { max-height: 150mm; margin: 6mm 0 3mm; object-fit: contain; break-inside: avoid-page; border-radius: 4mm; box-shadow: none; }
+  .tech-markdown blockquote, .tech-markdown pre, .tech-markdown table, .tech-markdown .katex-display { break-inside: avoid-page; }
+  .tech-markdown table { font-size: 7.5pt; }
+  .tech-markdown th, .tech-markdown td { padding: 2.5mm; }
+  .tech-markdown pre { white-space: pre-wrap; font-size: 7.5pt; }
+  .tech-markdown a { color: #075fae; text-decoration-thickness: .5pt; }
+  #grpo-with-executable-rewards .tech-markdown { font-size: 8.8pt; line-height: 1.45; }
+  #grpo-with-executable-rewards .tech-markdown img { margin-block: 4mm 2mm; }
+  #grpo-with-executable-rewards .tech-markdown .katex-display { padding-block: 1.5mm; }
+}
 
 /* Entrance motion */
 .reveal { animation: reveal-up .58s cubic-bezier(.2,.7,.2,1) both; }.reveal-1 { animation-delay: 70ms; }.reveal-2 { animation-delay: 140ms; }.reveal-3 { animation-delay: 210ms; }.reveal-4 { animation-delay: 280ms; }.reveal-5 { animation-delay: 350ms; }

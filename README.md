@@ -127,8 +127,9 @@ the frozen held-out exam above.*
 ## Technical Deep Dive
 
 The full engineering account is available as a public, invitation-free
-[visual article](https://verifierforge-web.vercel.app/tech) and as the
-[versioned Markdown source](docs/blog/technical-deep-dive.md). It covers:
+[visual article](https://verifierforge-web.vercel.app/tech), a single
+[submission-ready PDF](output/pdf/verifierforge-technical-deep-dive.pdf), and
+the [versioned Markdown source](docs/blog/technical-deep-dive.md). It covers:
 
 - the executable NL→SQL verifier, GRPO group-relative update, and gate A;
 - the M3 quality run versus its deliberately imperfect random-reward

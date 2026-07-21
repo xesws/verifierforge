@@ -44,19 +44,18 @@ function splitArticle(markdown: string): { intro: string; chapters: Chapter[] } 
   }
 }
 
-const markdownComponents: Components = {
-  img: ({ src, alt }) => <img src={src ? figures[src] ?? src : undefined} alt={alt ?? ''} loading="lazy" />,
-  a: ({ href = '', children }) => {
-    const resolved = href.startsWith('#') || href.startsWith('http')
-      ? href
-      : new URL(href, 'https://github.com/xesws/verifierforge/blob/main/docs/blog/').href
-    return <a href={resolved} target={resolved.startsWith('http') ? '_blank' : undefined} rel="noreferrer">
-      {children}{resolved.startsWith('http') && <ExternalLink size={12} aria-hidden="true" />}
-    </a>
-  },
-}
-
-function Markdown({ children }: { children: string }) {
+function Markdown({ children, eagerImages = false }: { children: string; eagerImages?: boolean }) {
+  const markdownComponents: Components = {
+    img: ({ src, alt }) => <img src={src ? figures[src] ?? src : undefined} alt={alt ?? ''} loading={eagerImages ? 'eager' : 'lazy'} />,
+    a: ({ href = '', children: linkChildren }) => {
+      const resolved = href.startsWith('#') || href.startsWith('http')
+        ? href
+        : new URL(href, 'https://github.com/xesws/verifierforge/blob/main/docs/blog/').href
+      return <a href={resolved} target={resolved.startsWith('http') ? '_blank' : undefined} rel="noreferrer">
+        {linkChildren}{resolved.startsWith('http') && <ExternalLink size={12} aria-hidden="true" />}
+      </a>
+    },
+  }
   return (
     <ReactMarkdown components={markdownComponents} remarkPlugins={[remarkGfm, remarkMath]} rehypePlugins={[rehypeKatex]}>
       {children}
@@ -66,13 +65,14 @@ function Markdown({ children }: { children: string }) {
 
 export function TechPage() {
   const content = useMemo(() => splitArticle(article), [])
+  const printMode = useMemo(() => new URLSearchParams(window.location.search).get('print') === '1', [])
   return (
-    <div className="tech-shell">
+    <div className={`tech-shell${printMode ? ' tech-print-export' : ''}`} data-chapter-count={content.chapters.length}>
       <header className="tech-topbar">
         <Link to="/discover" className="tech-brand" aria-label="VerifierForge product">
           <img src={wordmark} alt="VerifierForge" />
         </Link>
-        <Link to="/discover" className="secondary-button"><ArrowLeft size={15} />Open the product</Link>
+        <Link to="/discover" className="secondary-button tech-product-link"><ArrowLeft size={15} />Open the product</Link>
       </header>
       <main className="tech-layout" id="main-content">
         <aside className="tech-toc glass-panel" aria-label="Article contents">
@@ -89,18 +89,19 @@ export function TechPage() {
         </aside>
         <article className="tech-article">
           <section className="tech-hero glass-panel">
-            <span className="eyebrow">VerifierForge · v0.36.0</span>
-            <Markdown>{content.intro}</Markdown>
+            <span className="eyebrow">VerifierForge · v0.40.0 evidence edition</span>
+            <Markdown eagerImages={printMode}>{content.intro}</Markdown>
             <div className="tech-proof-strip">
               <span><strong>58.3% → 78.3%</strong> held-out pass@1</span>
               <span><strong>8 checkpoints</strong> evaluated</span>
               <span><strong>6 figures</strong> generated from evidence</span>
             </div>
+            <p className="tech-print-meta">12 chapters · 6 evidence figures · prepared 2026-07-21</p>
           </section>
-          {content.chapters.map((chapter) => (
+          {content.chapters.map((chapter, index) => (
             <details className="tech-chapter glass-panel" id={chapter.slug} key={chapter.slug} open>
-              <summary><span>{chapter.title}</span><small>collapse / expand</small></summary>
-              <div className="tech-markdown"><Markdown>{chapter.markdown}</Markdown></div>
+              <summary><span data-chapter-number={String(index + 1).padStart(2, '0')}>{chapter.title}</span><small>collapse / expand</small></summary>
+              <div className="tech-markdown"><Markdown eagerImages={printMode}>{chapter.markdown}</Markdown></div>
             </details>
           ))}
         </article>
