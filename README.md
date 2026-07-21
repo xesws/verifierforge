@@ -359,6 +359,27 @@ BYO credentials through Settings and keep that fallback unset.
   customer credentials.
 
 
+## How we used GPT-5.6
+
+GPT-5.6 had two distinct jobs in VerifierForge. It helped build the product,
+and it became part of the product's governed intelligence layer; it did **not**
+train or replace the final Qwen specialist model.
+
+1. **Collaborative development with Soul Ultra.** GPT-5.6 worked alongside
+   Soul Ultra during implementation, review, debugging, and technical
+   documentation. The two-model workflow gave the project a second reasoning
+   path for checking designs and implementation decisions while the evidence
+   and repository remained the source of truth.
+
+2. **Agent decisions and verifier generation.** `gpt-5.6-luna` powers the
+   Forge Agent Layer through the Responses API: it calls four read-only tools
+   and must exit through a strict `AgentDecision` schema before a human can
+   approve any paid action. GPT-5.6 was also used to generate the candidate
+   C-code Verifier during verifier authoring. That generated verifier was not
+   trusted as a finished artifact: its code and behavior still passed through
+   review, tests, and the sandboxed validation boundary.
+
+
 ## How we worked with Codex
 
 ### 2026-07-21 — v0.38.0 through v0.39.1 reviewer-truth log
