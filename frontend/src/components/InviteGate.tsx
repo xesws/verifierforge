@@ -1,5 +1,6 @@
 import { type FormEvent, useState } from 'react'
-import { KeyRound, ShieldCheck } from 'lucide-react'
+import { BookOpenText, KeyRound, ShieldCheck } from 'lucide-react'
+import { Link } from 'react-router-dom'
 import { VerifierForgeClient, configuredApiBaseUrl } from '../api/client'
 import { useAuth } from '../state/AuthContext'
 
@@ -37,6 +38,7 @@ export function InviteGate() {
         {configurationError ? <div className="inline-notice error">{configurationError}</div> : <label><span><KeyRound size={15} />Invitation code</span><input type="password" value={value} onChange={(event) => setValue(event.target.value)} autoComplete="one-time-code" required /></label>}
         {error && <div className="inline-notice error" role="alert">{error}</div>}
         <button className="primary-button" type="submit" disabled={checking || Boolean(configurationError)}><ShieldCheck size={16} />{checking ? 'Checking…' : 'Enter VerifierForge'}</button>
+        <Link className="invite-tech-link" to="/tech"><BookOpenText size={15} />Read the technical deep dive — no invitation required</Link>
       </form>
     </div>
   )

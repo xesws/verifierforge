@@ -1,7 +1,7 @@
 {
   "name": "verifierforge-web",
   "private": true,
-  "version": "0.35.8",
+  "version": "0.36.0",
   "type": "module",
   "scripts": {
     "dev": "vite",
@@ -13,11 +13,16 @@
   "dependencies": {
     "@fontsource/ibm-plex-mono": "^5.2.6",
     "@fontsource/manrope": "^5.2.6",
+    "katex": "^0.16.22",
     "lucide-react": "^0.468.0",
     "react": "^18.3.1",
     "react-dom": "^18.3.1",
+    "react-markdown": "^10.1.0",
     "react-router-dom": "^7.1.1",
     "recharts": "^2.15.0",
+    "rehype-katex": "^7.0.1",
+    "remark-gfm": "^4.0.1",
+    "remark-math": "^6.0.0",
     "sql.js": "1.14.1"
   },
   "devDependencies": {

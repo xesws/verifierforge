@@ -1,3 +1,4 @@
+import { lazy, Suspense } from 'react'
 import { BrowserRouter, Navigate, Route, Routes } from 'react-router-dom'
 import { AppShell } from './AppShell'
 import { DiscoverPage } from '../pages/DiscoverPage'
@@ -7,10 +8,13 @@ import { ReportPage } from '../pages/ReportPage'
 import { ShipPage } from '../pages/ShipPage'
 import { JourneyGuard } from '../components/JourneyGuard'
 
+const TechPage = lazy(() => import('../pages/TechPage').then(({ TechPage: page }) => ({ default: page })))
+
 export function App() {
   return (
     <BrowserRouter>
       <Routes>
+        <Route path="tech" element={<Suspense fallback={<div className="tech-loading" role="status">Loading the evidence…</div>}><TechPage /></Suspense>} />
         <Route element={<AppShell />}>
           <Route index element={<Navigate to="/discover" replace />} />
           <Route path="discover" element={<DiscoverPage />} />

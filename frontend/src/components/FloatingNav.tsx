@@ -1,4 +1,4 @@
-import { BarChart3, FlaskConical, LockKeyhole, PackageCheck, Radar, ShieldCheck } from 'lucide-react'
+import { BarChart3, BookOpenText, FlaskConical, LockKeyhole, PackageCheck, Radar, ShieldCheck } from 'lucide-react'
 import { NavLink } from 'react-router-dom'
 import { FLAGSHIP_JOB_ID } from '../data/presentation'
 import { journeyAllows, type JourneyStage, useJourney } from '../state/JourneyContext'
@@ -45,6 +45,10 @@ export function FloatingNav() {
           )
         })}
       </nav>
+      <NavLink to="/tech" className={({ isActive }) => `nav-item tech-nav-item${isActive ? ' active' : ''}`}>
+        <BookOpenText size={18} strokeWidth={1.8} aria-hidden="true" />
+        <span>Tech</span>
+      </NavLink>
       <div className="nav-evidence">
         <span><i className="status-dot" />Live API</span>
         <span><ShieldCheck size={13} aria-hidden="true" />Evidence locked</span>
